@@ -19,12 +19,12 @@ test('应用可启动并渲染主界面', async () => {
 
     // 品牌与导航
     await expect(window.locator('.brand-name')).toHaveText('Teyvat Arkhon')
-    await expect(window.locator('.nav-item')).toHaveCount(6)
+    await expect(window.locator('.nav-item')).toHaveCount(7)
 
     // 默认进入总览页：内核状态卡片可见
     await expect(window.locator('.hero-text h1')).toBeVisible()
 
-    // 导航到设置页（第 6 项）
+    // 导航到设置页（第 6 项，最后一个是日志页）
     await window.locator('.nav-item').nth(5).click()
     await expect(window.locator('h3', { hasText: '外观与语言' })).toBeVisible()
 
