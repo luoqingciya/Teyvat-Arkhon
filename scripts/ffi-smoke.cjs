@@ -5,7 +5,7 @@ const path = require('node:path')
 const fs = require('node:fs')
 const os = require('node:os')
 
-const ROOT = 'd:/Project/Teyvat-Arkhon'
+const ROOT = path.resolve(__dirname, '..')
 const native = require(path.join(ROOT, 'packages/native/bin/mihomo_binding.node'))
 const LIBMIHOMO = path.join(ROOT, 'packages/native/bridge/libmihomo.dll')
 
