@@ -3,6 +3,7 @@ import type { CoreStatus, SystemProxyState } from '@teyvat-arkhon/shared'
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 import type { SystemProxyController } from './system-proxy'
 import type { WindowsServiceManager } from './system-service'
+import { setPortableEnabled, isPortableMode } from './paths'
 
 /** 订阅主进程错误事件的内容推送到渲染进程 */
 export function createIpc(
@@ -27,6 +28,11 @@ export function createIpc(
   ipcMain.handle('core:stop', () => service.stop())
 
   ipcMain.handle('core:get-connections', () => service.getConnections())
+  ipcMain.handle('core:close-connection', (_e, id: string) => service.closeConnection(id))
+  ipcMain.handle('core:close-all-connections', () => service.closeAllConnections())
+
+  ipcMain.handle('config:get-active', () => service.getActiveConfig())
+  ipcMain.handle('config:save-active', (_e, content: string) => service.saveActiveConfig(content))
 
   ipcMain.handle('core:get-tun', () => service.getTunEnabled())
   ipcMain.handle('core:set-tun', (_e, enabled: boolean) => service.setTunEnabled(enabled))
@@ -52,4 +58,10 @@ export function createIpc(
   ipcMain.handle('system-proxy:set', async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))
 
   ipcMain.handle('app:version', () => app.getVersion())
+
+  ipcMain.handle('app:data-info', () => ({
+    dataDir: app.getPath('userData'),
+    portable: isPortableMode(app)
+  }))
+  ipcMain.handle('app:set-portable', (_e, enabled: boolean) => setPortableEnabled(app, enabled))
 }

@@ -7,6 +7,14 @@ import { createIpc } from './ipc'
 import { createSystemProxyController } from './system-proxy'
 import { createServiceManager } from './system-service'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
+import { setupAutoUpdater } from './updater'
+import { bootstrapDataDir } from './paths'
+
+// 数据目录策略（须在 ready 前确定）：便携模式数据跟随运行目录
+const dataLayout = bootstrapDataDir(app)
+console.log(
+  `[teyvat-arkhon] 运行数据目录: ${dataLayout.dataDir}（${dataLayout.portable ? '便携模式' : '系统用户目录'}）`
+)
 
 let service: CoreService | null = null
 let mainWindow: BrowserWindow | null = null
@@ -88,6 +96,8 @@ async function createWindow(): Promise<void> {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0b1120',
+    // Windows 窗口/任务栏图标（打包安装后改用 exe 内置图标，此处路径不存在自动忽略）
+    icon: join(app.getAppPath(), 'build', 'icon.png'),
     title: 'Teyvat Arkhon',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -168,6 +178,8 @@ if (!gotLock) {
 
     trafficMonitor = createTrafficMonitor(() => service)
     trafficMonitor.start()
+
+    setupAutoUpdater()
 
     await createWindow()
 

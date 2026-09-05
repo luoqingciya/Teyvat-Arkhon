@@ -148,6 +148,14 @@ export class FFICoreDriver implements CoreDriver {
     }
   }
 
+  async closeConnection(id: string): Promise<void> {
+    await this.ensureRest().delete(`/connections/${encodeURIComponent(id)}`)
+  }
+
+  async closeAllConnections(): Promise<void> {
+    await this.ensureRest().delete('/connections')
+  }
+
   async close(): Promise<void> {
     if (this.loaded) {
       try {

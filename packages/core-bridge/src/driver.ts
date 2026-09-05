@@ -28,6 +28,12 @@ export interface CoreDriver {
   /** 获取活跃连接与累计流量 */
   getConnections(): Promise<{ downloadTotal: number; uploadTotal: number; connections: ConnectionInfo[] }>
 
+  /** 关闭指定连接 */
+  closeConnection(id: string): Promise<void>
+
+  /** 关闭全部连接 */
+  closeAllConnections(): Promise<void>
+
   /** 释放资源（进程结束、句柄清理） */
   close(): Promise<void>
 }

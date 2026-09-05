@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: 打包 ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            ext: dll
+            cc: 'C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\gcc.exe'
+          - os: ubuntu-latest
+            ext: so
+            cc: gcc
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: 安装 MinGW（Windows）
+        if: runner.os == 'Windows'
+        run: choco install mingw -y --no-progress
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 修补 cmake-js（MinGW 链接标志）
+        run: node scripts/patch-cmake-js.mjs
+
+      - name: 构建 libmihomo（cgo c-shared）
+        working-directory: packages/native/bridge
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+          CC: ${{ matrix.cc }}
+          GOPROXY: 'https://proxy.golang.org,direct'
+        run: |
+          mkdir -p ../../../apps/electron/resources/core
+          go build -buildmode=c-shared -ldflags "-s -w -X github.com/metacubex/mihomo/constant.Version=v1.19.30" \
+            -o ../../../apps/electron/resources/core/libmihomo.${{ matrix.ext }} .
+
+      - name: 构建原生绑定 .node
+        working-directory: packages/native
+        shell: bash
+        run: |
+          node node_modules/cmake-js/bin/cmake-js compile -G "${{ runner.os == 'Windows' && 'MinGW Makefiles' || 'Unix Makefiles' }}"
+          mkdir -p ../../apps/electron/resources/core
+          cp bin/mihomo_binding.node ../../apps/electron/resources/core/
+
+      - name: 附带 MinGW 运行时 DLL（Windows）
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libgcc_s_seh-1.dll"  apps/electron/resources/core/ 2>/dev/null || true
+          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libstdc++-6.dll"      apps/electron/resources/core/ 2>/dev/null || true
+          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libwinpthread-1.dll" apps/electron/resources/core/ 2>/dev/null || true
+
+      - name: 下载内核与数据（mihomo/geo/wintun）
+        run: node scripts/download-core.mjs
+
+      - name: 构建与打包
+        run: |
+          pnpm prebuild-deps
+          pnpm --filter @teyvat-arkhon/electron build
+          pnpm --filter @teyvat-arkhon/electron exec electron-builder -- --publish always
+
+      - name: GPL 合规检查（LICENSE 进产物）
+        run: |
+          test -f release/linux*/*.AppImage -o -f release/*.exe && echo "产物存在"
+          find release -name "LICENSE*" | head -3
+
+      - name: 上传产物（无 GH_TOKEN 时仍保留）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: release/**
+          if-no-files-found: ignore

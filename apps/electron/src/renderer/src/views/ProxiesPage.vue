@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
+const { t } = useTranslation()
 
 const groupNodes = computed(() => {
   const group = store.currentGroup
@@ -25,7 +27,7 @@ function delayClass(delay: number): string {
   <div class="proxies">
     <div class="toolbar glass">
       <div class="groups">
-        <span class="label">策略组</span>
+        <span class="label">{{ t('proxies.groups') }}</span>
         <button
           v-for="g in store.groups"
           :key="g.name"
@@ -38,26 +40,24 @@ function delayClass(delay: number): string {
         </button>
       </div>
       <div class="actions">
-        <button class="btn ghost" :disabled="!store.running" @click="store.refreshProxies()">刷新</button>
+        <button class="btn ghost" :disabled="!store.running" @click="store.refreshProxies()">{{ t('proxies.refresh') }}</button>
         <button class="btn primary" :disabled="!store.currentGroup?.all?.length || store.batchTest.running" @click="store.testAllNodes()">
-          <span v-if="store.batchTest.running">
-            批量测速中 {{ store.batchTest.current }}/{{ store.batchTest.total }}
-          </span>
-          <span v-else>批量测速</span>
+          <span v-if="store.batchTest.running">{{ t('proxies.testing', { cur: store.batchTest.current, total: store.batchTest.total }) }}</span>
+          <span v-else>{{ t('proxies.batchTest') }}</span>
         </button>
       </div>
     </div>
 
     <div class="table-wrap glass">
-      <div v-if="!store.running" class="empty">内核未运行，启动后在此查看节点</div>
-      <div v-else-if="groupNodes.length === 0" class="empty">该策略组暂无节点</div>
+      <div v-if="!store.running" class="empty">{{ t('proxies.empty') }}</div>
+      <div v-else-if="groupNodes.length === 0" class="empty">{{ t('proxies.emptyGroup') }}</div>
       <table v-else class="nodes">
         <thead>
           <tr>
-            <th class="c-name">节点</th>
-            <th class="c-type">类型</th>
-            <th class="c-delay">延迟</th>
-            <th class="c-act">操作</th>
+            <th class="c-name">{{ t('proxies.node') }}</th>
+            <th class="c-type">{{ t('proxies.type') }}</th>
+            <th class="c-delay">{{ t('proxies.delay') }}</th>
+            <th class="c-act">{{ t('proxies.action') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -72,16 +72,16 @@ function delayClass(delay: number): string {
               <span v-else-if="n.delay.delay >= 0 && !n.delay.error" :class="delayClass(n.delay.delay)">
                 {{ n.delay.delay }} ms
               </span>
-              <span v-else class="fail">超时</span>
+              <span v-else class="fail">{{ t('proxies.timeout') }}</span>
             </td>
             <td class="c-act">
-              <button class="btn mini" @click="store.testNode(n.name)">测速</button>
+              <button class="btn mini" @click="store.testNode(n.name)">{{ t('proxies.test') }}</button>
               <button
                 class="btn mini primary"
                 :disabled="store.currentGroup?.now === n.name"
                 @click="store.switchNode(n.name)"
               >
-                {{ store.currentGroup?.now === n.name ? '已选中' : '切换' }}
+                {{ store.currentGroup?.now === n.name ? t('proxies.selected') : t('proxies.switch') }}
               </button>
             </td>
           </tr>
@@ -177,9 +177,6 @@ function delayClass(delay: number): string {
 .nodes tr.now {
   background: rgba(79, 124, 255, 0.08);
 }
-.c-name {
-  width: auto;
-}
 .n-name {
   margin-left: 6px;
 }
@@ -214,8 +211,9 @@ function delayClass(delay: number): string {
   gap: 8px;
 }
 .empty {
-  padding: 60px 0;
-  text-align: center;
+  flex: 1;
+  display: grid;
+  place-items: center;
   color: var(--text-faint);
   font-size: 15px;
 }

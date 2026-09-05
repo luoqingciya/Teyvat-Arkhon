@@ -174,6 +174,14 @@ export class ProcessCoreDriver implements CoreDriver {
     }
   }
 
+  async closeConnection(id: string): Promise<void> {
+    await this.rest.delete(`/connections/${encodeURIComponent(id)}`)
+  }
+
+  async closeAllConnections(): Promise<void> {
+    await this.rest.delete('/connections')
+  }
+
   async close(): Promise<void> {
     await this.stop()
   }

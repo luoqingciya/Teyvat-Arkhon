@@ -1,23 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
+import { setLanguage, type Lang } from '../i18n'
 
 const store = useAppStore()
+const { t } = useTranslation()
+const currentLang = ref<Lang>((localStorage.getItem('arkhon-lang') as Lang) ?? 'zh-CN')
 
-const serviceStateText: Record<string, string> = {
-  'not-installed': '未安装',
-  installed: '已安装（未运行）',
-  running: '运行中',
-  stopped: '已停止',
-  unknown: '未知'
-}
+const serviceStateText = computed<Record<string, string>>(() => ({
+  'not-installed': t('settings.notInstalled'),
+  installed: t('settings.installed'),
+  running: t('settings.running'),
+  stopped: t('settings.stopped'),
+  unknown: t('settings.unknown')
+}))
 
 const tunHint = computed(() => {
   if (!store.tunEnabled) return ''
-  return store.running ? '全局模式生效中' : '已写入配置，启动内核后生效'
+  return store.running ? t('settings.tunRunning') : t('settings.tunEffective')
 })
 
-const svcStateClass = (): string => {
+function svcStateClass(): string {
   switch (store.serviceState.state) {
     case 'running':
       return 'ok'
@@ -27,18 +31,24 @@ const svcStateClass = (): string => {
       return 'warn'
   }
 }
+
+function changeLang(e: Event): void {
+  const lang = (e.target as HTMLSelectElement).value as Lang
+  currentLang.value = lang
+  setLanguage(lang)
+}
 </script>
 
 <template>
   <div class="settings">
     <div class="card glass">
-      <h3>TUN 模式</h3>
+      <h3>TUN {{ t('settings.tun') }}</h3>
       <p class="hint">
-        透明代理接管全局流量（含不遵守系统代理的软件）。启用需管理员权限；内核重启后生效。
+        {{ t('settings.tunHint') }}
         <template v-if="tunHint">· <b class="accent">{{ tunHint }}</b></template>
       </p>
       <label class="switch-row">
-        <span class="row-label">启用 TUN 模式</span>
+        <span class="row-label">{{ t('settings.enableTun') }}</span>
         <button
           class="switch"
           :class="{ on: store.tunEnabled }"
@@ -53,14 +63,30 @@ const svcStateClass = (): string => {
     </div>
 
     <div class="card glass">
-      <h3>系统服务托管</h3>
-      <p class="hint">
-        将 mihomo 内核注册为 Windows 服务，实现开机自启、免打开应用常驻（服务运行在进程驱动模式）。
-      </p>
+      <h3>{{ t('settings.appearance') }}</h3>
+      <div class="field-row">
+        <span class="row-label">{{ t('settings.theme') }}</span>
+        <div class="seg">
+          <button class="seg-btn" :class="{ on: store.theme === 'dark' }" @click="store.setTheme('dark')">{{ t('settings.dark') }}</button>
+          <button class="seg-btn" :class="{ on: store.theme === 'light' }" @click="store.setTheme('light')">{{ t('settings.light') }}</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <span class="row-label">{{ t('settings.language') }}</span>
+        <select class="select" :value="currentLang" @change="changeLang">
+          <option value="zh-CN">简体中文</option>
+          <option value="en-US">English</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card glass">
+      <h3>{{ t('settings.service') }}</h3>
+      <p class="hint">{{ t('settings.serviceHint') }}</p>
       <div class="svc-row">
         <span class="row-label">
-          服务状态：
-          <b :class="svcStateClass">{{ serviceStateText[store.serviceState.state] ?? store.serviceState.state }}</b>
+          {{ t('settings.svcStatus') }}：
+          <b :class="svcStateClass()">{{ serviceStateText[store.serviceState.state] ?? store.serviceState.state }}</b>
         </span>
         <div class="svc-actions">
           <button
@@ -68,32 +94,35 @@ const svcStateClass = (): string => {
             :disabled="store.busy || store.serviceState.state === 'running'"
             @click="store.installService()"
           >
-            安装并启动
+            {{ t('settings.installSvc') }}
           </button>
           <button
             class="btn danger"
             :disabled="store.busy || store.serviceState.state === 'not-installed'"
             @click="store.uninstallService()"
           >
-            卸载
+            {{ t('settings.uninstallSvc') }}
           </button>
         </div>
       </div>
       <p v-if="store.serviceState.error" class="err">{{ store.serviceState.error }}</p>
-      <p class="note">安装/卸载会弹出 UAC 授权确认。</p>
+      <p class="note">{{ t('settings.svcNote') }}</p>
     </div>
 
     <div class="card glass">
-      <h3>关于</h3>
+      <h3>{{ t('settings.about') }}</h3>
       <dl class="kv">
-        <dt>版本</dt>
+        <dt>{{ t('settings.version') }}</dt>
         <dd>v{{ store.appVersion || '0.1.0' }}</dd>
-        <dt>协议</dt>
-        <dd>GPL-3.0 · <a class="link" href="https://www.gnu.org/licenses/gpl-3.0.txt">许可证文本</a></dd>
-        <dt>内核</dt>
+        <dt>{{ t('settings.license') }}</dt>
+        <dd>
+          GPL-3.0 ·
+          <a class="link" href="https://www.gnu.org/licenses/gpl-3.0.txt">{{ t('settings.licenseText') }}</a>
+        </dd>
+        <dt>{{ t('home.version') }}</dt>
         <dd>{{ store.status.version?.version ?? '—' }}</dd>
-        <dt>驱动</dt>
-        <dd>{{ store.status.driver === 'ffi' ? 'FFI 直连' : '进程模式' }}</dd>
+        <dt>{{ t('home.driver') }}</dt>
+        <dd>{{ store.status.driver === 'ffi' ? t('status.driverFfi') : t('status.driverProcess') }}</dd>
       </dl>
     </div>
   </div>
@@ -123,19 +152,76 @@ const svcStateClass = (): string => {
   color: var(--accent);
 }
 .switch-row,
-.svc-row {
+.svc-row,
+.field-row,
+.path-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   font-size: 15px;
+  min-height: 44px;
+}
+.field-row {
+  padding: 10px 0;
+}
+.path-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  padding: 8px 0;
+}
+.path {
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 4px 10px;
+  border-radius: 8px;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 .row-label b {
   color: var(--text);
 }
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  margin-left: auto;
+}
+.seg-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+}
+.seg-btn.on {
+  background: var(--accent);
+  color: #fff;
+}
+.select {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 14px;
+}
 .svc-actions {
   display: flex;
   gap: 10px;
+  margin-left: auto;
 }
 .err {
   color: #f87171;
@@ -160,6 +246,15 @@ const svcStateClass = (): string => {
 .kv dd {
   margin: 0;
   text-align: right;
+}
+.ok {
+  color: #34d399;
+}
+.muted {
+  color: var(--text-faint);
+}
+.warn {
+  color: #fbbf24;
 }
 .link {
   color: var(--accent);

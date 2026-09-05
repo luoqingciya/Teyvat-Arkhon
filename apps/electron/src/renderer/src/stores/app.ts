@@ -1,5 +1,5 @@
 /**
- * 全局状态：内核状态、订阅档案、代理节点、系统代理、页面切换。
+ * 全局状态：内核状态、订阅档案、代理节点、系统代理、页面切换、主题。
  */
 
 import { defineStore } from 'pinia'
@@ -12,8 +12,9 @@ import type {
   SystemServiceState,
   TrafficSnapshot
 } from '@teyvat-arkhon/shared'
+import { applyTheme, readTheme, type Theme } from '../theme'
 
-export type ViewKey = 'home' | 'proxies' | 'profiles' | 'settings'
+export type ViewKey = 'home' | 'proxies' | 'profiles' | 'connections' | 'config' | 'settings'
 
 interface AppState {
   status: CoreStatus
@@ -35,6 +36,10 @@ interface AppState {
   tunEnabled: boolean
   /** 系统服务状态 */
   serviceState: SystemServiceState
+  /** 主题 */
+  theme: Theme
+  /** 数据目录信息 */
+  dataInfo: { dataDir: string; portable: boolean }
 }
 
 interface BatchTestState {
@@ -59,6 +64,8 @@ export const useAppStore = defineStore('app', {
     trafficHistory: [],
     tunEnabled: false,
     serviceState: { name: 'TeyvatArkhonCore', state: 'not-installed' },
+    theme: readTheme(),
+    dataInfo: { dataDir: '', portable: false },
     batchTest: { running: false, current: 0, total: 0 }
   }),
 
@@ -80,6 +87,11 @@ export const useAppStore = defineStore('app', {
       window.arkhon.onStateChange((status) => {
         this.status = status
       })
+      window.arkhon.onTraffic((snapshot) => {
+        this.traffic = snapshot
+        this.trafficHistory.push({ t: Date.now(), down: snapshot.downloadSpeed, up: snapshot.uploadSpeed })
+        if (this.trafficHistory.length > 60) this.trafficHistory.shift()
+      })
       window.arkhon.onError((message) => {
         this.error = message
         setTimeout(() => (this.error = ''), 6000)
@@ -87,6 +99,8 @@ export const useAppStore = defineStore('app', {
       await this.refreshStatus()
       await this.refreshProfiles()
       await this.refreshSystemProxy()
+      await this.refreshTun()
+      await this.refreshService()
       this.appVersion = await window.arkhon.getAppVersion()
     },
 
@@ -146,8 +160,6 @@ export const useAppStore = defineStore('app', {
       if (!group) return
       try {
         await window.arkhon.selectProxy(group, node)
-        await window.arkhon.listProxies()
-        this.status = await window.arkhon.getCoreStatus()
         await this.refreshProxies()
       } catch (e) {
         this.error = (e as Error).message
@@ -187,7 +199,7 @@ export const useAppStore = defineStore('app', {
       try {
         const { profile } = await window.arkhon.importProfileFromUrl(url.trim())
         await this.refreshProfiles()
-        if (!this.profiles.some((p) => p.selected) && profile) {
+        if (profile && !this.profiles.some((p) => p.selected)) {
           await this.selectProfile(profile.id, false)
         }
         return true
@@ -205,7 +217,7 @@ export const useAppStore = defineStore('app', {
       try {
         const { profile } = await window.arkhon.importProfileFromText(name || '未命名订阅', content)
         await this.refreshProfiles()
-        if (!this.profiles.some((p) => p.selected)) {
+        if (profile && !this.profiles.some((p) => p.selected)) {
           await this.selectProfile(profile.id, false)
         }
         return true
@@ -222,7 +234,7 @@ export const useAppStore = defineStore('app', {
         await window.arkhon.selectProfile(id)
         await this.refreshProfiles()
         if (restart && this.running) {
-          await window.arkhon.startCore()
+          this.status = await window.arkhon.startCore()
           await this.refreshProxies()
         }
       } catch (e) {
@@ -273,7 +285,7 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    /** 切换 TUN（写配置 + 热重载；实际建卡需要管理员权限，失败会把错误抛给 UI） */
+    /** 切换 TUN（写配置 + 热重载；实际建卡需要管理员权限） */
     async toggleTun(enabled: boolean): Promise<void> {
       this.busy = true
       try {
@@ -319,6 +331,52 @@ export const useAppStore = defineStore('app', {
         this.error = (e as Error).message
       } finally {
         this.busy = false
+      }
+    },
+
+    // ---------- 连接管理 ----------
+
+    async closeConnection(id: string): Promise<void> {
+      try {
+        await window.arkhon.closeConnection(id)
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    async closeAllConnections(): Promise<void> {
+      try {
+        await window.arkhon.closeAllConnections()
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    // ---------- 外观 ----------
+
+    setTheme(theme: Theme): void {
+      this.theme = theme
+      applyTheme(theme)
+    },
+
+    // ---------- 数据目录 ----------
+
+    async refreshDataInfo(): Promise<void> {
+      try {
+        this.dataInfo = await window.arkhon.getDataInfo()
+      } catch {
+        /* 忽略 */
+      }
+    },
+
+    async togglePortable(enabled: boolean): Promise<void> {
+      try {
+        const res = await window.arkhon.setPortable(enabled)
+        this.dataInfo.portable = res.portable
+        this.error = res.note
+        setTimeout(() => (this.error = ''), 6000)
+      } catch (e) {
+        this.error = (e as Error).message
       }
     }
   }

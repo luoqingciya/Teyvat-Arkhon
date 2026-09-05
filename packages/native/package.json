@@ -8,8 +8,8 @@
   "types": "index.d.ts",
   "gypfile": false,
   "scripts": {
-    "build": "cmake-js compile --debug",
-    "build:release": "cmake-js compile",
+    "build:native": "cmake-js compile --debug",
+    "build:native:release": "cmake-js compile",
     "rebuild": "cmake-js rebuild --debug",
     "typecheck": "tsc --noEmit"
   },

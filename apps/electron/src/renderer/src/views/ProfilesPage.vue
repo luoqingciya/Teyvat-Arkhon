@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
-import type { Profile } from '@teyvat-arkhon/shared'
 
 const store = useAppStore()
+const { t } = useTranslation()
 
 const url = ref('')
 const textName = ref('')
@@ -29,51 +30,43 @@ async function submitText(): Promise<void> {
     textContent.value = ''
   }
 }
-
-function profileActions(p: Profile) {
-  return {
-    select: () => store.selectProfile(p.id),
-    refresh: () => store.refreshProfile(p.id),
-    remove: () => store.removeProfile(p.id)
-  }
-}
 </script>
 
 <template>
   <div class="profiles">
     <div class="import glass">
-      <h3>导入订阅</h3>
+      <h3>{{ t('profiles.import') }}</h3>
       <div class="rows">
         <div class="row url-row">
-          <input v-model="url" class="input" placeholder="粘贴订阅链接 (https://…)" @keyup.enter="submitUrl" />
-          <button class="btn primary" :disabled="store.busy || !url.trim()" @click="submitUrl">导入</button>
+          <input v-model="url" class="input" :placeholder="t('profiles.urlPlaceholder')" @keyup.enter="submitUrl" />
+          <button class="btn primary" :disabled="store.busy || !url.trim()" @click="submitUrl">{{ t('profiles.importBtn') }}</button>
         </div>
         <details class="text-toggle">
-          <summary>从文本导入（分享的 YAML / base64 内容）</summary>
+          <summary>{{ t('profiles.textToggle') }}</summary>
           <div class="row">
-            <input v-model="textName" class="input" placeholder="订阅名称（可选）" />
+            <input v-model="textName" class="input" :placeholder="t('profiles.namePlaceholder')" />
           </div>
           <div class="row">
-            <textarea v-model="textContent" class="input ta" rows="5" placeholder="粘贴完整配置内容…"></textarea>
+            <textarea v-model="textContent" class="input ta" rows="5" :placeholder="t('profiles.contentPlaceholder')"></textarea>
           </div>
           <div class="row">
-            <button class="btn primary" :disabled="store.busy || !textContent.trim()" @click="submitText">导入文本</button>
+            <button class="btn primary" :disabled="store.busy || !textContent.trim()" @click="submitText">{{ t('profiles.importText') }}</button>
           </div>
         </details>
       </div>
-      <p v-if="store.busy" class="busy">处理中…</p>
+      <p v-if="store.busy" class="busy">{{ t('profiles.processing') }}</p>
     </div>
 
     <div class="list">
-      <div v-if="store.profiles.length === 0" class="empty glass">还没有任何订阅，请先导入</div>
+      <div v-if="store.profiles.length === 0" class="empty glass">{{ t('profiles.empty') }}</div>
       <div v-for="p in store.profiles" :key="p.id" class="profile glass" :class="{ selected: p.selected }">
         <div class="p-main">
           <div class="p-title">
-            <span v-if="p.selected" class="badge">使用中</span>
+            <span v-if="p.selected" class="badge">{{ t('profiles.inUse') }}</span>
             <span class="p-name">{{ p.name }}</span>
           </div>
           <div class="p-meta">
-            <span>节点 {{ p.nodeCount ?? '—' }}</span>
+            <span>{{ t('profiles.nodes') }} {{ p.nodeCount ?? '—' }}</span>
             <span class="sep">·</span>
             <span>{{ fmtTime(p.updatedAt) }}</span>
             <span v-if="p.url" class="sep">·</span>
@@ -81,13 +74,11 @@ function profileActions(p: Profile) {
           </div>
         </div>
         <div class="p-actions">
-          <template v-if="profileActions(p).select">
-            <button class="btn mini primary" :disabled="p.selected" @click="profileActions(p).select()">
-              {{ p.selected ? '已使用' : '切换使用' }}
-            </button>
-            <button class="btn mini" :disabled="!p.url" @click="profileActions(p).refresh()">刷新</button>
-          </template>
-          <button class="btn mini danger" @click="profileActions(p).remove()">删除</button>
+          <button class="btn mini primary" :disabled="p.selected" @click="store.selectProfile(p.id)">
+            {{ p.selected ? t('profiles.used') : t('profiles.use') }}
+          </button>
+          <button class="btn mini" :disabled="!p.url" @click="store.refreshProfile(p.id)">{{ t('profiles.refresh') }}</button>
+          <button class="btn mini danger" @click="store.removeProfile(p.id)">{{ t('profiles.remove') }}</button>
         </div>
       </div>
     </div>

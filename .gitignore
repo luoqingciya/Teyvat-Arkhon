@@ -10,12 +10,22 @@ Thumbs.db
 .idea/
 *.tsbuildinfo
 
+# 打包图标（electron-builder buildResources 依赖，需入仓库）
+!apps/electron/build/
+!apps/electron/build/icon.png
+
+# Playwright UI 冒烟产物
+apps/electron/test-results/
+apps/electron/shots-*.png
+
 # 构建产物 / 工具链生成物
 packages/native/build/
 packages/native/bin/
 packages/native/bridge/libmihomo.*
 apps/electron/resources/core/*
 !apps/electron/resources/core/.gitkeep
+apps/electron/data/
+apps/electron/portable.txt
 
 # 环境与密钥
 .env

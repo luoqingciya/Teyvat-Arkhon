@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: 单元测试 / 类型检查 / 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 构建基础包
+        run: pnpm -r --if-present --filter ./packages/** build
+      - name: 单元测试
+        run: pnpm --filter @teyvat-arkhon/core-bridge exec vitest run
+      - name: 类型检查
+        run: pnpm --filter @teyvat-arkhon/electron typecheck
+      - name: 构建 Electron 应用
+        run: pnpm --filter @teyvat-arkhon/electron build
+
+  ui:
+    name: Playwright UI 冒烟（Windows）
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 构建应用
+        run: pnpm --filter @teyvat-arkhon/electron build
+      - name: UI 冒烟
+        run: pnpm --filter @teyvat-arkhon/electron exec playwright test

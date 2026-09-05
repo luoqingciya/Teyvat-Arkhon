@@ -168,6 +168,28 @@ export class CoreService extends EventEmitter {
     return this.driver.getConnections()
   }
 
+  closeConnection(id: string): Promise<void> {
+    if (!this.driver) throw new Error('内核未运行')
+    return this.driver.closeConnection(id)
+  }
+
+  closeAllConnections(): Promise<void> {
+    if (!this.driver) throw new Error('内核未运行')
+    return this.driver.closeAllConnections()
+  }
+
+  /** 读取当前工作配置原文（编辑器用） */
+  getActiveConfig(): Promise<string> {
+    return this.config.readActiveRaw()
+  }
+
+  /** 保存并校验工作配置，内核运行中则热重载 */
+  async saveActiveConfig(content: string): Promise<ClashConfigSummary> {
+    const summary = await this.config.writeActiveValidated(content)
+    await this.reloadActive()
+    return summary
+  }
+
   // ---------- 配置档案 ----------
 
   listProfiles(): Promise<Profile[]> {

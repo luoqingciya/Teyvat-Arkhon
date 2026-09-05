@@ -58,6 +58,10 @@ export class RestClient {
   patch(path: string, body?: unknown): Promise<unknown> {
     return this.request('PATCH', path, body)
   }
+
+  delete(path: string): Promise<unknown> {
+    return this.request('DELETE', path)
+  }
 }
 
 /** mihomo 代理数据形状（GET /proxies） */

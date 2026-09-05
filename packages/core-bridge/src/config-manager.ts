@@ -199,6 +199,19 @@ export class ConfigManager {
     return this.parseAndValidate(content)
   }
 
+  /** 读取当前工作配置原文（编辑器用）；文件缺失返回空串 */
+  async readActiveRaw(): Promise<string> {
+    if (!(await exists(this.activeConfigFile))) return ''
+    return fs.readFile(this.activeConfigFile, 'utf-8')
+  }
+
+  /** 校验并覆写工作配置（编辑器保存），不合法时抛 Error 且不落盘 */
+  async writeActiveValidated(content: string): Promise<ClashConfigSummary> {
+    const summary = this.parseAndValidate(content)
+    await fs.writeFile(this.activeConfigFile, content, 'utf-8')
+    return summary
+  }
+
   /**
    * 开关 TUN 模式（写回工作配置）。
    * 启用：无 tun 段时以应用默认值追加（已有自定义 tun 段则不动）；

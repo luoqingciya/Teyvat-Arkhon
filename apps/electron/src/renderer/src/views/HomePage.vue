@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
+const { t } = useTranslation()
 
-const driverLabel = () => (store.status.driver === 'ffi' ? 'FFI 直连（进程内）' : 'Mihomo 子进程（开发回退）')
+const driverLabel = () =>
+  store.status.driver === 'ffi' ? t('status.driverFfi') : t('status.driverProcess')
+
+const stateMap: Record<string, string> = {
+  stopped: t('status.stopped'),
+  starting: t('status.starting'),
+  running: t('status.running'),
+  stopping: t('status.stopping'),
+  error: t('status.error')
+}
 
 // ---------- 实时流量卡片 ----------
 const chart = ref<HTMLCanvasElement | null>(null)
@@ -67,8 +78,8 @@ function drawChart(): void {
   <div class="home">
     <section class="hero glass">
       <div class="hero-text">
-        <h1>提瓦特方舟</h1>
-        <p>基于 Mihomo 内核的高速网络代理客户端 · 深渊亦可畅行</p>
+        <h1>{{ t('home.title') }}</h1>
+        <p>{{ t('home.subtitle') }}</p>
       </div>
       <button
         class="power"
@@ -80,32 +91,28 @@ function drawChart(): void {
           <path d="M12 3v10" />
           <path d="M6.5 6.5a8 8 0 1 0 11 0" />
         </svg>
-        <span>{{ store.running ? '停止内核' : store.busy ? '处理中…' : '启动内核' }}</span>
+        <span>{{ store.running ? t('home.stop') : store.busy ? t('home.busy') : t('home.start') }}</span>
       </button>
     </section>
 
     <section class="grid">
       <div class="card glass">
-        <h3>内核状态</h3>
+        <h3>{{ t('home.coreState') }}</h3>
         <dl class="kv">
-          <dt>状态</dt>
-          <dd>
-            <span class="tag" :class="store.status.state">
-              {{ { stopped: '已停止', starting: '启动中', running: '运行中', stopping: '停止中', error: '异常' }[store.status.state] ?? store.status.state }}
-            </span>
-          </dd>
-          <dt>驱动模式</dt>
+          <dt>{{ t('home.state') }}</dt>
+          <dd><span class="tag" :class="store.status.state">{{ stateMap[store.status.state] ?? store.status.state }}</span></dd>
+          <dt>{{ t('home.driver') }}</dt>
           <dd>{{ driverLabel() }}</dd>
-          <dt>内核版本</dt>
+          <dt>{{ t('home.version') }}</dt>
           <dd>{{ store.status.version?.version ?? '—' }}</dd>
         </dl>
       </div>
 
       <div class="card glass">
-        <h3>系统代理</h3>
-        <p class="hint">开启后本机 HTTP/SOCKS5 流量将走内核本地混合端口</p>
+        <h3>{{ t('home.sysProxy') }}</h3>
+        <p class="hint">{{ t('home.sysProxyHint') }}</p>
         <label class="switch-row">
-          <span>启用系统代理</span>
+          <span>{{ t('home.enableSysProxy') }}</span>
           <button
             class="switch"
             :class="{ on: store.systemProxy.enabled }"
@@ -120,39 +127,39 @@ function drawChart(): void {
       </div>
 
       <div class="card glass">
-        <h3>实时流量</h3>
+        <h3>{{ t('home.traffic') }}</h3>
         <div class="traffic-wrap" :class="{ idle: !store.running }">
           <canvas ref="chart" class="chart" height="64"></canvas>
           <div class="rates">
             <div class="rate">
               <span class="arrow down">↓</span>
               <strong>{{ fmtSpeed(store.traffic?.downloadSpeed ?? 0) }}</strong>
-              <span class="dim">下载</span>
+              <span class="dim">{{ t('home.download') }}</span>
             </div>
             <div class="rate">
               <span class="arrow up">↑</span>
               <strong>{{ fmtSpeed(store.traffic?.uploadSpeed ?? 0) }}</strong>
-              <span class="dim">上传</span>
+              <span class="dim">{{ t('home.upload') }}</span>
             </div>
             <div class="rate">
               <span class="conn">≡</span>
               <strong>{{ store.traffic?.connections.length ?? 0 }}</strong>
-              <span class="dim">连接数</span>
+              <span class="dim">{{ t('home.connections') }}</span>
             </div>
           </div>
           <div class="totals dim">
-            累计 ↓ {{ fmtTotal(store.traffic?.downloadTotal ?? 0) }} · 累计 ↑ {{ fmtTotal(store.traffic?.uploadTotal ?? 0) }}
-            <span v-if="!store.running" class="stop-hint">（内核未运行）</span>
+            {{ t('home.total', { down: fmtTotal(store.traffic?.downloadTotal ?? 0), up: fmtTotal(store.traffic?.uploadTotal ?? 0) }) }}
+            <span v-if="!store.running" class="stop-hint">{{ t('home.coreStopped') }}</span>
           </div>
         </div>
       </div>
 
       <div class="card glass">
-        <h3>快速开始</h3>
+        <h3>{{ t('home.quickStart') }}</h3>
         <ol class="steps">
-          <li>前往<b>订阅</b>页导入你的 Clash 订阅链接或粘贴配置</li>
-          <li>回到本页点击<b>启动内核</b></li>
-          <li>在<b>代理</b>页选择节点并测速</li>
+          <li v-html="t('home.step1')"></li>
+          <li v-html="t('home.step2')"></li>
+          <li v-html="t('home.step3')"></li>
         </ol>
       </div>
     </section>
@@ -166,11 +173,24 @@ function drawChart(): void {
   gap: 18px;
 }
 .hero {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 30px 34px;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  top: -80px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 124, 255, 0.18), transparent 65%);
+  pointer-events: none;
 }
 .hero-text h1 {
   margin: 0 0 6px;
@@ -216,18 +236,18 @@ function drawChart(): void {
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-auto-rows: 1fr;
+  gap: 16px;
 }
 .card {
-  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
 }
 .card h3 {
   margin: 0 0 14px;
   font-size: 16px;
   font-weight: 600;
-}
-.card:last-child {
-  grid-column: 1 / -1;
 }
 .kv {
   margin: 0;
@@ -318,6 +338,8 @@ function drawChart(): void {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  justify-content: space-between;
 }
 .traffic-wrap.idle {
   opacity: 0.6;

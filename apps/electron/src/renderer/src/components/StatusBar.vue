@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
+const { t } = useTranslation()
 
 const stateText: Record<string, string> = {
-  stopped: '已停止',
-  starting: '启动中',
-  running: '运行中',
-  stopping: '停止中',
-  error: '异常'
+  stopped: t('status.stopped'),
+  starting: t('status.starting'),
+  running: t('status.running'),
+  stopping: t('status.stopping'),
+  error: t('status.error')
 }
 </script>
 
@@ -17,12 +19,13 @@ const stateText: Record<string, string> = {
     <span class="dot" :class="store.status.state"></span>
     <span class="state">{{ stateText[store.status.state] ?? store.status.state }}</span>
     <span class="sep">·</span>
-    <span class="driver">驱动: {{ store.status.driver === 'ffi' ? 'FFI 直连' : '进程模式' }}</span>
+    <span class="driver">{{ t('status.driver') }}: {{ store.status.driver === 'ffi' ? t('status.driverFfi') : t('status.driverProcess') }}</span>
     <template v-if="store.status.version">
       <span class="sep">·</span>
-      <span>内核 {{ store.status.version.version }}</span>
+      <span>{{ t('home.version') }} {{ store.status.version.version }}</span>
     </template>
-    <span v-if="store.systemProxy.enabled" class="proxy-on">系统代理已开启</span>
+    <span v-if="store.traffic" class="conn-pill">{{ store.traffic.connections.length }}</span>
+    <span v-if="store.systemProxy.enabled" class="proxy-on">{{ t('status.sysProxyOn') }}</span>
     <transition name="fade">
       <div v-if="store.error" class="err">{{ store.error }}</div>
     </transition>
@@ -72,6 +75,16 @@ const stateText: Record<string, string> = {
 .proxy-on {
   margin-left: auto;
   color: #34d399;
+}
+.conn-pill {
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 12px;
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.14);
 }
 .err {
   margin-left: auto;

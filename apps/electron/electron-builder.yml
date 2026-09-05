@@ -1,0 +1,55 @@
+# Teyvat Arkhon - electron-builder 配置
+# 由 GitHub Actions（.github/workflows/release.yml）在推送 tag 时执行打包与发布
+
+appId: com.teyvat.arkhon
+productName: Teyvat Arkhon
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - "out/**"
+  - "!**/*.map"
+
+# 原生绑定 .node 需解包（asar 内不可执行）
+asarUnpack:
+  - "**/*.node"
+
+# 内核资源：libmihomo、mihomo 二进制、geo 数据、wintun 驱动
+extraResources:
+  - from: resources/core
+    to: core
+    filter:
+      - "**/*"
+      - "!.gitkeep"
+
+# 许可证合规：打包 GPL-3.0 文本
+includeLicenseFiles:
+  - ../../LICENSE
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  shortcutName: Teyvat Arkhon
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Network
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+
+# 自动更新：基于 GitHub Releases
+publish:
+  provider: github
+  owner: luoqingciya
+  repo: Teyvat-Arkhon
+  releaseType: release

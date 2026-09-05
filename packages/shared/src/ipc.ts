@@ -26,6 +26,12 @@ export interface ArkhonAPI {
     uploadTotal: number
     connections: ConnectionInfo[]
   }>
+  closeConnection(id: string): Promise<void>
+  closeAllConnections(): Promise<void>
+
+  // ---------- 配置编辑器 ----------
+  getActiveConfig(): Promise<string>
+  saveActiveConfig(content: string): Promise<ClashConfigSummary>
 
   // ---------- TUN 模式 ----------
   getTunEnabled(): Promise<boolean>
@@ -55,6 +61,8 @@ export interface ArkhonAPI {
 
   // ---------- 应用 ----------
   getAppVersion(): Promise<string>
+  getDataInfo(): Promise<{ dataDir: string; portable: boolean }>
+  setPortable(enabled: boolean): Promise<{ portable: boolean; note: string }>
 
   // ---------- 事件订阅（返回取消函数） ----------
   onStateChange(cb: (status: CoreStatus) => void): () => void

@@ -23,6 +23,12 @@ const api: ArkhonAPI = {
       uploadTotal: number
       connections: ConnectionInfo[]
     }>,
+  closeConnection: (id) => ipcRenderer.invoke('core:close-connection', id) as Promise<void>,
+  closeAllConnections: () => ipcRenderer.invoke('core:close-all-connections') as Promise<void>,
+
+  getActiveConfig: () => ipcRenderer.invoke('config:get-active') as Promise<string>,
+  saveActiveConfig: (content) =>
+    ipcRenderer.invoke('config:save-active', content) as Promise<ClashConfigSummary>,
 
   getTunEnabled: () => ipcRenderer.invoke('core:get-tun') as Promise<boolean>,
   setTunEnabled: (enabled) =>
@@ -53,6 +59,10 @@ const api: ArkhonAPI = {
   setSystemProxy: (enabled) => ipcRenderer.invoke('system-proxy:set', enabled) as Promise<SystemProxyState>,
 
   getAppVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
+  getDataInfo: () =>
+    ipcRenderer.invoke('app:data-info') as Promise<{ dataDir: string; portable: boolean }>,
+  setPortable: (enabled) =>
+    ipcRenderer.invoke('app:set-portable', enabled) as Promise<{ portable: boolean; note: string }>,
 
   onStateChange: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, status: CoreStatus): void => cb(status)
