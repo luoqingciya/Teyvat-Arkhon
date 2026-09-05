@@ -14,6 +14,11 @@ import { bootstrapDataDir } from './paths'
 const dataLayout = bootstrapDataDir(app)
 // Windows 任务栏图标/通知需绑定 AppUserModelID（与 electron-builder appId 一致）
 if (process.platform === 'win32') app.setAppUserModelId('com.teyvat.arkhon')
+// Windows 下 LoadLibrary 搜索路径不含 resources\core，.node 依赖的 MinGW 运行时
+// DLL 需借助 PATH 才能找到；把内核目录前置到 PATH，避免原生绑定加载失败导致闪退
+if (process.platform === 'win32' && app.isPackaged) {
+  process.env.PATH = `${coreResourcesDir()};${process.env.PATH ?? ''}`
+}
 console.log(
   `[teyvat-arkhon] 运行数据目录: ${dataLayout.dataDir}（${dataLayout.portable ? '便携模式' : '系统用户目录'}）`
 )
@@ -161,7 +166,16 @@ async function bootstrapService(): Promise<CoreService> {
   const configDir = userDataConfigDir()
   const ffi = detectFfi()
 
-  if (ffi.libPath) {
+  // Windows 打包版：MinGW 编译的 N-API 绑定在 Electron 加载时存在二进制不兼容
+  // （独立 Node 正常，Electron 运行时加载即崩溃）。默认走进程驱动（功能等价），
+  // 设 TEVVAT_ARKHON_FORCE_FFI=1 可强制启用 FFI（供无此问题的平台/环境）。
+  const forceFfi = process.env['TEVVAT_ARKHON_FORCE_FFI'] === '1'
+  const winPackagedFfiBroken = process.platform === 'win32' && app.isPackaged && !forceFfi
+  const useFfi = !!(ffi.libPath && !winPackagedFfiBroken)
+
+  if (ffi.libPath && !useFfi) {
+    console.log('[teyvat-arkhon] 检测到 FFI, 但 Windows 打包版当前默认进程驱动（FFI 存在加载兼容问题）')
+  } else if (useFfi) {
     console.log('[teyvat-arkhon] FFI 驱动可用: libmihomo=%s binding=%s', ffi.libPath, ffi.bindingPath)
   } else {
     console.log('[teyvat-arkhon] 未探测到 FFI 原生链路，回退到进程驱动')
@@ -170,8 +184,8 @@ async function bootstrapService(): Promise<CoreService> {
   const svc = new CoreService({
     profilesDir: join(app.getPath('userData'), 'profiles'),
     activeConfigFile: join(configDir, 'config.yaml'),
-    driver: ffi.libPath
-      ? { mode: 'ffi', options: { libPath: ffi.libPath, bindingPath: ffi.bindingPath } }
+    driver: useFfi
+      ? { mode: 'ffi', options: { libPath: ffi.libPath as string, bindingPath: ffi.bindingPath } }
       : {
           mode: 'process',
           options: {

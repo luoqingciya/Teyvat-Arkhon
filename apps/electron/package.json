@@ -1,6 +1,6 @@
 {
   "name": "@teyvat-arkhon/electron",
-  "version": "0.9.2-rc",
+  "version": "0.9.3-rc",
   "private": true,
   "license": "GPL-3.0-only",
   "main": "out/main/index.js",
@@ -52,7 +52,7 @@
     "@playwright/test": "^1.46.1",
     "@types/node": "^20.14.0",
     "@vitejs/plugin-vue": "^5.1.4",
-    "electron": "^31.7.0",
+    "electron": "^40.0.0",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "typescript": "^5.5.4",

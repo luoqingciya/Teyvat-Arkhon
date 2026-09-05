@@ -10,6 +10,15 @@
 ### Added
 - 待定：fork 内核定制特性（Teyvat Arkhon 私有内核扩展）
 
+## [0.9.3-rc] - 2026-09-05
+
+### Fixed
+- **修复 Windows 打包版点击"启用内核"闪退**：MinGW 工具链编译的 N-API 绑定在 Electron 运行时加载即崩溃（独立 Node 正常），推送 tag 的产物遂闪退；改为 Windows 打包版默认使用**进程驱动**（功能等价），Linux/macOS 仍走 FFI 直连，设 `TEVVAT_ARKHON_FORCE_FFI=1` 可强制启用 FFI
+- 状态栏驱动模式未启动时显示为"进程模式"的误导：现在按真实配置驱动展示
+
+### Changed
+- Electron 31 → **40**（内置 Node 24），原生绑定按 Electron 40 headers 编译
+
 ## [0.9.2-rc] - 2026-09-05
 
 ### Added
@@ -28,7 +37,8 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.2-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.3-rc...HEAD
+[0.9.3-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.3-rc
 [0.9.2-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.2-rc
 [0.9.1-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.1-rc
 [0.9.0-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.0-rc

@@ -68,6 +68,9 @@ jobs:
       - name: 构建原生绑定 .node
         working-directory: packages/native
         shell: bash
+        env:
+          npm_config_runtime: electron
+          npm_config_target: 40.10.6
         run: |
           node node_modules/cmake-js/bin/cmake-js compile -G "${{ runner.os == 'Windows' && 'MinGW Makefiles' || 'Unix Makefiles' }}"
           mkdir -p ../../apps/electron/resources/core

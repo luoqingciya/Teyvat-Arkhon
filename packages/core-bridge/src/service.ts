@@ -51,7 +51,8 @@ export class CoreService extends EventEmitter {
   }
 
   status(): CoreStatus {
-    return { state: this.state, version: this.version, driver: this.driver?.kind ?? 'process' }
+    // 未启动时驱动尚未实例化，按配置的驱动模式展示（避免误显示为进程回退）
+    return { state: this.state, version: this.version, driver: this.driver?.kind ?? this.opts.driver.mode }
   }
 
   private setState(next: CoreState): void {

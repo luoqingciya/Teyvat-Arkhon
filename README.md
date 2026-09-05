@@ -37,7 +37,7 @@
 **内核与链路**
 
 - **FFI 直连架构**：主进程经 N-API 加载 `libmihomo`（由 cgo `-buildmode=c-shared` 编译的共享库），启动/停止/热重载/版本等控制面均为**进程内同步调用，零网络开销**；数据面（节点、连接、延迟）复用内核内建 `external-controller` REST API。
-- **进程驱动回退**：未探测到原生链路（无 `libmihomo` 或 `.node`）时自动切换为 sidecar 模式——spawn mihomo 二进制 + RESTful API，功能等价，方便无工具链环境与 CI 使用。
+- **进程驱动**：Windows 打包版默认以 sidecar 方式运行 mihomo 二进制（当前 MinGW 工具链编译的 N-API 绑定在 Electron 下存在加载兼容问题，已自动规避）；Linux/macOS 使用 FFI 直连。两种模式功能等价，状态栏实时显示当前驱动。
 
 **订阅与代理**
 
