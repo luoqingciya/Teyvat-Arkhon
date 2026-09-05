@@ -9,7 +9,8 @@ import { setPortableEnabled, isPortableMode } from './paths'
 export function createIpc(
   service: CoreService,
   systemProxy: SystemProxyController,
-  serviceManager: WindowsServiceManager
+  serviceManager: WindowsServiceManager,
+  tunPrereq: () => boolean
 ): void {
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -64,4 +65,8 @@ export function createIpc(
     portable: isPortableMode(app)
   }))
   ipcMain.handle('app:set-portable', (_e, enabled: boolean) => setPortableEnabled(app, enabled))
+  ipcMain.handle('app:get-tun-prereq', () => ({
+    wintun: tunPrereq(),
+    windows: process.platform === 'win32'
+  }))
 }

@@ -187,7 +187,15 @@ if (!gotLock) {
       workingDir: userDataConfigDir(),
       configFile: join(userDataConfigDir(), 'config.yaml')
     })
-    createIpc(service, systemProxy, serviceManager)
+    createIpc(
+      service,
+      systemProxy,
+      serviceManager,
+      // TUN 前置依赖探测：resources/core 或内核工作目录存在 wintun.dll 即为可用
+      () =>
+        existsSync(join(coreResourcesDir(), 'wintun.dll')) ||
+        (existsSync(userDataConfigDir()) && existsSync(join(userDataConfigDir(), 'wintun.dll')))
+    )
 
     trafficMonitor = createTrafficMonitor(() => service)
     trafficMonitor.start()

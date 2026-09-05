@@ -63,6 +63,7 @@ export interface ArkhonAPI {
   getAppVersion(): Promise<string>
   getDataInfo(): Promise<{ dataDir: string; portable: boolean }>
   setPortable(enabled: boolean): Promise<{ portable: boolean; note: string }>
+  getTunPrereq(): Promise<{ wintun: boolean; windows: boolean }>
 
   // ---------- 事件订阅（返回取消函数） ----------
   onStateChange(cb: (status: CoreStatus) => void): () => void

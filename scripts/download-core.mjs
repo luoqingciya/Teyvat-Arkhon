@@ -13,11 +13,22 @@ import { createWriteStream } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 
 const OWNER = 'MetaCubeX'
 const REPO = 'mihomo'
 const TARGET_DIR = path.resolve('apps/electron/resources/core')
+
+// 完整性校验清单（见 deps.sha256.json）：
+//   core[tag][assets]: null 表示未登记哈希，下载跳过严格校验；非 null 则必须匹配
+//   geo[name]: 与「当前 latest」对应，仅做一致性提示
+const SHA_FILE = new URL('./deps.sha256.json', import.meta.url)
+const SHA = JSON.parse(await fs.readFile(SHA_FILE, 'utf8'))
+
+function sha256(buf) {
+  return createHash('sha256').update(buf).digest('hex')
+}
 
 const platformMap = {
   win32: 'windows',
@@ -103,11 +114,34 @@ async function main() {
       await fs.writeFile(finalDest, bin)
       await fs.chmod(finalDest, 0o755)
     }
+
+    // 完整性校验（针对解压后的 mihomo 可执行文件）
+    verifyCore(finalDest, tag)
     console.log(`[download-core] 完成: ${finalDest} (${data.length} bytes 压缩)`)
   }
 
   await downloadGeo()
   await downloadWintun()
+}
+
+/** 校验解压后的内核二进制：清单内存在该版本+平台哈希则必须匹配，否则视为下载损坏中止 */
+async function verifyCore(binaryPath, tag) {
+  const key = assetName(process.platform, process.arch)
+  const expected = SHA.core?.[tag]?.[key]
+  if (!expected) {
+    console.warn(
+      `[download-core] ⚠ 内核 ${tag}/${key} 未登记校验哈希，跳过严格校验（建议 CI 首次下载后补登记 deps.sha256.json）`
+    )
+    return
+  }
+  const bin = await fs.readFile(binaryPath)
+  const actual = sha256(bin)
+  if (actual !== expected) {
+    throw new Error(
+      `内核完整性校验失败 (${tag}/${key})\n期望 ${expected}\n实际 ${actual}\n可能下载损坏或版本哈希发生变更，请核对后重试`
+    )
+  }
+  console.log(`[download-core] ✓ 内核完整性校验通过 (${key} sha256 前8位 ${actual.slice(0, 8)}…)`)
 }
 
 /** 下载 geoip/geosite 数据到 resources/core（mihomo 规则 GEOIP/GEOSITE 依赖） */
@@ -129,6 +163,18 @@ async function downloadGeo() {
     }
     file.end()
     await new Promise((r) => file.on('finish', r))
+    // 一致性提示：geo 取 meta-rules-dat latest，会随上游更新；仅提示，不强阻断
+    const actual = sha256(await fs.readFile(dest))
+    const recorded = SHA.geo?.[name]
+    if (recorded) {
+      if (actual === recorded) {
+        console.log(`[download-core] ✓ ${name} 与清单哈希一致`)
+      } else {
+        console.warn(
+          `[download-core] ⚠ ${name} 哈希与清单不一致（上游可能已更新）。若非手动更新预期，请确认文件未被截断/损坏\n  当前 ${actual.slice(0, 16)}… / 清单 ${recorded.slice(0, 16)}…`
+        )
+      }
+    }
     console.log(`[download-core] ${name} 完成`)
   }
 }

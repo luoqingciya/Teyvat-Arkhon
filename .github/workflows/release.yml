@@ -35,14 +35,44 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 下载内核与数据（mihomo/geo/wintun）
+      - name: 下载内核与数据（mihomo/geo/wintun，含 sha256 校验）
         run: node scripts/download-core.mjs v1.19.30
 
-      - name: 构建与打包
+      - name: 构建基础包与应用
         run: |
           pnpm prebuild-deps
           pnpm --filter @teyvat-arkhon/electron build
-          pnpm --filter @teyvat-arkhon/electron exec electron-builder -- --publish always
+
+      # 发布前内核全链路闸门：订阅导入→启动→路由→流量→热重载（防"本机绿、打包崩"）
+      - name: 内核全链路 E2E
+        run: node scripts/e2e-core.cjs
+
+      - name: 打包发布
+        run: pnpm --filter @teyvat-arkhon/electron exec electron-builder -- --publish always
+
+      - name: 打包产物启动冒烟（Linux）
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y xvfb
+          BIN=$(find release -path '*linux-unpacked*' -type f -executable ! -name '*.so*' | head -n1)
+          echo "冒烟二进制: $BIN"
+          xvfb-run -a "$BIN" &
+          PID=$!
+          sleep 6
+          kill -0 $PID && echo "✓ 应用进程存活，冒烟通过" || { echo "✗ 应用启动即退出"; exit 1; }
+          kill $PID || true
+
+      - name: 打包产物启动冒烟（Windows）
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem "release/win-unpacked/*.exe" | Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
+          Write-Output "冒烟二进制: $($exe.FullName)"
+          $p = Start-Process $exe.FullName -PassThru
+          Start-Sleep -Seconds 6
+          if ($p.HasExited) { Write-Error "应用启动即退出 (code $($p.ExitCode))"; exit 1 }
+          Write-Output "✓ 应用进程存活，冒烟通过"
+          Stop-Process -Id $p.Id -Force
 
       - name: GPL 合规检查（LICENSE 进产物）
         run: |

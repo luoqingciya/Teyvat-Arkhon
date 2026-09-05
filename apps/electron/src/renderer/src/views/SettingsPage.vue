@@ -47,6 +47,9 @@ function changeLang(e: Event): void {
         {{ t('settings.tunHint') }}
         <template v-if="tunHint">· <b class="accent">{{ tunHint }}</b></template>
       </p>
+      <p v-if="store.tunPrereq.windows && !store.tunPrereq.wintun" class="err">
+        ⚠ {{ t('settings.tunNoWintun') }}
+      </p>
       <label class="switch-row">
         <span class="row-label">{{ t('settings.enableTun') }}</span>
         <button

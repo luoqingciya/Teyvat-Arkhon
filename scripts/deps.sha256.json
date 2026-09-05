@@ -1,0 +1,15 @@
+{
+  "_comment": "内核/geo 完整性校验哈希清单。core 表内存在的版本与平台将做强校验（SHA256 不匹配即失败）；值为 null 的平台未登记哈希，下载时打印警告并跳过严格校验（建议首次 CI 下载后把实际哈希补登记到对应平台）。geo 来自 meta-rules-dat latest，会随上游更新而变化，仅做一致性提示（不阻断下载）。",
+  "core": {
+    "v1.19.30": {
+      "windows-amd64": "f55b3028d9160beb9044f21b05dd7405b46524614a19642d6291492f5f985761",
+      "linux-amd64": null,
+      "darwin-arm64": null,
+      "darwin-amd64": null
+    }
+  },
+  "geo": {
+    "geoip.dat": "4149e607530f91da697bad4696f8c59f0a475af38e69405e4124438c9886c721",
+    "geosite.dat": "7104fc19469298564947d42c320a1d5442416f1f72648bf516314d719594338c"
+  }
+}

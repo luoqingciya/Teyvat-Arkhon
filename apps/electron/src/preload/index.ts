@@ -64,6 +64,9 @@ const api: ArkhonAPI = {
   setPortable: (enabled) =>
     ipcRenderer.invoke('app:set-portable', enabled) as Promise<{ portable: boolean; note: string }>,
 
+  getTunPrereq: () =>
+    ipcRenderer.invoke('app:get-tun-prereq') as Promise<{ wintun: boolean; windows: boolean }>,
+
   onStateChange: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, status: CoreStatus): void => cb(status)
     ipcRenderer.on('arkhon:state', listener)

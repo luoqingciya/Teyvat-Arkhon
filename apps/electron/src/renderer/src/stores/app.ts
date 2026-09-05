@@ -34,6 +34,8 @@ interface AppState {
   trafficHistory: Array<{ t: number; down: number; up: number }>
   /** TUN 开关状态 */
   tunEnabled: boolean
+  /** TUN 前置依赖（wintun 驱动是否存在） */
+  tunPrereq: { wintun: boolean; windows: boolean }
   /** 系统服务状态 */
   serviceState: SystemServiceState
   /** 主题 */
@@ -63,6 +65,7 @@ export const useAppStore = defineStore('app', {
     traffic: null,
     trafficHistory: [],
     tunEnabled: false,
+    tunPrereq: { wintun: true, windows: false },
     serviceState: { name: 'TeyvatArkhonCore', state: 'not-installed' },
     theme: readTheme(),
     dataInfo: { dataDir: '', portable: false },
@@ -101,6 +104,7 @@ export const useAppStore = defineStore('app', {
       await this.refreshSystemProxy()
       await this.refreshTun()
       await this.refreshService()
+      await this.refreshTunPrereq()
       this.appVersion = await window.arkhon.getAppVersion()
     },
 
@@ -282,6 +286,15 @@ export const useAppStore = defineStore('app', {
         this.tunEnabled = await window.arkhon.getTunEnabled()
       } catch {
         this.tunEnabled = false
+      }
+    },
+
+    /** 拉取 TUN 前置依赖（wintun 是否存在） */
+    async refreshTunPrereq(): Promise<void> {
+      try {
+        this.tunPrereq = await window.arkhon.getTunPrereq()
+      } catch {
+        /* 忽略，保留默认值 */
       }
     },
 
