@@ -38,8 +38,14 @@ function releaseUrl(tag) {
   return `mihomo-${assetName(process.platform, process.arch)}-${tag}.gz`
 }
 
+/** GitHub API 请求带 token（CI 中 runner 出口 IP 无 token 易被限流 403） */
+function ghHeaders() {
+  const token = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN']
+  return token ? { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } : {}
+}
+
 async function latestTag() {
-  const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`)
+  const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, { headers: ghHeaders() })
   if (!res.ok) throw new Error(`查询最新版本失败: HTTP ${res.status}`)
   return (await res.json()).tag_name
 }

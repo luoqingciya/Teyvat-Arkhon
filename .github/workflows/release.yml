@@ -76,7 +76,7 @@ jobs:
           cp "$MINGW_BIN/libwinpthread-1.dll"  apps/electron/resources/core/ 2>/dev/null || true
 
       - name: 下载内核与数据（mihomo/geo/wintun）
-        run: node scripts/download-core.mjs
+        run: node scripts/download-core.mjs v1.19.30
 
       - name: 构建与打包
         run: |
