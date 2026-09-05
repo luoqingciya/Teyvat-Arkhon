@@ -34,23 +34,14 @@ function assetName(platform, arch) {
 }
 
 function releaseUrl(tag) {
-  return `mihomo-${assetName(process.platform, process.arch)}-${tag}.zip`
+  // v1.19+ 版本 mihomo 发布资产为 .gz 单文件（原为 .zip）
+  return `mihomo-${assetName(process.platform, process.arch)}-${tag}.gz`
 }
 
 async function latestTag() {
   const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`)
   if (!res.ok) throw new Error(`查询最新版本失败: HTTP ${res.status}`)
   return (await res.json()).tag_name
-}
-
-async function unzip(zipPath, outDir) {
-  if (process.platform === 'win32') {
-    const r = spawnSync('powershell', ['-NoProfile', '-Command', `Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${outDir}'`], { stdio: 'inherit' })
-    if (r.status !== 0) throw new Error('powershell Expand-Archive 解压失败')
-  } else {
-    const r = spawnSync('unzip', ['-o', zipPath, '-d', outDir], { stdio: 'inherit' })
-    if (r.status !== 0) throw new Error('unzip 解压失败')
-  }
 }
 
 async function main() {
@@ -66,35 +57,18 @@ async function main() {
     console.log(`[download-core] 下载: ${url}`)
 
     await fs.mkdir(TARGET_DIR, { recursive: true })
-    const zipPath = path.join(TARGET_DIR, `${fileName}`)
-
     const res = await fetch(url)
     if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
-    const total = Number(res.headers.get('content-length') ?? 0)
-    let received = 0
-    const file = createWriteStream(zipPath)
-    for await (const chunk of res.body) {
-      file.write(chunk)
-      received += chunk.length
-      process.stdout.write(`\r  进度: ${total ? ((received / total) * 100).toFixed(0) : received}%`)
+    const gz = Buffer.from(await res.arrayBuffer())
+    let bin
+    try {
+      bin = gunzipSync(gz)
+    } catch (e) {
+      throw new Error(`gzip 解压失败（${fileName}）: ${e instanceof Error ? e.message : String(e)}`)
     }
-    file.end()
-    await new Promise((r) => file.on('finish', r))
-    process.stdout.write('\n')
-
-    await unzip(zipPath, TARGET_DIR)
-    await fs.rm(zipPath, { force: true })
-
-    // 重命名产物为统一命名（zip 内文件名形如 mihomo-windows-amd64.exe）
-    const src = path.join(TARGET_DIR, osInZipName(process.platform, process.arch))
-    if (src !== finalDest) {
-      try {
-        await fs.rename(src, finalDest)
-      } catch {
-        await fs.copyFile(src, finalDest)
-      }
-    }
-    console.log(`[download-core] 完成: ${finalDest}`)
+    await fs.writeFile(finalDest, bin)
+    if (process.platform !== 'win32') await fs.chmod(finalDest, 0o755)
+    console.log(`[download-core] 完成: ${finalDest} (${bin.length} bytes)`)
   }
 
   await downloadGeo()
@@ -150,11 +124,6 @@ async function downloadWintun() {
   } catch (e) {
     console.warn(`[download-core] wintun.dll 下载失败（可稍后手动放置）: ${e.message}`)
   }
-}
-
-function osInZipName(platform, arch) {
-  const name = assetName(platform, arch)
-  return process.platform === 'win32' ? `mihomo-${name}.exe` : `mihomo-${name}`
 }
 
 main().catch((e) => {

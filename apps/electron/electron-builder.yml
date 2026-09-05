@@ -24,10 +24,7 @@ extraResources:
       - "**/*"
       - "!.gitkeep"
 
-# 许可证合规：打包 GPL-3.0 文本
-includeLicenseFiles:
-  - ../../LICENSE
-
+# 许可证合规：electron-builder 自动包含仓库根 LICENSE 文件进产物（GPL-3.0）
 win:
   target:
     - target: nsis
