@@ -47,6 +47,10 @@ jobs:
       - name: 修补 cmake-js（MinGW 链接标志）
         run: node scripts/patch-cmake-js.mjs
 
+      - name: 检出内核 fork（go.mod 本地路径 replace 依赖同一相对路径）
+        shell: bash
+        run: git clone --depth 1 --branch v1.19.30 https://github.com/luoqingciya/mihomo-teyvat.git ../mihomo-teyvat
+
       - name: 构建 libmihomo（cgo c-shared）
         working-directory: packages/native/bridge
         shell: bash

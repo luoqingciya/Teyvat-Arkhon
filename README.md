@@ -147,7 +147,7 @@ pnpm --filter @teyvat-arkhon/electron package:dir          # 本地打包预览�
 
 ### 构建原生链路（可选，仅 FFI 模式需要）
 
-> **内核定制基线**：桥接编译的内核源码来自自有 [fork luoqingciya/mihomo-teyvat](https://github.com/luoqingciya/mihomo-teyvat)（`packages/native/bridge/go.mod` 中 `replace` 指向其 `v1.19.30` tag，与上游同一 commit）。在 fork 上改动内核后，打新 tag 并更新 `replace` 版本即可让 CI 产出定制内核。
+> **内核定制基线**：编译时使用与仓库**同级**的本地内核工作副本 `mihomo-teyvat/`（内置 fork [luoqingciya/mihomo-teyvat](https://github.com/luoqingciya/mihomo-teyvat) 的 `v1.19.30`，与上游同一 commit）。[go.mod](packages/native/bridge/go.mod) 以**本地路径 replace** 指向它，改动 fork 源码后重新编译即生效；CI 每次构建前自动在相同相对路径检出该 fork。
 
 ```bash
 # 1) Go 桥接 → libmihomo 共享库（packages/native/bridge 目录内）
