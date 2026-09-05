@@ -1,11 +1,15 @@
 /**
  * 运行数据目录策略。
  *
- * 默认：使用系统 standard userData 目录（Windows: %APPDATA%\<app>，macOS: ~/Library/Application Support，Linux: ~/.config/<app>）。
+ * 默认（安装版 / 开发期）：使用系统 standard userData 目录（Windows: %APPDATA%\<app>，macOS: ~/Library/Application Support，Linux: ~/.config/<app>）。
  *
  * 便携模式：所有运行时数据（订阅档案、工作配置、geo/wintun 播种）落在
- * 应用运行目录旁的 data/ 下，实现"数据跟随安装目录"的绿色版体验。
- * 判定：环境变量 TEVVAT_ARKHON_PORTABLE=1，或运行目录下存在 portable.txt。
+ * 应用运行目录的 data/ 下，实现"数据跟随运行目录"的绿色版体验。
+ * 判定（优先级）：
+ *   1. 环境变量 TEVVAT_ARKHON_PORTABLE=1（强制便携）
+ *   2. 运行目录下存在 portable.txt（强制便携）
+ *   3. 默认策略：打包版若 exe 所在目录可写（解压的免安装版），自动数据跟随 exe 同级；
+ *      安装版（如 Program Files 等不可写目录）或开发期回退系统用户目录。
  */
 
 import { type App } from 'electron'
@@ -21,13 +25,28 @@ export function appRootDir(appHandle: App): string {
   return appHandle.getAppPath()
 }
 
-export function isPortableMode(appHandle: App, env = process.env): boolean {
-  if (env['TEVVAT_ARKHON_PORTABLE'] === '1') return true
+/** 目录可写探测：能创建并删除临时文件视为可写 */
+function dirWritable(dir: string): boolean {
+  const probe = join(dir, `.wprobe-${process.pid}`)
   try {
-    return existsSync(join(appRootDir(appHandle), PORTABLE_MARKER))
+    writeFileSync(probe, '1')
+    unlinkSync(probe)
+    return true
   } catch {
     return false
   }
+}
+
+export function isPortableMode(appHandle: App, env = process.env): boolean {
+  if (env['TEVVAT_ARKHON_PORTABLE'] === '1') return true
+  try {
+    if (existsSync(join(appRootDir(appHandle), PORTABLE_MARKER))) return true
+  } catch {
+    /* 目录不可达则跳过标记判断 */
+  }
+  // 默认策略：仅打包版按"可写则跟随运行目录"处理；开发期固定在系统用户目录
+  if (!appHandle.isPackaged) return false
+  return dirWritable(appRootDir(appHandle))
 }
 
 /**

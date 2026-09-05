@@ -10,8 +10,10 @@ import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
 import { setupAutoUpdater } from './updater'
 import { bootstrapDataDir } from './paths'
 
-// 数据目录策略（须在 ready 前确定）：便携模式数据跟随运行目录
+// 数据目录策略（须在 ready 前确定）：默认便携时数据跟随运行目录
 const dataLayout = bootstrapDataDir(app)
+// Windows 任务栏图标/通知需绑定 AppUserModelID（与 electron-builder appId 一致）
+if (process.platform === 'win32') app.setAppUserModelId('com.teyvat.arkhon')
 console.log(
   `[teyvat-arkhon] 运行数据目录: ${dataLayout.dataDir}（${dataLayout.portable ? '便携模式' : '系统用户目录'}）`
 )
@@ -88,8 +90,8 @@ function userDataConfigDir(): string {
 }
 
 // ---------- 系统托盘 ----------
-/** 托盘图标：打包后取自 resources/icon.png（extraResources 复制），开发期用 build/icon.png */
-function trayIconPath(): string {
+/** 应用图标：打包后取自 resources/icon.png（extraResources 复制），开发期用 build/icon.png */
+function appIconPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'icon.png')
 }
 
@@ -97,7 +99,7 @@ let tray: Tray | null = null
 let isQuitting = false
 
 function createTray(win: BrowserWindow): void {
-  const icon = nativeImage.createFromPath(trayIconPath())
+  const icon = nativeImage.createFromPath(appIconPath())
   if (icon.isEmpty()) return
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Teyvat Arkhon')
@@ -122,8 +124,8 @@ async function createWindow(): Promise<void> {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0b1120',
-    // Windows 窗口/任务栏图标（打包安装后改用 exe 内置图标，此处路径不存在自动忽略）
-    icon: join(app.getAppPath(), 'build', 'icon.png'),
+    // 窗口/任务栏图标（随包分发 resources/icon.png，与托盘同源）
+    icon: appIconPath(),
     title: 'Teyvat Arkhon',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

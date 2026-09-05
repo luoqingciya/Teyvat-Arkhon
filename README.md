@@ -11,7 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-31-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
 
-> 当前预发布版本：**v0.9.0-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
+> 当前预发布版本：**v0.9.1-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
@@ -68,7 +68,7 @@
 
 > 提示：TUN 模式需要管理员权限；Windows 下若缺少 `wintun.dll`，请手动放入 `resources/core` 或内核工作目录。
 >
-> 提示：**zip 免安装版**默认数据存系统用户目录；想要"解压到哪、数据在哪"的绿色体验，在解压目录放一个空的 `portable.txt`（或设环境变量 `TEVVAT_ARKHON_PORTABLE=1`）即可开启便携模式，订阅/配置/geo 全部跟随目录。
+> 提示：**zip 免安装版**数据默认就在解压目录的 `data/` 下（随 exe 走的绿色便携，无需额外设置）；安装版数据在系统用户目录。
 
 ---
 
