@@ -11,7 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-31-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
 
-> 当前预发布版本：**v0.9.1-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
+> 当前预发布版本：**v0.9.2-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
@@ -178,9 +178,12 @@ node scripts/patch-cmake-js.mjs   # 打 MinGW 链接兼容补丁（幂等）
 | Clash / mihomo 完整 YAML | ✅ | 节点类型覆盖 ss/vmess/trojan/vless/hysteria2/tuic/ssr/http/socks5/wireguard 等，能力随内核 |
 | Base64 包装的 YAML | ✅ | 自动解码（含 base64url 变体） |
 | HTTP(S) 订阅链接 | ✅ | 携带客户端 UA，兼容多数机场 Clash 端点 |
-| **hysteria2 单节点链接** | ✅ | `hysteria2://…` URI 自动转换为 Clash 节点导入（支持多条并列、insecure/sni/obfs/alpn 等参数） |
-| v2rayN 类 URI 列表（ss/vmess/trojan/vless） | ⚠️ | 暂不支持，可先经订阅转换服务转成 Clash 配置 |
-| Surge / Shadowrocket / sing-box / SSD | ⚠️ | 暂不支持，请使用/转换 Clash 格式 |
+| **单节点 URI（ss/vmess/vless/trojan/hysteria2）** | ✅ | 粘贴即导，自动转 Clash 节点并生成策略组；支持 base64 与参数形式（ws/grpc/tls/reality/obfs 等） |
+| **sing-box 导出 JSON** | ✅ | 识别 `outbounds` 数组，转换 vless/vmess/trojan/ss/hysteria2/tuic |
+| **SSD（shadowsocksD）** | ✅ | 标准 SSD JSON（servers 数组）自动转 ss 节点 |
+| **Surge 节点行** | ✅ | `Name = ss/trojan/hy2, …` 基础格式 |
+| Shadowrocket | ✅ | 其导出为 v2rayN URI，走 URI 导入 |
+| 其他（sing-box 复杂 inbound 等） | ⚠️ | 超出上行字段的复杂编排暂不转换，建议使用 Clash 格式 |
 
 ---
 

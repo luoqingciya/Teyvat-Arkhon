@@ -10,6 +10,29 @@
 ### Added
 - 待定：fork 内核定制特性（Teyvat Arkhon 私有内核扩展）
 
+## [0.9.2-rc] - 2026-09-05
+
+### Added
+- **订阅导入支持更多第三方格式**（自动转换为 Clash/mihomo 配置并生成策略组与默认规则）：
+  - 单节点 URI：`ss://`（base64/直写/插件）、`vmess://`、`vless://`（tls/reality/ws/grpc/flow）、`trojan://`（ws/h2/grpc）、`hysteria2://`、`hysteria://`
+  - sing-box 导出 JSON（`outbounds` 数组：vless/vmess/trojan/ss/hysteria2/tuic）
+  - SSD（shadowsocksD）JSON
+  - Surge 节点行（ss / trojan / hy2 常用写法）
+
+## [0.9.1-rc] - 2026-09-05
+
+### Changed
+- 窗口/任务栏图标统一使用随包图标资源，Windows 绑定 `AppUserModelId`
+- 数据默认跟随运行目录：exe 所在目录可写（免安装版）自动启用便携模式，安装版回退系统用户目录
+
+### Fixed
+- zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
+
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.2-rc...HEAD
+[0.9.2-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.2-rc
+[0.9.1-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.1-rc
+[0.9.0-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.0-rc
+
 ## [0.9.0-rc] - 2026-09-05
 
 首个可发布的预览版本，完成第一~四阶段全部功能，CI 打包发布流水线全绿。

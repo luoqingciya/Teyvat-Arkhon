@@ -86,6 +86,63 @@ describe('ConfigManager', () => {
     await expect(mgr.importFromText('mixed', mixed)).rejects.toThrow(/YAML|无法作为内核配置/)
   })
 
+  it.each([
+    ['ss base64 形态', 'ss://' + Buffer.from('aes-256-gcm:pass123@1.2.3.4:8388', 'utf-8').toString('base64') + '#SS-01', 'ss'],
+    ['ss 直写形态', 'ss://aes-256-gcm:pass123@5.6.7.8:443#SS-02', 'ss'],
+    ['vmess', 'vmess://' + Buffer.from(
+      JSON.stringify({ v: '2', ps: 'VM-A', add: 'vm.example.com', port: '443', id: '1111-2222', aid: '0', net: 'ws', path: '/ws', host: 'vm.example.com', tls: 'tls', scy: 'auto' }),
+      'utf-8'
+    ).toString('base64'), 'vmess'],
+    ['vless reality', 'vless://uuid-0001@vl.example.com:443?type=tcp&security=reality&sni=gh.example&pbk=PUB&sid=ABCD&flow=xtls-rprx-vision#VL-01', 'vless'],
+    ['trojan ws', 'trojan://pass-tj@tj.example.com:443?type=ws&path=%2Fstream&host=tj.example.com&sni=tj.example.com#TJ-01', 'trojan']
+  ])('%s 可转换导入', async (_label, uri, expectedType) => {
+    const { profile, summary } = await mgr.importFromText('legacy', uri)
+    expect(profile.nodeCount).toBe(1)
+    expect(summary.proxies[0].type).toBe(expectedType)
+  })
+
+  it('sing-box 导出 JSON 可转换导入', async () => {
+    const sb = JSON.stringify({
+      version: 1,
+      outbounds: [
+        {
+          type: 'vless',
+          tag: 'SB-VLESS',
+          server: 'sb.example.com',
+          server_port: 443,
+          uuid: 'aaa-bbb',
+          tls: { enabled: true, server_name: 'sb.example.com', utls: { enabled: true, fingerprint: 'chrome' } },
+          transport: { type: 'ws', path: '/ws', headers: { Host: 'sb.example.com' } }
+        },
+        { type: 'shadowsocks', tag: 'SB-SS', server: 'sb2.example.com', server_port: 8388, method: 'chacha20-ietf-poly1305', password: 'pwd' }
+      ]
+    })
+    const { profile, summary } = await mgr.importFromText('singbox', sb)
+    expect(profile.nodeCount).toBe(2)
+    const types = summary.proxies.map((p) => p.type).sort()
+    expect(types).toEqual(['ss', 'vless'])
+  })
+
+  it('SSD JSON 可转换导入', async () => {
+    const ssd = JSON.stringify({
+      airplan: 'test',
+      servers: [
+        { server: 'ssd.example.com', server_port: 8388, password: 'pw', method: 'aes-128-gcm', remarks: 'SSD-A' }
+      ]
+    })
+    const { profile, summary } = await mgr.importFromText('ssd', ssd)
+    expect(profile.nodeCount).toBe(1)
+    expect(summary.proxies[0].type).toBe('ss')
+  })
+
+  it('Surge 节点行可转换导入', async () => {
+    const surge = ['HK = ss, 1.2.3.4, 8388, encrypt-method=aes-256-gcm, password=surge-pwd', 'US = trojan, 5.6.7.8, 443, password=tj'].join('\n')
+    const { profile, summary } = await mgr.importFromText('surge', surge)
+    expect(profile.nodeCount).toBe(2)
+    const types = summary.proxies.map((p) => p.type).sort()
+    expect(types).toEqual(['ss', 'trojan'])
+  })
+
   it('选择档案会写入工作配置并标记 selected', async () => {
     const { profile } = await mgr.importFromText('sub-a', SAMPLE_YAML)
     const summary = await mgr.selectProfile(profile.id)
