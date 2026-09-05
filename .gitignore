@@ -1,0 +1,22 @@
+node_modules/
+dist/
+out/
+build/
+release/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.tsbuildinfo
+
+# 构建产物 / 工具链生成物
+packages/native/build/
+packages/native/bin/
+packages/native/bridge/libmihomo.*
+apps/electron/resources/core/*
+!apps/electron/resources/core/.gitkeep
+
+# 环境与密钥
+.env
+.env.*

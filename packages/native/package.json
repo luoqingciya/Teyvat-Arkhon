@@ -1,0 +1,22 @@
+{
+  "name": "@teyvat-arkhon/native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "C/C++ 原生模块：Mihomo FFI 绑定、TUN 管理、系统服务（N-API）",
+  "license": "GPL-3.0-only",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "gypfile": false,
+  "scripts": {
+    "build": "cmake-js compile --debug",
+    "build:release": "cmake-js compile",
+    "rebuild": "cmake-js rebuild --debug",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "cmake-js": "^7.3.0",
+    "node-addon-api": "^8.1.0",
+    "node-gyp": "^10.2.0",
+    "typescript": "^5.5.4"
+  }
+}

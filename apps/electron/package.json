@@ -1,0 +1,30 @@
+{
+  "name": "@teyvat-arkhon/electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Teyvat Arkhon - Electron 桌面应用",
+  "license": "GPL-3.0-only",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src",
+    "start": "electron-vite preview"
+  },
+  "dependencies": {
+    "@teyvat-arkhon/core-bridge": "workspace:*",
+    "@teyvat-arkhon/shared": "workspace:*",
+    "pinia": "^2.2.4",
+    "vue": "^3.5.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "electron": "^31.7.0",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  }
+}

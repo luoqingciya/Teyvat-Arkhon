@@ -1,0 +1,19 @@
+{
+  "name": "@teyvat-arkhon/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "跨端共享的类型定义与纯函数工具",
+  "license": "GPL-3.0-only",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4"
+  }
+}

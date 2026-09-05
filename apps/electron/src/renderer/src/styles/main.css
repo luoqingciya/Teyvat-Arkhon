@@ -1,0 +1,100 @@
+/* Teyvat Arkhon - 全局样式（暗色提瓦特基调 + 玻璃拟态） */
+
+:root {
+  --bg: #0b1120;
+  --bg-2: #0f172a;
+  --bg-hover: rgba(148, 163, 184, 0.09);
+  --border: rgba(148, 163, 184, 0.16);
+  --text: #e8edf6;
+  --text-dim: #9aa7bd;
+  --text-faint: #5d6b84;
+  --accent: #6c9bff;
+  --accent-soft: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 玻璃卡片 */
+.glass {
+  background: linear-gradient(160deg, rgba(30, 41, 59, 0.55), rgba(15, 23, 42, 0.72));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 34px rgba(2, 6, 23, 0.35);
+}
+
+/* 通用按钮 */
+.btn {
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.16);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #4f7cff, #38bdf8);
+  color: #fff;
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn.ghost {
+  background: transparent;
+}
+.btn.danger {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.btn.mini {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+::selection {
+  background: rgba(79, 124, 255, 0.4);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+  background-clip: padding-box;
+}

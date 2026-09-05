@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["index.d.ts"]
+}

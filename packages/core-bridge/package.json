@@ -1,0 +1,26 @@
+{
+  "name": "@teyvat-arkhon/core-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "封装 Mihomo 核心调用的 TypeScript 业务层（FFI 直连 / 进程驱动双模式）",
+  "license": "GPL-3.0-only",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@teyvat-arkhon/shared": "workspace:*",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  }
+}
