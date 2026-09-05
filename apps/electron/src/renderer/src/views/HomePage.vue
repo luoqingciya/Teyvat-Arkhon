@@ -94,6 +94,25 @@ function drawChart(): void {
       </button>
     </section>
 
+    <section class="mode-bar glass">
+      <div class="mode-label">
+        <h3>{{ t('home.mode') }}</h3>
+        <p class="hint">{{ t('home.modeHint') }}</p>
+      </div>
+      <div class="seg">
+        <button
+          v-for="m in (['rule', 'global', 'direct'] as const)"
+          :key="m"
+          class="seg-item"
+          :class="{ active: store.coreMode === m }"
+          :disabled="!store.running"
+          @click="store.setMode(m)"
+        >
+          {{ t(`home.mode${m[0].toUpperCase()}${m.slice(1)}`) }}
+        </button>
+      </div>
+    </section>
+
     <section class="grid">
       <div class="card glass">
         <h3>{{ t('home.coreState') }}</h3>
@@ -237,6 +256,51 @@ function drawChart(): void {
   grid-template-columns: 1fr 1fr;
   grid-auto-rows: 1fr;
   gap: 16px;
+}
+.mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 24px;
+  flex-wrap: wrap;
+}
+.mode-label h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.mode-label .hint {
+  margin: 0;
+}
+.seg {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.4);
+}
+.seg-item {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.seg-item:hover:not(:disabled) {
+  color: var(--text);
+}
+.seg-item.active {
+  background: linear-gradient(135deg, rgba(79, 124, 255, 0.35), rgba(56, 189, 248, 0.2));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(79, 124, 255, 0.45);
+}
+.seg-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .card {
   display: flex;

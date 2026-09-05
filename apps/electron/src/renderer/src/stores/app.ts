@@ -8,13 +8,14 @@ import type {
   DelayResult,
   Profile,
   ProxyItem,
+  ProxyMode,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
 } from '@teyvat-arkhon/shared'
 import { applyTheme, readTheme, type Theme } from '../theme'
 
-export type ViewKey = 'home' | 'proxies' | 'profiles' | 'connections' | 'config' | 'settings'
+export type ViewKey = 'home' | 'proxies' | 'profiles' | 'connections' | 'config' | 'settings' | 'logs'
 
 interface AppState {
   status: CoreStatus
@@ -42,7 +43,35 @@ interface AppState {
   theme: Theme
   /** 数据目录信息 */
   dataInfo: { dataDir: string; portable: boolean }
+  /** 当前运行模式 */
+  coreMode: ProxyMode
+  /** 内核日志缓冲（环形，最多 logLimit 条） */
+  logs: string[]
+  /** 测速配置 */
+  delaySetting: { url: string; timeoutMs: number }
 }
+
+/** 测速配置本地持久化键 */
+const DELAY_STORAGE_KEY = 'delay-setting'
+
+function readDelaySetting(): { url: string; timeoutMs: number } {
+  try {
+    const raw = localStorage.getItem(DELAY_STORAGE_KEY)
+    if (raw) {
+      const p = JSON.parse(raw) as { url?: string; timeoutMs?: number }
+      return {
+        url: typeof p.url === 'string' && p.url ? p.url : 'https://www.gstatic.com/generate_204',
+        timeoutMs: typeof p.timeoutMs === 'number' && p.timeoutMs > 0 ? p.timeoutMs : 5000
+      }
+    }
+  } catch {
+    /* 忽略读取失败，用默认值 */
+  }
+  return { url: 'https://www.gstatic.com/generate_204', timeoutMs: 5000 }
+}
+
+/** 测速配置的最大缓冲行数（与后端 logLimit 对齐） */
+const LOG_LIMIT = 500
 
 interface BatchTestState {
   running: boolean
@@ -69,7 +98,10 @@ export const useAppStore = defineStore('app', {
     serviceState: { name: 'TeyvatArkhonCore', state: 'not-installed' },
     theme: readTheme(),
     dataInfo: { dataDir: '', portable: false },
-    batchTest: { running: false, current: 0, total: 0 }
+    batchTest: { running: false, current: 0, total: 0 },
+    coreMode: 'rule',
+    logs: [],
+    delaySetting: readDelaySetting()
   }),
 
   getters: {
@@ -99,13 +131,39 @@ export const useAppStore = defineStore('app', {
         this.error = message
         setTimeout(() => (this.error = ''), 6000)
       })
+      window.arkhon.onCoreLog((line) => {
+        this.logs.push(line)
+        if (this.logs.length > LOG_LIMIT) this.logs.shift()
+      })
       await this.refreshStatus()
       await this.refreshProfiles()
       await this.refreshSystemProxy()
       await this.refreshTun()
       await this.refreshService()
       await this.refreshTunPrereq()
+      await this.initCoreMode()
+      await this.initLogs()
       this.appVersion = await window.arkhon.getAppVersion()
+    },
+
+    /** 启动时同步当前运行模式 */
+    async initCoreMode(): Promise<void> {
+      try {
+        const mode = await window.arkhon.getCoreMode()
+        if (mode) this.coreMode = mode
+      } catch {
+        /* 未运行，保持默认 */
+      }
+    },
+
+    /** 启动时拉取运行态日志快照 */
+    async initLogs(): Promise<void> {
+      try {
+        const lines = await window.arkhon.getCoreLogs()
+        if (lines.length) this.logs = lines.slice(-LOG_LIMIT)
+      } catch {
+        /* 忽略 */
+      }
     },
 
     async refreshStatus(): Promise<void> {
@@ -120,14 +178,30 @@ export const useAppStore = defineStore('app', {
 
     async start(): Promise<void> {
       this.busy = true
+      this.logs = []
       try {
         this.status = await window.arkhon.startCore()
+        await this.initCoreMode()
         await this.refreshProxies()
         if (!this.selectedGroup && this.groups.length > 0) this.selectedGroup = this.groups[0].name
       } catch (e) {
         this.error = (e as Error).message
       } finally {
         this.busy = false
+      }
+    },
+
+    /** 切换运行模式（rule/global/direct） */
+    async setMode(mode: ProxyMode): Promise<void> {
+      if (!this.running) {
+        this.coreMode = mode
+        return
+      }
+      try {
+        await window.arkhon.setCoreMode(mode)
+        this.coreMode = mode
+      } catch (e) {
+        this.error = (e as Error).message
       }
     },
 
@@ -172,10 +246,25 @@ export const useAppStore = defineStore('app', {
 
     async testNode(name: string): Promise<void> {
       try {
-        this.delays[name] = await window.arkhon.testDelay(name)
+        this.delays[name] = await window.arkhon.testDelay(
+          name,
+          this.delaySetting.url,
+          this.delaySetting.timeoutMs
+        )
       } catch (e) {
         this.delays[name] = { node: name, delay: -1, error: (e as Error).message }
       }
+    },
+
+    /** 保存测速配置（URL/超时）到本地持久化 */
+    saveDelaySetting(url: string, timeoutMs: number): void {
+      this.delaySetting = { url: url.trim() || 'https://www.gstatic.com/generate_204', timeoutMs }
+      localStorage.setItem(DELAY_STORAGE_KEY, JSON.stringify(this.delaySetting))
+    },
+
+    /** 清空内核日志缓冲 */
+    clearLogs(): void {
+      this.logs = []
     },
 
     /** 批量测速（顺序执行，逐行反馈进度） */

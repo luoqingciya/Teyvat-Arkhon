@@ -12,7 +12,8 @@ import type {
   DelayResult,
   MihomoVersion,
   Profile,
-  ProxyItem
+  ProxyItem,
+  ProxyMode
 } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
 import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
@@ -117,7 +118,8 @@ export class CoreService extends EventEmitter {
       externalController: cleanController(active.externalController, opts.externalController),
       secret: active.secret ?? opts.secret,
       fetchImpl: this.opts.fetchImpl,
-      onExit: () => this.setState('stopped')
+      onExit: () => this.setState('stopped'),
+      onLog: (line) => this.emit('core-log', line)
     })
   }
 
@@ -135,6 +137,21 @@ export class CoreService extends EventEmitter {
   listProxies(): Promise<ProxyItem[]> {
     if (!this.driver) throw new Error('内核未运行')
     return this.driver.getProxies()
+  }
+
+  setMode(mode: ProxyMode): Promise<void> {
+    if (!this.driver) throw new Error('内核未运行')
+    return this.driver.setMode(mode)
+  }
+
+  async getMode(): Promise<ProxyMode | undefined> {
+    if (!this.driver) return undefined
+    return this.driver.getMode()
+  }
+
+  /** 最近内核日志（仅运行态；停止后保留上次缓冲快照由主进程维护） */
+  getLogs(): string[] {
+    return this.driver?.getLogs() ?? []
   }
 
   selectProxy(groupName: string, nodeName: string): Promise<void> {

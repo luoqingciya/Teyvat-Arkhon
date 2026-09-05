@@ -8,6 +8,7 @@ import ProfilesPage from './views/ProfilesPage.vue'
 import ConnectionsPage from './views/ConnectionsPage.vue'
 import ConfigEditorPage from './views/ConfigEditorPage.vue'
 import SettingsPage from './views/SettingsPage.vue'
+import LogsPage from './views/LogsPage.vue'
 
 const store = useAppStore()
 </script>
@@ -23,6 +24,7 @@ const store = useAppStore()
         <ConnectionsPage v-else-if="store.activeView === 'connections'" />
         <ConfigEditorPage v-else-if="store.activeView === 'config'" />
         <SettingsPage v-else-if="store.activeView === 'settings'" />
+        <LogsPage v-else-if="store.activeView === 'logs'" />
       </main>
       <StatusBar />
     </div>

@@ -12,7 +12,7 @@ export type Lang = 'zh-CN' | 'en-US'
 const resources = {
   'zh-CN': {
     translation: {
-      nav: { home: '总览', proxies: '代理', profiles: '订阅', connections: '连接', config: '配置', settings: '设置' },
+      nav: { home: '总览', proxies: '代理', profiles: '订阅', connections: '连接', config: '配置', settings: '设置', logs: '日志' },
       status: {
         stopped: '已停止',
         starting: '启动中',
@@ -40,6 +40,11 @@ const resources = {
         download: '下载',
         upload: '上传',
         connections: '连接数',
+        mode: '运行模式',
+        modeHint: '全局：无视规则全部走代理；直连：全部直连；规则：按下方规则路由',
+        modeRule: '规则',
+        modeGlobal: '全局',
+        modeDirect: '直连',
         total: '累计 ↓ {{down}} · 累计 ↑ {{up}}',
         coreStopped: '（内核未运行）',
         quickStart: '快速开始',
@@ -83,6 +88,8 @@ const resources = {
       connections: {
         title: '活跃连接',
         empty: '当前没有活跃连接',
+        search: '搜索目标/规则/进程…',
+        noMatch: '没有匹配的连接',
         host: '目标',
         type: '类型',
         network: '网络',
@@ -103,6 +110,14 @@ const resources = {
         saved: '已保存并热重载',
         empty: '还没有工作配置，请先在订阅页导入并启用一个订阅',
         errorSaving: '保存失败'
+      },
+      logs: {
+        title: '内核日志',
+        hint: '实时展示 mihomo 内核运行输出，便于排障（启动失败 / 规则 miss / TUN 异常等）。',
+        copy: '复制全量',
+        copied: '已复制',
+        clear: '清空',
+        empty: '暂无日志。启动内核后此处将实时显示内核输出。'
       },
       settings: {
         title: '设置',
@@ -128,6 +143,12 @@ const resources = {
         dark: '暗色（提瓦特）',
         light: '亮色',
         language: '语言',
+        delaySetting: '测速设置',
+        delayHint: '自定义延迟测试的探测地址与超时时间，用于节点/批量测速。',
+        delayUrl: '测速 URL',
+        delayTimeout: '超时时间',
+        delaySave: '保存测速设置',
+        delaySaved: '已保存',
         about: '关于',
         version: '版本',
         license: '协议',
@@ -138,7 +159,7 @@ const resources = {
   },
   'en-US': {
     translation: {
-      nav: { home: 'Home', proxies: 'Proxies', profiles: 'Subscriptions', connections: 'Connections', config: 'Config', settings: 'Settings' },
+      nav: { home: 'Home', proxies: 'Proxies', profiles: 'Subscriptions', connections: 'Connections', config: 'Config', settings: 'Settings', logs: 'Logs' },
       status: {
         stopped: 'Stopped',
         starting: 'Starting',
@@ -166,6 +187,11 @@ const resources = {
         download: 'Download',
         upload: 'Upload',
         connections: 'Connections',
+        mode: 'Mode',
+        modeHint: 'Global: proxy everything; Direct: bypass everything; Rule: route by rules below',
+        modeRule: 'Rule',
+        modeGlobal: 'Global',
+        modeDirect: 'Direct',
         total: 'Total ↓{{down}} · ↑{{up}}',
         coreStopped: '(core stopped)',
         quickStart: 'Quick Start',
@@ -209,6 +235,8 @@ const resources = {
       connections: {
         title: 'Active Connections',
         empty: 'No active connections',
+        search: 'Search host / rule / process…',
+        noMatch: 'No matching connections',
         host: 'Host',
         type: 'Type',
         network: 'Network',
@@ -229,6 +257,14 @@ const resources = {
         saved: 'Saved and reloaded',
         empty: 'No working config yet — import a subscription first',
         errorSaving: 'Save failed'
+      },
+      logs: {
+        title: 'Core Logs',
+        hint: 'Live mihomo core output for troubleshooting (startup failure / rule miss / TUN errors).',
+        copy: 'Copy all',
+        copied: 'Copied',
+        clear: 'Clear',
+        empty: 'No logs yet. Start the core to see live output here.'
       },
       settings: {
         title: 'Settings',
@@ -259,6 +295,12 @@ const resources = {
         dark: 'Dark (Teyvat)',
         light: 'Light',
         language: 'Language',
+        delaySetting: 'Latency Test',
+        delayHint: 'Custom latency test probe URL and timeout for node / batch testing.',
+        delayUrl: 'Test URL',
+        delayTimeout: 'Timeout',
+        delaySave: 'Save latency settings',
+        delaySaved: 'Saved',
         about: 'About',
         version: 'Version',
         license: 'License',

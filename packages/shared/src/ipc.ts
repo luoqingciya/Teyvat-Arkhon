@@ -5,6 +5,7 @@ import type {
   DelayResult,
   Profile,
   ProxyItem,
+  ProxyMode,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -19,6 +20,9 @@ export interface ArkhonAPI {
   getCoreStatus(): Promise<CoreStatus>
   startCore(): Promise<CoreStatus>
   stopCore(): Promise<CoreStatus>
+  setCoreMode(mode: ProxyMode): Promise<void>
+  getCoreMode(): Promise<ProxyMode | undefined>
+  getCoreLogs(): Promise<string[]>
 
   // ---------- 实时连接与流量 ----------
   getConnections(): Promise<{
@@ -69,4 +73,5 @@ export interface ArkhonAPI {
   onStateChange(cb: (status: CoreStatus) => void): () => void
   onTraffic(cb: (snapshot: TrafficSnapshot) => void): () => void
   onError(cb: (message: string) => void): () => void
+  onCoreLog(cb: (line: string) => void): () => void
 }

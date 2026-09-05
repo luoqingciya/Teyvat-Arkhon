@@ -21,6 +21,18 @@ const tunHint = computed(() => {
   return store.running ? t('settings.tunRunning') : t('settings.tunEffective')
 })
 
+const delayUrl = ref(store.delaySetting.url)
+const delayTimeout = ref(String(store.delaySetting.timeoutMs))
+const delaySaved = ref(false)
+
+function saveDelay(): void {
+  store.saveDelaySetting(delayUrl.value.trim(), Number(delayTimeout.value) || 5000)
+  delayUrl.value = store.delaySetting.url
+  delayTimeout.value = String(store.delaySetting.timeoutMs)
+  delaySaved.value = true
+  setTimeout(() => (delaySaved.value = false), 2000)
+}
+
 function svcStateClass(): string {
   switch (store.serviceState.state) {
     case 'running':
@@ -63,6 +75,27 @@ function changeLang(e: Event): void {
           <span class="knob"></span>
         </button>
       </label>
+    </div>
+
+    <div class="card glass">
+      <h3>{{ t('settings.delaySetting') }}</h3>
+      <p class="hint">{{ t('settings.delayHint') }}</p>
+      <label class="input-row">
+        <span>{{ t('settings.delayUrl') }}</span>
+        <input v-model="delayUrl" class="input" type="url" placeholder="https://www.gstatic.com/generate_204" />
+      </label>
+      <label class="input-row">
+        <span>{{ t('settings.delayTimeout') }}</span>
+        <select v-model="delayTimeout" class="select">
+          <option value="2000">2s</option>
+          <option value="5000">5s</option>
+          <option value="10000">10s</option>
+          <option value="15000">15s</option>
+        </select>
+      </label>
+      <button class="btn" :disabled="store.busy" @click="saveDelay">
+        {{ delaySaved ? t('settings.delaySaved') : t('settings.delaySave') }}
+      </button>
     </div>
 
     <div class="card glass">
@@ -220,6 +253,26 @@ function changeLang(e: Event): void {
   background: var(--bg-2);
   color: var(--text);
   font-size: 14px;
+}
+.input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  margin: 8px 0;
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  margin-left: 18px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 14px;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 .svc-actions {
   display: flex;

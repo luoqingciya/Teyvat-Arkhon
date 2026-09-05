@@ -198,6 +198,13 @@ async function main() {
     check(viaProxy.status === 200, '命中 PROXY 规则的请求返回 200', `status=${viaProxy.status} body=${viaProxy.body}`)
     check(/\/tunnel-probe/.test(viaProxy.body), '流量经本地上游中转（标记命中）', `body=${viaProxy.body}`)
 
+    // 运行模式切换：rule → global（PATCH /configs）
+    await svc.setMode('global').catch(() => {})
+    const modeAfter = await svc.getMode()
+    check(modeAfter === 'global', '运行模式切换为 global', `mode=${modeAfter}`)
+    await svc.setMode('rule').catch(() => {})
+    check((await svc.getMode()) === 'rule', '运行模式切回 rule', `mode=${await svc.getMode()}`)
+
     // 规则 MATCH,DIRECT → 直连回显
     const viaDirect = await requestThroughCore(`http://127.0.0.1:${ECHO_PORT}/direct-probe`)
     check(/ECHO-OK[\s\S]*\/direct-probe/.test(viaDirect.body), 'MATCH,DIRECT 直连生效（标记命中）', `body=${viaDirect.body}`)

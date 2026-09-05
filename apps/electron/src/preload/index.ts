@@ -7,6 +7,7 @@ import type {
   DelayResult,
   Profile,
   ProxyItem,
+  ProxyMode,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -16,6 +17,9 @@ const api: ArkhonAPI = {
   getCoreStatus: () => ipcRenderer.invoke('core:get-status') as Promise<CoreStatus>,
   startCore: () => ipcRenderer.invoke('core:start') as Promise<CoreStatus>,
   stopCore: () => ipcRenderer.invoke('core:stop') as Promise<CoreStatus>,
+  setCoreMode: (mode) => ipcRenderer.invoke('core:set-mode', mode) as Promise<void>,
+  getCoreMode: () => ipcRenderer.invoke('core:get-mode') as Promise<ProxyMode | undefined>,
+  getCoreLogs: () => ipcRenderer.invoke('core:get-logs') as Promise<string[]>,
 
   getConnections: () =>
     ipcRenderer.invoke('core:get-connections') as Promise<{
@@ -81,6 +85,11 @@ const api: ArkhonAPI = {
     const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)
     ipcRenderer.on('arkhon:error', listener)
     return () => ipcRenderer.removeListener('arkhon:error', listener)
+  },
+  onCoreLog: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, line: string): void => cb(line)
+    ipcRenderer.on('arkhon:log', listener)
+    return () => ipcRenderer.removeListener('arkhon:log', listener)
   }
 }
 

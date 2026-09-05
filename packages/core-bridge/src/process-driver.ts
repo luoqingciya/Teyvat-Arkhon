@@ -4,7 +4,13 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import type { ConnectionInfo, DelayResult, MihomoVersion, ProxyItem } from '@teyvat-arkhon/shared'
+import type {
+  ConnectionInfo,
+  DelayResult,
+  MihomoVersion,
+  ProxyItem,
+  ProxyMode
+} from '@teyvat-arkhon/shared'
 import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap } from './rest-client'
 import type { CoreDriver } from './driver'
 
@@ -19,6 +25,10 @@ export interface ProcessDriverOptions {
   secret: string
   /** 子进程意外退出回调 */
   onExit?: (code: number | null, signal: NodeJS.Signals | null) => void
+  /** 内核 stdout/stderr 每行日志回调 */
+  onLog?: (line: string) => void
+  /** 内核日志环形缓冲上限 */
+  logLimit?: number
   /** fetch 注入（测试用） */
   fetchImpl?: typeof fetch
   /** 就绪等待超时 ms */
@@ -34,6 +44,8 @@ export class ProcessCoreDriver implements CoreDriver {
   private child: ChildProcess | null = null
   private exited = false
   private readonly startupTimeoutMs: number
+  private readonly logs: string[] = []
+  private readonly logLimit: number
 
   constructor(private readonly opts: ProcessDriverOptions) {
     this.rest = new RestClient({
@@ -42,10 +54,26 @@ export class ProcessCoreDriver implements CoreDriver {
       fetchImpl: opts.fetchImpl
     })
     this.startupTimeoutMs = opts.startupTimeoutMs ?? 10_000
+    this.logLimit = opts.logLimit ?? 500
   }
 
   get running(): boolean {
     return this.child !== null && !this.exited
+  }
+
+  private pushLog(chunk: Buffer | string): void {
+    const text = Buffer.isBuffer(chunk) ? chunk.toString() : chunk
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      this.logs.push(trimmed)
+      if (this.logs.length > this.logLimit) this.logs.shift()
+      this.opts.onLog?.(trimmed)
+    }
+  }
+
+  getLogs(): string[] {
+    return [...this.logs]
   }
 
   async start(): Promise<void> {
@@ -56,8 +84,10 @@ export class ProcessCoreDriver implements CoreDriver {
     try {
       this.child = spawn(binary, ['-d', this.opts.workingDir], {
         windowsHide: true,
-        stdio: 'ignore'
+        stdio: ['ignore', 'pipe', 'pipe']
       })
+      this.child.stdout?.on('data', (d: Buffer) => this.pushLog(d))
+      this.child.stderr?.on('data', (d: Buffer) => this.pushLog(d))
     } catch (e) {
       throw new Error(
         `无法启动 mihomo（${binary}）。请先运行 pnpm core:download 下载内核，` +
@@ -112,6 +142,16 @@ export class ProcessCoreDriver implements CoreDriver {
 
   async reload(configPath: string): Promise<void> {
     await this.rest.patch('/configs', { path: configPath })
+  }
+
+  async setMode(mode: ProxyMode): Promise<void> {
+    await this.rest.patch('/configs', { mode })
+  }
+
+  async getMode(): Promise<ProxyMode | undefined> {
+    const cfg = await this.rest.get<{ mode?: string }>('/configs')
+    const m = cfg.mode
+    return m === 'rule' || m === 'global' || m === 'direct' ? m : undefined
   }
 
   async getVersion(): Promise<MihomoVersion> {

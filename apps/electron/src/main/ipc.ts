@@ -1,5 +1,5 @@
 import { BrowserWindow, app, ipcMain } from 'electron'
-import type { CoreStatus, SystemProxyState } from '@teyvat-arkhon/shared'
+import type { CoreStatus, ProxyMode, SystemProxyState } from '@teyvat-arkhon/shared'
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 import type { SystemProxyController } from './system-proxy'
 import type { WindowsServiceManager } from './system-service'
@@ -23,10 +23,18 @@ export function createIpc(
       win.webContents.send('arkhon:error', msg)
     }
   })
+  service.on('core-log', (line: string) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('arkhon:log', line)
+    }
+  })
 
   ipcMain.handle('core:get-status', () => service.status())
   ipcMain.handle('core:start', () => service.start())
   ipcMain.handle('core:stop', () => service.stop())
+  ipcMain.handle('core:set-mode', (_e, mode: ProxyMode) => service.setMode(mode))
+  ipcMain.handle('core:get-mode', () => service.getMode())
+  ipcMain.handle('core:get-logs', () => service.getLogs())
 
   ipcMain.handle('core:get-connections', () => service.getConnections())
   ipcMain.handle('core:close-connection', (_e, id: string) => service.closeConnection(id))

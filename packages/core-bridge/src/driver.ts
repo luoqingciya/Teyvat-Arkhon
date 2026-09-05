@@ -1,4 +1,11 @@
-import type { ConnectionInfo, CoreStatus, DelayResult, MihomoVersion, ProxyItem } from '@teyvat-arkhon/shared'
+import type {
+  ConnectionInfo,
+  CoreStatus,
+  DelayResult,
+  MihomoVersion,
+  ProxyItem,
+  ProxyMode
+} from '@teyvat-arkhon/shared'
 
 /** 核心驱动统一接口：当前统一使用进程驱动（稳定优先） */
 export interface CoreDriver {
@@ -15,6 +22,15 @@ export interface CoreDriver {
 
   /** 内核版本信息 */
   getVersion(): Promise<MihomoVersion>
+
+  /** 切换代理运行模式（rule/global/direct，运行态生效） */
+  setMode(mode: ProxyMode): Promise<void>
+
+  /** 获取当前运行模式（运行态） */
+  getMode(): Promise<ProxyMode | undefined>
+
+  /** 最近内核日志（顶格 N 条） */
+  getLogs(): string[]
 
   /** 获取策略组与节点列表（扁平化） */
   getProxies(): Promise<ProxyItem[]>

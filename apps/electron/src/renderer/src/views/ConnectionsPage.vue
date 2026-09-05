@@ -1,9 +1,22 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
 const { t } = useTranslation()
+const keyword = ref('')
+
+const filtered = computed(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  const all = store.traffic?.connections ?? []
+  if (!kw) return all
+  return all.filter((c) =>
+    [c.host, c.rule, c.process, c.type, c.network, c.rulePayload].some(
+      (v) => v != null && String(v).toLowerCase().includes(kw)
+    )
+  )
+})
 
 function fmt(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`
@@ -28,6 +41,12 @@ function fmtTime(iso: string): string {
         <span v-if="store.traffic" class="hint">
           {{ t('connections.totalHint', { count: store.traffic.connections.length, down: fmt(store.traffic.downloadTotal), up: fmt(store.traffic.uploadTotal) }) }}
         </span>
+        <input
+          v-model="keyword"
+          class="search"
+          type="search"
+          :placeholder="t('connections.search')"
+        />
         <button class="btn danger mini" :disabled="!store.running" @click="store.closeAllConnections()">
           {{ t('connections.closeAll') }}
         </button>
@@ -39,6 +58,7 @@ function fmtTime(iso: string): string {
       <div v-else-if="!store.traffic || store.traffic.connections.length === 0" class="empty">
         {{ t('connections.empty') }}
       </div>
+      <div v-else-if="filtered.length === 0" class="empty">{{ t('connections.noMatch') }}</div>
       <table v-else class="ctable">
         <thead>
           <tr>
@@ -53,7 +73,7 @@ function fmtTime(iso: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="c in store.traffic.connections" :key="c.id">
+          <tr v-for="c in filtered" :key="c.id">
             <td class="c-host">{{ c.host || '—' }}</td>
             <td>
               <span class="type-tag">{{ c.type || '—' }}{{ c.process ? ' · ' + c.process : '' }}</span>
@@ -101,6 +121,15 @@ function fmtTime(iso: string): string {
 .hint {
   font-size: 13px;
   color: var(--text-dim);
+}
+.search {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 13px;
+  width: 200px;
 }
 .table-wrap {
   flex: 1;

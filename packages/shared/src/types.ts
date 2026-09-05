@@ -47,13 +47,18 @@ export interface ClashConfigSummary {
   proxyGroups: Array<{ name: string; type: string }>
 }
 
-/** 核心运行状态 */
+/** 内核运行状态 */
 export type CoreState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
+
+/** 代理运行模式（mihomo mode） */
+export type ProxyMode = 'rule' | 'global' | 'direct'
 
 export interface CoreStatus {
   state: CoreState
   version?: MihomoVersion
   driver: 'process'
+  /** 当前运行模式（运行态有效） */
+  mode?: ProxyMode
 }
 
 /** 系统代理状态 */
