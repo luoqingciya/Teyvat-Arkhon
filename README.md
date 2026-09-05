@@ -6,9 +6,12 @@
 
 [![CI](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/ci.yml/badge.svg)](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/badge/release-GitHub%20Actions-blue)](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/release.yml)
+[![Download](https://img.shields.io/badge/download-Releases-green)](https://github.com/luoqingciya/Teyvat-Arkhon/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-31-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
+
+> 当前预发布版本：**v0.9.0-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
@@ -59,11 +62,13 @@
 
 ## 🚀 快速上手
 
-1. **获取应用**：从 [Releases](https://github.com/luoqingciya/Teyvat-Arkhon/releases) 下载对应平台的安装包（Windows NSIS / Linux AppImage 或 deb）。
+1. **获取应用**：从 [Releases](https://github.com/luoqingciya/Teyvat-Arkhon/releases) 下载对应产物 —— **Windows**：NSIS 安装版（`.exe`）或 **免安装 zip 版**（`.zip`，解压即用）；**Linux**：AppImage 或 deb。
 2. **导入订阅**：打开应用 →「订阅」页 → 粘贴 Clash 订阅链接或完整 YAML 配置 → 导入。
 3. **启动内核**：回到「总览」页点击 **启动内核**；在「代理」页选择节点并测速；如需全局接管可开启「系统代理」或「TUN」。
 
 > 提示：TUN 模式需要管理员权限；Windows 下若缺少 `wintun.dll`，请手动放入 `resources/core` 或内核工作目录。
+>
+> 提示：**zip 免安装版**默认数据存系统用户目录；想要"解压到哪、数据在哪"的绿色体验，在解压目录放一个空的 `portable.txt`（或设环境变量 `TEVVAT_ARKHON_PORTABLE=1`）即可开启便携模式，订阅/配置/geo 全部跟随目录。
 
 ---
 
@@ -122,7 +127,7 @@
 
 ### 环境要求
 
-- Node.js ≥ 20、pnpm 10+
+- Node.js ≥ 22.13、pnpm 11（monorepo workspace + strict 布局）
 - 构建/运行**原生链路**需要：Go（cgo）与 gcc —— Windows 推荐 [MinGW-w64](https://www.mingw-w64.org/)（MSVC 组件不参与 cgo），macOS / Linux 用系统 `gcc`/`clang`
 - 打包需要 electron-builder 依赖（CI 已内置）
 
@@ -141,6 +146,8 @@ pnpm --filter @teyvat-arkhon/electron package:dir          # 本地打包预览�
 ```
 
 ### 构建原生链路（可选，仅 FFI 模式需要）
+
+> **内核定制基线**：桥接编译的内核源码来自自有 [fork luoqingciya/mihomo-teyvat](https://github.com/luoqingciya/mihomo-teyvat)（`packages/native/bridge/go.mod` 中 `replace` 指向其 `v1.19.30` tag，与上游同一 commit）。在 fork 上改动内核后，打新 tag 并更新 `replace` 版本即可让 CI 产出定制内核。
 
 ```bash
 # 1) Go 桥接 → libmihomo 共享库（packages/native/bridge 目录内）
@@ -190,6 +197,9 @@ A：TUN 建卡需要管理员权限；Windows 还需 `wintun.dll`（`pnpm core:d
 **Q：便携模式与系统目录模式有什么区别？**
 A：便携模式把订阅档案/工作配置/geo 等数据从系统用户目录移到运行目录旁的 `data/`，随 U 盘可迁移、绿色免写入系统；系统代理和 Windows 服务仍属系统级，不随便携。切换后需重启应用。
 
+**Q：zip 免安装版和安装版有什么区别？**
+A：zip 版解压即可运行、无需写入系统，适合绿色分发与 U 盘携带；默认数据仍在系统用户目录，配合 `portable.txt` / `TEVVAT_ARKHON_PORTABLE=1` 即完全便携。安装版提供开始菜单快捷方式、卸载程序和更平滑的自动更新安装。
+
 **Q：如何关闭自动更新？**
 A：启动时设置环境变量 `TEVVAT_ARKHON_DISABLE_UPDATE=1` 即可跳过检查。
 
@@ -211,8 +221,8 @@ A：「代理」页顶部的策略组 chips 切换分组，表格中每行可"�
 
 - **CI 测试**：每次 push / PR 自动运行单测、类型检查、应用构建（ubuntu）与 Playwright UI 冒烟（windows）。
 - **一键发布**：推送 `v*` 标签（例：`git tag v0.2.0 && git push origin v0.2.0`）触发 [release.yml](.github/workflows/release.yml)：
-  win/linux 矩阵自动完成 安装 MinGW → Go 编译 `libmihomo` → cmake-js 编译 `.node` → `core:download`（内核/geo/wintun）→ electron-builder 打包（Windows NSIS / Linux AppImage+deb）→ 上传 GitHub Releases。
-- **自动更新**：应用内置 electron-updater 读取 Releases 最新版本。
+  win/linux 矩阵自动完成 安装 MinGW → Go 编译 `libmihomo`（自 fork）→ cmake-js 编译 `.node` → `core:download`（内核/geo/wintun，固定 v1.19.30）→ electron-builder 打包（**Windows NSIS 安装版 + 免安装 zip / Linux AppImage+deb**）→ 上传 GitHub Releases。
+- **自动更新**：应用内置 electron-updater 读取 Releases 最新版本；zip 免安装版直接替换解压目录文件升级。
 
 ---
 
