@@ -14,10 +14,8 @@ jobs:
         include:
           - os: windows-latest
             ext: dll
-            cc: 'C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\gcc.exe'
           - os: ubuntu-latest
             ext: so
-            cc: gcc
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,9 +48,11 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: '1'
-          CC: ${{ matrix.cc }}
           GOPROXY: 'https://proxy.golang.org,direct'
         run: |
+          # MinGW gcc 由前一步 choco 安装并加入 PATH（choco 新版部署在 C:\ProgramData\mingw64）
+          if [ "$RUNNER_OS" = "Windows" ]; then export CC="$(cygpath -w "$(command -v gcc)")"; else export CC="$(command -v gcc)"; fi
+          echo "C compiler: $CC"
           mkdir -p ../../../apps/electron/resources/core
           go build -buildmode=c-shared -ldflags "-s -w -X github.com/metacubex/mihomo/constant.Version=v1.19.30" \
             -o ../../../apps/electron/resources/core/libmihomo.${{ matrix.ext }} .
@@ -69,9 +69,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libgcc_s_seh-1.dll"  apps/electron/resources/core/ 2>/dev/null || true
-          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libstdc++-6.dll"      apps/electron/resources/core/ 2>/dev/null || true
-          cp "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\libwinpthread-1.dll" apps/electron/resources/core/ 2>/dev/null || true
+          MINGW_BIN="$(dirname "$(command -v gcc)")"
+          echo "MinGW bin: $MINGW_BIN"
+          cp "$MINGW_BIN/libgcc_s_seh-1.dll"  apps/electron/resources/core/ 2>/dev/null || true
+          cp "$MINGW_BIN/libstdc++-6.dll"      apps/electron/resources/core/ 2>/dev/null || true
+          cp "$MINGW_BIN/libwinpthread-1.dll"  apps/electron/resources/core/ 2>/dev/null || true
 
       - name: 下载内核与数据（mihomo/geo/wintun）
         run: node scripts/download-core.mjs

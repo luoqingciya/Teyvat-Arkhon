@@ -33,7 +33,8 @@ if (!src.includes(oldBlock)) {
 
 const newBlock = `// ${MARKER} 专属链接标志仅在使用 Visual Studio 生成器时生效；MinGW/GNU ld 不识别 /DELAYLOAD
 if (!this.options.generator || this.options.generator.includes('Visual Studio')) {
-  this.linkerFlags.push('/DELAYLOAD:NODE.EXE')`
+  this.linkerFlags.push('/DELAYLOAD:NODE.EXE')
+}`
 
 writeFileSync(toolsetPath, src.replace(oldBlock, newBlock), 'utf-8')
 console.log('[patch-cmake-js] 补丁已应用')
