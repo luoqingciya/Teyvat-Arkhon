@@ -108,3 +108,28 @@ export interface SystemServiceState {
   state: ServiceState
   error?: string
 }
+
+/** 网络自检：单项探测结果（经内核代理链路发出） */
+export interface NetProbeResult {
+  /** 探测目标标识，如 ip / netflix / youtube / openai */
+  key: string
+  label: string
+  /** 探测是否完成（完成不代表可达） */
+  ok: boolean
+  /** HTTP 状态码（网络错误时为 0） */
+  status: number
+  /** 附加信息：IP / 地区 / 组织 / 错误信息 */
+  detail?: string
+  /** 探测耗时 ms */
+  elapsedMs: number
+}
+
+/** UWP 回环豁免状态（Windows） */
+export interface LoopbackState {
+  /** 平台是否支持（非 Windows 恒为 false） */
+  supported: boolean
+  /** 已豁免的应用数（-s 输出解析，0 表示未知/无） */
+  exemptCount: number
+  /** 最近一次操作结果说明 */
+  note?: string
+}

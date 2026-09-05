@@ -1,18 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
 const { t } = useTranslation()
 
+/** 按延迟升序排列（未测速/超时的排在最后） */
+const sortByDelay = ref(false)
+
 const groupNodes = computed(() => {
   const group = store.currentGroup
   if (!group?.all) return []
-  return group.all.map((name) => {
+  const nodes = group.all.map((name) => {
     const p = store.proxies.find((x) => x.name === name)
     const delay = store.delays[name]
     return { name, type: p?.type ?? '', delay }
+  })
+  if (!sortByDelay.value) return nodes
+  return [...nodes].sort((a, b) => {
+    const da = a.delay?.delay ?? Number.POSITIVE_INFINITY
+    const db = b.delay?.delay ?? Number.POSITIVE_INFINITY
+    return da - db
   })
 })
 
@@ -40,6 +49,9 @@ function delayClass(delay: number): string {
         </button>
       </div>
       <div class="actions">
+        <button class="chip-sort" :class="{ on: sortByDelay }" @click="sortByDelay = !sortByDelay">
+          {{ t('proxies.sortByDelay') }}
+        </button>
         <button class="btn ghost" :disabled="!store.running" @click="store.refreshProxies()">{{ t('proxies.refresh') }}</button>
         <button class="btn primary" :disabled="!store.currentGroup?.all?.length || store.batchTest.running" @click="store.testAllNodes()">
           <span v-if="store.batchTest.running">{{ t('proxies.testing', { cur: store.batchTest.current, total: store.batchTest.total }) }}</span>
@@ -148,6 +160,24 @@ function delayClass(delay: number): string {
 .actions {
   display: flex;
   gap: 10px;
+}
+.chip-sort {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.chip-sort:hover {
+  border-color: rgba(79, 124, 255, 0.5);
+}
+.chip-sort.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(79, 124, 255, 0.14);
 }
 .table-wrap {
   flex: 1;

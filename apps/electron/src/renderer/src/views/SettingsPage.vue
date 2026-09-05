@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
+import type { NetProbeResult } from '@teyvat-arkhon/shared'
 import { useAppStore } from '../stores/app'
 import { setLanguage, type Lang } from '../i18n'
 
@@ -49,6 +50,33 @@ function changeLang(e: Event): void {
   currentLang.value = lang
   setLanguage(lang)
 }
+
+/** 自检项展示名（ip 走 i18n，其余为固定服务名） */
+function probeLabel(key: string): string {
+  switch (key) {
+    case 'ip':
+      return t('settings.netCheckIp')
+    case 'netflix':
+      return 'Netflix'
+    case 'youtube':
+      return 'YouTube'
+    case 'openai':
+      return 'OpenAI'
+    default:
+      return key
+  }
+}
+
+/** 自检项状态文案（按结果派生，保证中英文一致） */
+function probeStatus(p: NetProbeResult): { text: string; cls: string } {
+  if (p.ok) {
+    if (p.status === 401) return { text: t('settings.netCheckAuth'), cls: 'ok' }
+    if (p.status === 403) return { text: t('settings.netCheckRegion'), cls: 'ok' }
+    return { text: t('settings.netCheckReachable'), cls: 'ok' }
+  }
+  if (p.status === 0) return { text: t('settings.netCheckUnreachable'), cls: 'fail' }
+  return { text: `${t('settings.netCheckFail')} HTTP ${p.status}`, cls: 'fail' }
+}
 </script>
 
 <template>
@@ -96,6 +124,60 @@ function changeLang(e: Event): void {
       <button class="btn" :disabled="store.busy" @click="saveDelay">
         {{ delaySaved ? t('settings.delaySaved') : t('settings.delaySave') }}
       </button>
+    </div>
+
+    <div class="card glass">
+      <h3>{{ t('settings.autoRefresh') }}</h3>
+      <p class="hint">{{ t('settings.autoRefreshHint') }}</p>
+      <div class="switch-row">
+        <span class="row-label">{{ t('settings.autoRefreshOn') }}</span>
+        <button
+          class="switch"
+          :class="{ on: store.autoRefresh }"
+          role="switch"
+          :aria-checked="store.autoRefresh"
+          :disabled="store.busy"
+          @click="store.setAutoRefresh(!store.autoRefresh)"
+        >
+          <span class="knob"></span>
+        </button>
+      </div>
+      <button class="btn" :disabled="store.busy" @click="store.refreshAllProfiles()">
+        {{ t('settings.refreshNow') }}
+      </button>
+    </div>
+
+    <div class="card glass">
+      <h3>{{ t('settings.netCheck') }}</h3>
+      <p class="hint">{{ t('settings.netCheckHint') }}</p>
+      <button class="btn primary" :disabled="store.netChecking" @click="store.runNetCheck()">
+        {{ store.netChecking ? t('settings.netCheckRunning') : t('settings.netCheckRun') }}
+      </button>
+      <div v-if="store.netProbe?.length" class="probe-list">
+        <div v-for="p in store.netProbe" :key="p.key" class="probe-row">
+          <span class="probe-name">{{ probeLabel(p.key) }}</span>
+          <span class="probe-detail">{{ p.detail ?? '' }}</span>
+          <span class="probe-status" :class="probeStatus(p).cls">{{ probeStatus(p).text }}</span>
+          <span class="probe-ms">{{ p.elapsedMs }} ms</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="store.loopback?.supported" class="card glass">
+      <h3>{{ t('settings.loopback') }}</h3>
+      <p class="hint">{{ t('settings.loopbackHint') }}</p>
+      <div class="switch-row">
+        <span class="row-label">{{ t('settings.loopbackExempted', { count: store.loopback.exemptCount }) }}</span>
+        <div class="svc-actions">
+          <button class="btn primary" :disabled="store.busy" @click="store.enableLoopback()">
+            {{ t('settings.loopbackEnable') }}
+          </button>
+          <button class="btn danger" :disabled="store.busy || store.loopback.exemptCount === 0" @click="store.disableLoopback()">
+            {{ t('settings.loopbackDisable') }}
+          </button>
+        </div>
+      </div>
+      <p v-if="store.loopback.note" class="note">{{ store.loopback.note }}</p>
     </div>
 
     <div class="card glass">
@@ -318,6 +400,46 @@ function changeLang(e: Event): void {
 }
 .link:hover {
   text-decoration: underline;
+}
+.probe-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.probe-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+}
+.probe-name {
+  min-width: 90px;
+  font-weight: 600;
+  color: var(--text);
+}
+.probe-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.probe-status.ok {
+  color: #34d399;
+}
+.probe-status.fail {
+  color: #f87171;
+}
+.probe-ms {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .switch {
   width: 52px;

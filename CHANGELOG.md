@@ -5,6 +5,28 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.6-rc...HEAD
+
+## [0.9.6-rc] - 2026-09-06
+
+### Added
+- **订阅自动更新**：启动即刷新全部 URL 订阅，之后每 6 小时定时刷新（设置页可开关、手动"立即刷新"）；失败保留旧档，成功自动热重载当前档案
+- **网络自检**：经内核代理链路探测出口 IP/地区与 Netflix / YouTube / OpenAI 可达性，设置页分项展示结果与耗时
+- **UWP 回环豁免（Windows）**：一键豁免 / 撤销 Microsoft Store、邮件、Xbox 等 UWP 应用的回环限制（CheckNetIsolation），非 Windows 自动隐藏入口
+- **测速并发化**：批量测速改为限量并发（8 并发游标队列，逐行反馈进度）；代理页新增"按延迟排序"（超时/未测节点置底）
+- 日志页**搜索框与级别过滤**（信息 / 警告 / 错误 / 调试）与"跟随最新"开关
+
+### Changed
+- **运行模式持久化**：切换 规则 / 全局 / 直连 同步写回工作配置 `mode` 字段，内核重启后保持用户选择
+- **日志页可读性重构**：自动解析 mihomo 日志为 时间戳 / 级别徽标 / 消息 三栏（兼容新版与 logrus 旧格式），按级别着色（debug/info/warning/error/panic），长行不再硬折断 URL
+- 订阅 / 模式切换等 IPC 全面接入 preload 类型与主进程接线；订阅自动更新开关持久化于 `userData/settings.json`
+
+### Fixed
+- eslint 配置缺失渲染端 DOM 全局（`setTimeout` / `Event` / `HTML*Element`）导致的 lint 失败
+- core-bridge `uri-profiles` 中 `modeSeen` 死代码 lint 报错（行为不变，输出等价）
+
+验证：typecheck / 20 项单测 / electron-vite 构建 / 21 项内核 E2E / Playwright UI 冒烟全绿。
+
 ## [0.9.5-rc] - 2026-09-05
 
 ### Added
@@ -58,7 +80,7 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.5-rc...HEAD
+[0.9.6-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.6-rc
 [0.9.5-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.5-rc
 [0.9.4-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.4-rc
 [0.9.3-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.3-rc
@@ -112,5 +134,4 @@
 - 修复 release 工作流缺少 `contents: write` 权限导致发布 403
 - 移除 electron-builder 非法配置字段 `includeLicenseFiles`（根 LICENSE 自动分发）
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.0-rc...HEAD
 [0.9.0-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.0-rc

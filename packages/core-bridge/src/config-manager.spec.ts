@@ -199,6 +199,27 @@ describe('ConfigManager', () => {
     const c3 = await fs.readFile(activeFile, 'utf-8')
     expect(/^\s*tun:/.test(c3)).toBe(false)
   })
+
+  it('setActiveMode 持久化：替换已有 mode 行、幂等、缺失时追加', async () => {
+    const { profile } = await mgr.importFromText('sub-a', SAMPLE_YAML)
+    await mgr.selectProfile(profile.id)
+
+    // 已有 mode: rule → 替换为 global
+    await mgr.setActiveMode('global')
+    let c = await fs.readFile(activeFile, 'utf-8')
+    expect(/^\s*mode:\s*global\s*$/m.test(c)).toBe(true)
+    expect(c.match(/^\s*mode:/gm)).toHaveLength(1)
+
+    // 幂等：同值不重复写入
+    await mgr.setActiveMode('global')
+    expect((await fs.readFile(activeFile, 'utf-8')).match(/^\s*mode:/gm)).toHaveLength(1)
+
+    // 无 mode 行的配置：追加
+    await fs.writeFile(activeFile, 'mixed-port: 7890\n', 'utf-8')
+    await mgr.setActiveMode('direct')
+    c = await fs.readFile(activeFile, 'utf-8')
+    expect(/^\s*mode:\s*direct\s*$/m.test(c)).toBe(true)
+  })
 })
 
 function updatedResponse(): Response {

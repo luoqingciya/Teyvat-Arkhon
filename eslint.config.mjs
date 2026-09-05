@@ -39,7 +39,12 @@ export default tseslint.config(
         process: 'readonly',
         NodeJS: 'readonly',
         setInterval: 'readonly',
-        clearInterval: 'readonly'
+        clearInterval: 'readonly',
+        setTimeout: 'readonly',
+        Event: 'readonly',
+        HTMLDivElement: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        HTMLSelectElement: 'readonly'
       }
     },
     rules: {

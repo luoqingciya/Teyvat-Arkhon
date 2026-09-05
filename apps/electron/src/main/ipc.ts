@@ -3,6 +3,8 @@ import type { CoreStatus, ProxyMode, SystemProxyState } from '@teyvat-arkhon/sha
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 import type { SystemProxyController } from './system-proxy'
 import type { WindowsServiceManager } from './system-service'
+import type { NetChecker } from './net-check'
+import type { LoopbackController } from './system-loopback'
 import { setPortableEnabled, isPortableMode } from './paths'
 
 /** 订阅主进程错误事件的内容推送到渲染进程 */
@@ -10,7 +12,11 @@ export function createIpc(
   service: CoreService,
   systemProxy: SystemProxyController,
   serviceManager: WindowsServiceManager,
-  tunPrereq: () => boolean
+  tunPrereq: () => boolean,
+  netChecker: NetChecker,
+  loopback: LoopbackController,
+  getAutoRefresh: () => boolean,
+  setAutoRefresh: (enabled: boolean) => void
 ): void {
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -62,6 +68,16 @@ export function createIpc(
   ipcMain.handle('profiles:remove', (_e, id: string) => service.removeProfile(id))
   ipcMain.handle('profiles:refresh', (_e, id: string) => service.refreshProfile(id))
   ipcMain.handle('profiles:select', (_e, id: string) => service.selectProfile(id))
+  ipcMain.handle('profiles:refresh-all', () => service.refreshAllUrlProfiles())
+
+  ipcMain.handle('net:check', () => netChecker.run())
+
+  ipcMain.handle('loopback:status', () => loopback.status())
+  ipcMain.handle('loopback:enable', () => loopback.enable())
+  ipcMain.handle('loopback:disable', () => loopback.disable())
+
+  ipcMain.handle('app:auto-refresh-get', () => getAutoRefresh())
+  ipcMain.handle('app:auto-refresh-set', (_e, enabled: boolean) => setAutoRefresh(enabled))
 
   ipcMain.handle('system-proxy:get', async (): Promise<SystemProxyState> => systemProxy.read())
   ipcMain.handle('system-proxy:set', async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))

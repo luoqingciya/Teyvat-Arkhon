@@ -5,6 +5,8 @@ import type {
   ConnectionInfo,
   CoreStatus,
   DelayResult,
+  LoopbackState,
+  NetProbeResult,
   Profile,
   ProxyItem,
   ProxyMode,
@@ -58,6 +60,17 @@ const api: ArkhonAPI = {
   removeProfile: (id) => ipcRenderer.invoke('profiles:remove', id) as Promise<void>,
   refreshProfile: (id) => ipcRenderer.invoke('profiles:refresh', id) as Promise<Profile>,
   selectProfile: (id) => ipcRenderer.invoke('profiles:select', id) as Promise<ClashConfigSummary>,
+  refreshAllProfiles: () =>
+    ipcRenderer.invoke('profiles:refresh-all') as Promise<{ ok: number; failed: number }>,
+
+  runNetCheck: () => ipcRenderer.invoke('net:check') as Promise<NetProbeResult[]>,
+
+  getLoopbackState: () => ipcRenderer.invoke('loopback:status') as Promise<LoopbackState>,
+  enableLoopbackExempt: () => ipcRenderer.invoke('loopback:enable') as Promise<LoopbackState>,
+  disableLoopbackExempt: () => ipcRenderer.invoke('loopback:disable') as Promise<LoopbackState>,
+
+  getAutoRefresh: () => ipcRenderer.invoke('app:auto-refresh-get') as Promise<boolean>,
+  setAutoRefresh: (enabled) => ipcRenderer.invoke('app:auto-refresh-set', enabled) as Promise<void>,
 
   getSystemProxy: () => ipcRenderer.invoke('system-proxy:get') as Promise<SystemProxyState>,
   setSystemProxy: (enabled) => ipcRenderer.invoke('system-proxy:set', enabled) as Promise<SystemProxyState>,

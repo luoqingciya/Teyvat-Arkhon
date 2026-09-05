@@ -219,7 +219,8 @@ function parseSsPluginOpts(plugin: string, opts: string): Record<string, unknown
     if (part.includes('=')) {
       const [k, v] = splitOnce(part, '=')
       if (k) kv[decodeURIComponent(k.trim())] = decodeURIComponent(v.trim())
-    } else if (!modeSeen || !['websocket','ws','http','tls'].includes(part)) {
+    } else if (!modeSeen || !['websocket', 'ws', 'http', 'tls'].includes(part)) {
+      modeSeen = true
       rest.push(part)
     }
   }

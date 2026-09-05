@@ -216,6 +216,26 @@ export class ConfigManager {
   }
 
   /**
+   * 持久化运行模式到工作配置（重启内核后仍保留）。
+   * 已有 mode 行则替换，否则追加；仅当值变化时写盘。
+   */
+  async setActiveMode(mode: 'rule' | 'global' | 'direct'): Promise<void> {
+    if (!(await exists(this.activeConfigFile))) return
+    const content = await fs.readFile(this.activeConfigFile, 'utf-8')
+    const line = `mode: ${mode}`
+    if (new RegExp(`^\\s*mode:\\s*${mode}\\s*$`, 'm').test(content)) return
+
+    const next = /^\s*mode:\s*/m.test(content)
+      ? content.replace(/^(\s*mode:\s*).*$/m, `$1${mode}`)
+      : content.endsWith('\n')
+        ? content + line + '\n'
+        : content + '\n' + line + '\n'
+    if (next !== content) {
+      await fs.writeFile(this.activeConfigFile, next, 'utf-8')
+    }
+  }
+
+  /**
    * 开关 TUN 模式（写回工作配置）。
    * 启用：无 tun 段时以应用默认值追加（已有自定义 tun 段则不动）；
    * 禁用：仅移除应用默认写入的那一行，用户自定义段保留。

@@ -6,6 +6,8 @@ import { defineStore } from 'pinia'
 import type {
   CoreStatus,
   DelayResult,
+  LoopbackState,
+  NetProbeResult,
   Profile,
   ProxyItem,
   ProxyMode,
@@ -49,6 +51,14 @@ interface AppState {
   logs: string[]
   /** 测速配置 */
   delaySetting: { url: string; timeoutMs: number }
+  /** 订阅自动更新开关（主进程持久化） */
+  autoRefresh: boolean
+  /** 网络自检结果 */
+  netProbe: NetProbeResult[] | null
+  /** 网络自检进行中 */
+  netChecking: boolean
+  /** UWP 回环豁免状态 */
+  loopback: LoopbackState | null
 }
 
 /** 测速配置本地持久化键 */
@@ -72,6 +82,9 @@ function readDelaySetting(): { url: string; timeoutMs: number } {
 
 /** 测速配置的最大缓冲行数（与后端 logLimit 对齐） */
 const LOG_LIMIT = 500
+
+/** 批量测速的并发上限（限量并发：避免瞬时打满内核/订阅出口） */
+const TEST_CONCURRENCY = 8
 
 interface BatchTestState {
   running: boolean
@@ -101,7 +114,11 @@ export const useAppStore = defineStore('app', {
     batchTest: { running: false, current: 0, total: 0 },
     coreMode: 'rule',
     logs: [],
-    delaySetting: readDelaySetting()
+    delaySetting: readDelaySetting(),
+    autoRefresh: false,
+    netProbe: null,
+    netChecking: false,
+    loopback: null
   }),
 
   getters: {
@@ -143,6 +160,8 @@ export const useAppStore = defineStore('app', {
       await this.refreshTunPrereq()
       await this.initCoreMode()
       await this.initLogs()
+      await this.refreshAutoRefresh()
+      await this.refreshLoopback()
       this.appVersion = await window.arkhon.getAppVersion()
     },
 
@@ -267,17 +286,29 @@ export const useAppStore = defineStore('app', {
       this.logs = []
     },
 
-    /** 批量测速（顺序执行，逐行反馈进度） */
+    /** 批量测速（限量并发执行，逐行反馈进度） */
     async testAllNodes(): Promise<void> {
       const group = this.currentGroup
       if (!group?.all) return
-      const nodes = group.all
+      const nodes = [...group.all]
       this.batchTest = { running: true, current: 0, total: nodes.length }
-      for (let i = 0; i < nodes.length; i++) {
-        this.batchTest.current = i + 1
-        await this.testNode(nodes[i])
+      try {
+        // 游标式任务队列：多个 worker 共享取号，天然限流且无重复
+        let cursor = 0
+        const workers = Array.from(
+          { length: Math.min(TEST_CONCURRENCY, nodes.length) },
+          async () => {
+            while (cursor < nodes.length) {
+              const i = cursor++
+              this.batchTest.current = i + 1
+              await this.testNode(nodes[i])
+            }
+          }
+        )
+        await Promise.all(workers)
+      } finally {
+        this.batchTest = { running: false, current: 0, total: 0 }
       }
-      this.batchTest = { running: false, current: 0, total: 0 }
     },
 
     // ---------- 订阅档案 ----------
@@ -350,6 +381,86 @@ export const useAppStore = defineStore('app', {
         await this.refreshProfiles()
       } catch (e) {
         this.error = (e as Error).message
+      }
+    },
+
+    // ---------- 订阅自动更新 ----------
+
+    async refreshAutoRefresh(): Promise<void> {
+      try {
+        this.autoRefresh = await window.arkhon.getAutoRefresh()
+      } catch {
+        this.autoRefresh = false
+      }
+    },
+
+    /** 切换订阅自动更新（主进程持久化并联动定时器） */
+    async setAutoRefresh(enabled: boolean): Promise<void> {
+      try {
+        await window.arkhon.setAutoRefresh(enabled)
+        this.autoRefresh = enabled
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    /** 手动刷新全部 URL 订阅（成功数/失败数） */
+    async refreshAllProfiles(): Promise<void> {
+      this.busy = true
+      try {
+        const { ok, failed } = await window.arkhon.refreshAllProfiles()
+        this.error = ok + failed > 0 ? `订阅刷新完成：成功 ${ok}，失败 ${failed}` : ''
+        await this.refreshProfiles()
+      } catch (e) {
+        this.error = (e as Error).message
+      } finally {
+        this.busy = false
+      }
+    },
+
+    // ---------- 网络自检 ----------
+
+    async runNetCheck(): Promise<void> {
+      this.netChecking = true
+      this.netProbe = null
+      try {
+        this.netProbe = await window.arkhon.runNetCheck()
+      } catch (e) {
+        this.error = (e as Error).message
+      } finally {
+        this.netChecking = false
+      }
+    },
+
+    // ---------- UWP 回环豁免（Windows） ----------
+
+    async refreshLoopback(): Promise<void> {
+      try {
+        this.loopback = await window.arkhon.getLoopbackState()
+      } catch {
+        this.loopback = { supported: false, exemptCount: 0 }
+      }
+    },
+
+    async enableLoopback(): Promise<void> {
+      this.busy = true
+      try {
+        this.loopback = await window.arkhon.enableLoopbackExempt()
+      } catch (e) {
+        this.error = (e as Error).message
+      } finally {
+        this.busy = false
+      }
+    },
+
+    async disableLoopback(): Promise<void> {
+      this.busy = true
+      try {
+        this.loopback = await window.arkhon.disableLoopbackExempt()
+      } catch (e) {
+        this.error = (e as Error).message
+      } finally {
+        this.busy = false
       }
     },
 

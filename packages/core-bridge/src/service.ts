@@ -139,9 +139,11 @@ export class CoreService extends EventEmitter {
     return this.driver.getProxies()
   }
 
-  setMode(mode: ProxyMode): Promise<void> {
+  /** 切换运行模式：内核即时生效 + 写回工作配置（内核重启后保留） */
+  async setMode(mode: ProxyMode): Promise<void> {
     if (!this.driver) throw new Error('内核未运行')
-    return this.driver.setMode(mode)
+    await this.driver.setMode(mode)
+    await this.config.setActiveMode(mode)
   }
 
   async getMode(): Promise<ProxyMode | undefined> {
@@ -215,6 +217,33 @@ export class CoreService extends EventEmitter {
 
   refreshProfile(id: string): Promise<Profile> {
     return this.config.refreshProfile(id, this.opts.fetchImpl)
+  }
+
+  /**
+   * 刷新全部 URL 订阅（自动更新用）。
+   * 失败的档案保留旧内容（refreshProfile 失败即抛错不落盘）；
+   * 若当前使用中的档案被成功刷新且内核运行中，则热重载使其生效。
+   */
+  async refreshAllUrlProfiles(): Promise<{ ok: number; failed: number }> {
+    const profiles = await this.config.listProfiles()
+    const urls = profiles.filter((p) => p.url)
+    let ok = 0
+    let failed = 0
+    const refreshedIds = new Set<string>()
+    for (const p of urls) {
+      try {
+        await this.config.refreshProfile(p.id, this.opts.fetchImpl)
+        refreshedIds.add(p.id)
+        ok++
+      } catch {
+        failed++
+      }
+    }
+    const active = profiles.find((p) => p.selected)
+    if (ok > 0 && active && refreshedIds.has(active.id) && this.state === 'running') {
+      await this.reloadActive().catch(() => undefined)
+    }
+    return { ok, failed }
   }
 
   /** 切换档案 + 热重载内核 */

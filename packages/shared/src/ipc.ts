@@ -3,6 +3,8 @@ import type {
   ConnectionInfo,
   CoreStatus,
   DelayResult,
+  LoopbackState,
+  NetProbeResult,
   Profile,
   ProxyItem,
   ProxyMode,
@@ -58,6 +60,22 @@ export interface ArkhonAPI {
   removeProfile(id: string): Promise<void>
   refreshProfile(id: string): Promise<Profile>
   selectProfile(id: string): Promise<ClashConfigSummary>
+  /** 刷新全部 URL 订阅（自动更新用），返回成功/失败数量 */
+  refreshAllProfiles(): Promise<{ ok: number; failed: number }>
+
+  // ---------- 网络自检 ----------
+  /** 经内核代理链路执行一组探测（出口 IP / 流媒体解锁等） */
+  runNetCheck(): Promise<NetProbeResult[]>
+
+  // ---------- UWP 回环豁免（Windows） ----------
+  getLoopbackState(): Promise<LoopbackState>
+  enableLoopbackExempt(): Promise<LoopbackState>
+  disableLoopbackExempt(): Promise<LoopbackState>
+
+  // ---------- 订阅自动更新 ----------
+  /** 自动刷新是否开启（主进程持久化） */
+  getAutoRefresh(): Promise<boolean>
+  setAutoRefresh(enabled: boolean): Promise<void>
 
   // ---------- 系统代理 ----------
   getSystemProxy(): Promise<SystemProxyState>
