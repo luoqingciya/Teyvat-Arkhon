@@ -4,6 +4,10 @@ go 1.27.1
 
 require github.com/metacubex/mihomo v1.19.30
 
+// 定制基线：使用自有 fork（luoqingciya/mihomo-teyvat）的 v1.19.30
+// 在 fork 上改动内核后，更新此 replace 到新 tag/commit 即可
+replace github.com/metacubex/mihomo => github.com/luoqingciya/mihomo-teyvat v1.19.30
+
 require (
 	github.com/RyuaNerin/go-krypto v1.3.0 // indirect
 	github.com/Yawning/aez v0.0.0-20211027044916-e49e68abd344 // indirect
