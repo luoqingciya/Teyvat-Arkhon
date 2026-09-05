@@ -4,12 +4,16 @@
  *
  * 产物文件名约定（与 main/index.ts coreFileName 一致）:
  *   mihomo-windows-x64.exe / mihomo-darwin-arm64 / mihomo-linux-x64 ...
+ *
+ * 注: mihomo v1.19+ release 资产格式按平台不同:
+ *   windows-* 为 .zip（内含 mihomo-windows-amd64.exe），linux/darwin-* 为 .gz 单文件。
  */
 
 import { createWriteStream } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { gunzipSync } from 'node:zlib'
 
 const OWNER = 'MetaCubeX'
 const REPO = 'mihomo'
@@ -33,11 +37,6 @@ function assetName(platform, arch) {
   return os === 'windows' ? `windows-${cpu}` : `${os}-${cpu}`
 }
 
-function releaseUrl(tag) {
-  // v1.19+ 版本 mihomo 发布资产为 .gz 单文件（原为 .zip）
-  return `mihomo-${assetName(process.platform, process.arch)}-${tag}.gz`
-}
-
 /** GitHub API 请求带 token（CI 中 runner 出口 IP 无 token 易被限流 403） */
 function ghHeaders() {
   const token = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN']
@@ -50,6 +49,20 @@ async function latestTag() {
   return (await res.json()).tag_name
 }
 
+async function unzip(zipPath, outDir) {
+  if (process.platform === 'win32') {
+    const r = spawnSync(
+      'powershell',
+      ['-NoProfile', '-Command', `Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${outDir}'`],
+      { stdio: 'inherit' }
+    )
+    if (r.status !== 0) throw new Error('powershell Expand-Archive 解压失败')
+  } else {
+    const r = spawnSync('unzip', ['-o', zipPath, '-d', outDir], { stdio: 'inherit' })
+    if (r.status !== 0) throw new Error('unzip 解压失败')
+  }
+}
+
 async function main() {
   const finalName = `mihomo-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`
   const finalDest = path.join(TARGET_DIR, finalName)
@@ -57,24 +70,40 @@ async function main() {
     console.log(`[download-core] 内核已存在 (${finalName})，跳过下载`)
   } else {
     const tag = process.argv[2] ?? (await latestTag())
-    const fileName = releaseUrl(tag)
-    const url = `https://github.com/${OWNER}/${REPO}/releases/download/${tag}/${fileName}`
+    await fs.mkdir(TARGET_DIR, { recursive: true })
+
+    const baseName = `mihomo-${assetName(process.platform, process.arch)}-${tag}`
+    const url = `https://github.com/${OWNER}/${REPO}/releases/download/${tag}/${baseName}.${process.platform === 'win32' ? 'zip' : 'gz'}`
     console.log(`[download-core] 目标: ${tag}`)
     console.log(`[download-core] 下载: ${url}`)
 
-    await fs.mkdir(TARGET_DIR, { recursive: true })
     const res = await fetch(url)
     if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
-    const gz = Buffer.from(await res.arrayBuffer())
-    let bin
-    try {
-      bin = gunzipSync(gz)
-    } catch (e) {
-      throw new Error(`gzip 解压失败（${fileName}）: ${e instanceof Error ? e.message : String(e)}`)
+    const data = Buffer.from(await res.arrayBuffer())
+
+    if (process.platform === 'win32') {
+      const zipPath = path.join(TARGET_DIR, `${baseName}.zip`)
+      await fs.writeFile(zipPath, data)
+      await unzip(zipPath, TARGET_DIR)
+      await fs.rm(zipPath, { force: true })
+      // zip 内文件形如 mihomo-windows-amd64.exe
+      const src = path.join(TARGET_DIR, `mihomo-${assetName(process.platform, process.arch)}.exe`)
+      try {
+        await fs.rename(src, finalDest)
+      } catch {
+        await fs.copyFile(src, finalDest)
+      }
+    } else {
+      let bin
+      try {
+        bin = gunzipSync(data)
+      } catch (e) {
+        throw new Error(`gzip 解压失败: ${e instanceof Error ? e.message : String(e)}`)
+      }
+      await fs.writeFile(finalDest, bin)
+      await fs.chmod(finalDest, 0o755)
     }
-    await fs.writeFile(finalDest, bin)
-    if (process.platform !== 'win32') await fs.chmod(finalDest, 0o755)
-    console.log(`[download-core] 完成: ${finalDest} (${bin.length} bytes)`)
+    console.log(`[download-core] 完成: ${finalDest} (${data.length} bytes 压缩)`)
   }
 
   await downloadGeo()
@@ -128,11 +157,11 @@ async function downloadWintun() {
     await fs.rm(path.join(TARGET_DIR, 'wintun-tmp'), { recursive: true, force: true })
     console.log('[download-core] wintun.dll 完成')
   } catch (e) {
-    console.warn(`[download-core] wintun.dll 下载失败（可稍后手动放置）: ${e.message}`)
+    console.warn(`[download-core] wintun.dll 下载失败（可稍后手动放置）: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 
 main().catch((e) => {
-  console.error(`[download-core] 失败: ${e.message}`)
+  console.error(`[download-core] 失败: ${e instanceof Error ? e.message : String(e)}`)
   process.exit(1)
 })
