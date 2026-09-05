@@ -1,6 +1,6 @@
 {
   "name": "teyvat-arkhon",
-  "version": "0.9.3-rc",
+  "version": "0.9.4-rc",
   "private": true,
   "description": "基于 Electron + C/C++ 的跨平台代理客户端（Mihomo 核心）",
   "license": "GPL-3.0-only",
@@ -15,9 +15,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "core:download": "node scripts/download-core.mjs",
-    "core:e2e": "node scripts/e2e-core.cjs",
-    "ffi:smoke": "node scripts/ffi-smoke.cjs",
-    "native:build": "pnpm --filter @teyvat-arkhon/native build"
+    "core:e2e": "node scripts/e2e-core.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.0",

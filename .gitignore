@@ -19,9 +19,6 @@ apps/electron/test-results/
 apps/electron/shots-*.png
 
 # 构建产物 / 工具链生成物
-packages/native/build/
-packages/native/bin/
-packages/native/bridge/libmihomo.*
 apps/electron/resources/core/*
 !apps/electron/resources/core/.gitkeep
 apps/electron/data/

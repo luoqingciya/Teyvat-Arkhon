@@ -12,11 +12,7 @@ files:
   - "out/**"
   - "!**/*.map"
 
-# 原生绑定 .node 需解包（asar 内不可执行）
-asarUnpack:
-  - "**/*.node"
-
-# 内核资源：libmihomo、mihomo 二进制、geo 数据、wintun 驱动
+# 内核资源：mihomo 二进制、geo 数据、wintun 驱动
 extraResources:
   - from: resources/core
     to: core

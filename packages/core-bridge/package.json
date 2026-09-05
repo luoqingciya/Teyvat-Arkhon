@@ -2,7 +2,7 @@
   "name": "@teyvat-arkhon/core-bridge",
   "version": "0.1.0",
   "private": true,
-  "description": "封装 Mihomo 核心调用的 TypeScript 业务层（FFI 直连 / 进程驱动双模式）",
+  "description": "封装 Mihomo 核心调用的 TypeScript 业务层（进程驱动）",
   "license": "GPL-3.0-only",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

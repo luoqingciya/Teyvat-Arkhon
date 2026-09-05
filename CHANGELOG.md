@@ -10,6 +10,15 @@
 ### Added
 - 待定：fork 内核定制特性（Teyvat Arkhon 私有内核扩展）
 
+## [0.9.4-rc] - 2026-09-05
+
+### Removed
+- **移除 FFI 直连架构**：删除 ffi-driver 与原生绑定加载路径，内核统一使用**进程驱动**（sidecar + REST），稳定优先；发布产物不再包含 libmihomo/.node 等原生模块
+
+### Changed
+- 内核链路：唯一驱动为进程驱动，状态栏/关于页显示"进程模式"；CI 发布流水线移除 Go/cgo/cmake 原生构建步骤，包体积更小
+- 开发脚本：移除 `ffi:smoke`；E2E 改为进程驱动全链路回归
+
 ## [0.9.3-rc] - 2026-09-05
 
 ### Fixed
@@ -37,7 +46,8 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.3-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.4-rc...HEAD
+[0.9.4-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.4-rc
 [0.9.3-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.3-rc
 [0.9.2-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.2-rc
 [0.9.1-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.1-rc

@@ -1,7 +1,6 @@
 export * from './driver'
 export * from './rest-client'
 export * from './process-driver'
-export * from './ffi-driver'
 export * from './config-manager'
 export * from './service'
 export type { CoreStatus, CoreState, MihomoVersion, ProxyItem, Profile, ClashConfigSummary, DelayResult } from '@teyvat-arkhon/shared'

@@ -53,7 +53,7 @@ export type CoreState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error
 export interface CoreStatus {
   state: CoreState
   version?: MihomoVersion
-  driver: 'ffi' | 'process'
+  driver: 'process'
 }
 
 /** 系统代理状态 */

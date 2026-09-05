@@ -122,7 +122,7 @@ function changeLang(e: Event): void {
         <dt>{{ t('home.version') }}</dt>
         <dd>{{ store.status.version?.version ?? '—' }}</dd>
         <dt>{{ t('home.driver') }}</dt>
-        <dd>{{ store.status.driver === 'ffi' ? t('status.driverFfi') : t('status.driverProcess') }}</dd>
+        <dd>{{ t('status.driverProcess') }}</dd>
       </dl>
     </div>
   </div>

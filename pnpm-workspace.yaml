@@ -7,7 +7,6 @@ onlyBuiltDependencies:
   - esbuild
   - vue-demi
   - node-gyp
-  - cmake-js
   - unrs-resolver
 
 allowBuilds:
@@ -15,4 +14,3 @@ allowBuilds:
   esbuild: true
   vue-demi: true
   node-gyp: true
-  cmake-js: true

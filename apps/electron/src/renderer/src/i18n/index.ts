@@ -20,7 +20,6 @@ const resources = {
         stopping: '停止中',
         error: '异常',
         driver: '驱动',
-        driverFfi: 'FFI 直连',
         driverProcess: '进程模式',
         sysProxyOn: '系统代理已开启'
       },
@@ -146,7 +145,6 @@ const resources = {
         stopping: 'Stopping',
         error: 'Error',
         driver: 'Driver',
-        driverFfi: 'FFI in-process',
         driverProcess: 'Process mode',
         sysProxyOn: 'System proxy ON'
       },

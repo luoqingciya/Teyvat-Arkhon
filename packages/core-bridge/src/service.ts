@@ -16,14 +16,13 @@ import type {
 } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
 import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
-import { FFICoreDriver, type FFIDriverOptions } from './ffi-driver'
 import { ConfigManager } from './config-manager'
 
 export interface CoreServiceOptions {
   profilesDir: string
   activeConfigFile: string
-  /** 驱动选择：'process' 为进程回退（开发环境），'ffi' 为 FFI 直连（生产） */
-  driver: { mode: 'process'; options: ProcessDriverOptions } | { mode: 'ffi'; options: FFIDriverOptions }
+  /** 内核驱动（当前统一使用进程驱动，稳定优先；字段保留以便未来扩展） */
+  driver: { mode: 'process'; options: ProcessDriverOptions }
   fetchImpl?: typeof fetch
 }
 
@@ -112,25 +111,13 @@ export class CoreService extends EventEmitter {
   }
 
   private buildDriver(active: ClashConfigSummary): CoreDriver {
-    const mode = this.opts.driver.mode
-    if (mode === 'process') {
-      const opts = this.opts.driver.options
-      return new ProcessCoreDriver({
-        ...opts,
-        externalController: cleanController(active.externalController, opts.externalController),
-        secret: active.secret ?? opts.secret,
-        fetchImpl: this.opts.fetchImpl,
-        onExit: () => this.setState('stopped')
-      })
-    }
     const opts = this.opts.driver.options
-    return new FFICoreDriver({
+    return new ProcessCoreDriver({
       ...opts,
-      rest: {
-        controller: cleanController(active.externalController, opts.rest?.controller ?? '127.0.0.1:9090'),
-        secret: active.secret ?? opts.rest?.secret,
-        fetchImpl: this.opts.fetchImpl
-      }
+      externalController: cleanController(active.externalController, opts.externalController),
+      secret: active.secret ?? opts.secret,
+      fetchImpl: this.opts.fetchImpl,
+      onExit: () => this.setState('stopped')
     })
   }
 

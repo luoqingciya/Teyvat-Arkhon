@@ -1,6 +1,6 @@
 /**
  * 进程驱动：以 sidecar 方式运行 mihomo 二进制，通过 external-controller RESTful API 通信。
- * 用作开发环境 / 无原生工具链平台的回退驱动；生产环境优先使用 FFI 驱动（ffi-driver.ts）。
+ * 当前唯一驱动（稳定优先）：独立进程天然隔离，升级与排障简单。
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'

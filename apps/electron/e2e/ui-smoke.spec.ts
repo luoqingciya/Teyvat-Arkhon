@@ -2,7 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test'
 import { join } from 'node:path'
 
 /**
- * UI 冒烟测试：启动 Electron 应用（进程驱动回退或 FFI），
+ * UI 冒烟测试：启动 Electron 应用（进程驱动），
  * 验证主界面渲染、导航与设置页可达。
  * 运行前需先构建：pnpm --filter @teyvat-arkhon/electron build
  */

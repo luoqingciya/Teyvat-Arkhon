@@ -19,7 +19,7 @@ const stateText: Record<string, string> = {
     <span class="dot" :class="store.status.state"></span>
     <span class="state">{{ stateText[store.status.state] ?? store.status.state }}</span>
     <span class="sep">·</span>
-    <span class="driver">{{ t('status.driver') }}: {{ store.status.driver === 'ffi' ? t('status.driverFfi') : t('status.driverProcess') }}</span>
+    <span class="driver">{{ t('status.driver') }}: {{ t('status.driverProcess') }}</span>
     <template v-if="store.status.version">
       <span class="sep">·</span>
       <span>{{ t('home.version') }} {{ store.status.version.version }}</span>

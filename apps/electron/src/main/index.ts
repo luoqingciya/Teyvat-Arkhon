@@ -14,11 +14,6 @@ import { bootstrapDataDir } from './paths'
 const dataLayout = bootstrapDataDir(app)
 // Windows 任务栏图标/通知需绑定 AppUserModelID（与 electron-builder appId 一致）
 if (process.platform === 'win32') app.setAppUserModelId('com.teyvat.arkhon')
-// Windows 下 LoadLibrary 搜索路径不含 resources\core，.node 依赖的 MinGW 运行时
-// DLL 需借助 PATH 才能找到；把内核目录前置到 PATH，避免原生绑定加载失败导致闪退
-if (process.platform === 'win32' && app.isPackaged) {
-  process.env.PATH = `${coreResourcesDir()};${process.env.PATH ?? ''}`
-}
 console.log(
   `[teyvat-arkhon] 运行数据目录: ${dataLayout.dataDir}（${dataLayout.portable ? '便携模式' : '系统用户目录'}）`
 )
@@ -37,20 +32,6 @@ export function coreFileName(): string {
 export function coreResourcesDir(): string {
   if (app.isPackaged) return join(process.resourcesPath, 'core')
   return join(app.getAppPath(), 'resources', 'core')
-}
-
-/**
- * 探测 FFI 原生链路是否可用：需要 libmihomo 共享库 + 原生绑定 .node 同时存在。
- * 不具备时由调用方回退到进程驱动。
- */
-function detectFfi(): { libPath?: string; bindingPath?: string } {
-  const libPath = join(coreResourcesDir(), 'libmihomo.dll')
-  if (!existsSync(libPath)) return {}
-  const bindingPath = app.isPackaged
-    ? join(process.resourcesPath, 'core', 'mihomo_binding.node')
-    : join(app.getAppPath(), '..', '..', 'packages', 'native', 'bin', 'mihomo_binding.node')
-  if (!existsSync(bindingPath)) return {}
-  return { libPath, bindingPath }
 }
 
 /** mihomo 默认数据目录（与 mihomo constant.Path 取值一致） */
@@ -164,37 +145,20 @@ async function createWindow(): Promise<void> {
 
 async function bootstrapService(): Promise<CoreService> {
   const configDir = userDataConfigDir()
-  const ffi = detectFfi()
-
-  // Windows 打包版：MinGW 编译的 N-API 绑定在 Electron 加载时存在二进制不兼容
-  // （独立 Node 正常，Electron 运行时加载即崩溃）。默认走进程驱动（功能等价），
-  // 设 TEVVAT_ARKHON_FORCE_FFI=1 可强制启用 FFI（供无此问题的平台/环境）。
-  const forceFfi = process.env['TEVVAT_ARKHON_FORCE_FFI'] === '1'
-  const winPackagedFfiBroken = process.platform === 'win32' && app.isPackaged && !forceFfi
-  const useFfi = !!(ffi.libPath && !winPackagedFfiBroken)
-
-  if (ffi.libPath && !useFfi) {
-    console.log('[teyvat-arkhon] 检测到 FFI, 但 Windows 打包版当前默认进程驱动（FFI 存在加载兼容问题）')
-  } else if (useFfi) {
-    console.log('[teyvat-arkhon] FFI 驱动可用: libmihomo=%s binding=%s', ffi.libPath, ffi.bindingPath)
-  } else {
-    console.log('[teyvat-arkhon] 未探测到 FFI 原生链路，回退到进程驱动')
-  }
+  console.log('[teyvat-arkhon] 内核驱动：进程驱动（稳定优先）')
 
   const svc = new CoreService({
     profilesDir: join(app.getPath('userData'), 'profiles'),
     activeConfigFile: join(configDir, 'config.yaml'),
-    driver: useFfi
-      ? { mode: 'ffi', options: { libPath: ffi.libPath as string, bindingPath: ffi.bindingPath } }
-      : {
-          mode: 'process',
-          options: {
-            binaryPath: join(coreResourcesDir(), coreFileName()),
-            workingDir: configDir,
-            externalController: '127.0.0.1:9090',
-            secret: ''
-          }
-        }
+    driver: {
+      mode: 'process',
+      options: {
+        binaryPath: join(coreResourcesDir(), coreFileName()),
+        workingDir: configDir,
+        externalController: '127.0.0.1:9090',
+        secret: ''
+      }
+    }
   })
   await svc.init()
   return svc

@@ -1,8 +1,8 @@
 import type { ConnectionInfo, CoreStatus, DelayResult, MihomoVersion, ProxyItem } from '@teyvat-arkhon/shared'
 
-/** 核心驱动统一接口：FFI 直连驱动与进程驱动实现同一契约，运行时按配置切换 */
+/** 核心驱动统一接口：当前统一使用进程驱动（稳定优先） */
 export interface CoreDriver {
-  readonly kind: 'ffi' | 'process'
+  readonly kind: 'process'
 
   /** 启动核心并等待就绪（进程驱动会轮询 external-controller） */
   start(configPath: string): Promise<void>
