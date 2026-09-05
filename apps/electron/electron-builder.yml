@@ -23,6 +23,9 @@ extraResources:
     filter:
       - "**/*"
       - "!.gitkeep"
+  # 托盘图标（主进程 nativeImage 直接读取）
+  - from: build/icon.png
+    to: icon.png
 
 # 许可证合规：electron-builder 自动包含仓库根 LICENSE 文件进产物（GPL-3.0）
 win:

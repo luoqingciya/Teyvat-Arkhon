@@ -42,7 +42,11 @@
     "builder-util-runtime": "^9.7.0",
     "debug": "^4.3.4",
     "sax": "^1.2.4",
-    "ms": "^2.1.2"
+    "ms": "^2.1.3",
+    "graceful-fs": "^4.2.11",
+    "jsonfile": "^6.1.0",
+    "universalify": "^2.0.1",
+    "argparse": "^2.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.46.1",

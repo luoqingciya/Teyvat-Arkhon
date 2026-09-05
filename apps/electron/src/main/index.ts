@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import * as os from 'node:os'
 import { join } from 'node:path'
@@ -87,6 +87,32 @@ function userDataConfigDir(): string {
   return join(app.getPath('userData'), 'config')
 }
 
+// ---------- 系统托盘 ----------
+/** 托盘图标：打包后取自 resources/icon.png（extraResources 复制），开发期用 build/icon.png */
+function trayIconPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build', 'icon.png')
+}
+
+let tray: Tray | null = null
+let isQuitting = false
+
+function createTray(win: BrowserWindow): void {
+  const icon = nativeImage.createFromPath(trayIconPath())
+  if (icon.isEmpty()) return
+  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  tray.setToolTip('Teyvat Arkhon')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '显示主窗口', click: () => { win.show(); win.focus() } },
+      { type: 'separator' },
+      { label: '退出', click: () => { isQuitting = true; app.quit() } }
+    ])
+  )
+  tray.on('click', () => {
+    if (win.isVisible()) win.hide()
+    else { win.show(); win.focus() }
+  })
+}
 async function createWindow(): Promise<void> {
   const win = new BrowserWindow({
     width: 1180,
@@ -111,9 +137,16 @@ async function createWindow(): Promise<void> {
     win.show()
     win.maximize()
   })
+  win.on('close', (e) => {
+    // 关闭主窗口时最小化到系统托盘；托盘菜单"退出"才真正结束进程
+    if (isQuitting) return
+    e.preventDefault()
+    win.hide()
+  })
   win.on('closed', () => {
     mainWindow = null
   })
+  createTray(win)
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     await win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -194,6 +227,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async (e) => {
+  // 托盘"退出"或系统退出时放行窗口 close（不再最小化到托盘）
+  isQuitting = true
   if (service) {
     e.preventDefault()
     trafficMonitor?.stop()
