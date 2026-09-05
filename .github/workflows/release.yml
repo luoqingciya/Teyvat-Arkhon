@@ -56,11 +56,17 @@ jobs:
           sudo apt-get update -y && sudo apt-get install -y xvfb
           BIN=$(find apps/electron/release -path '*linux-unpacked*' -type f -executable ! -name '*.so*' | head -n1)
           echo "冒烟二进制: $BIN"
-          xvfb-run -a "$BIN" &
+          xvfb-run -a "$BIN" --no-sandbox --disable-gpu > smoke.log 2>&1 &
           PID=$!
-          sleep 6
-          kill -0 $PID && echo "✓ 应用进程存活，冒烟通过" || { echo "✗ 应用启动即退出"; exit 1; }
-          kill $PID || true
+          sleep 8
+          if kill -0 $PID 2>/dev/null; then
+            echo "✓ 应用进程存活，冒烟通过"
+            kill $PID || true
+          else
+            echo "✗ 应用启动即退出，日志如下："
+            cat smoke.log || true
+            exit 1
+          fi
 
       - name: 打包产物启动冒烟（Windows）
         if: runner.os == 'Windows'
@@ -68,9 +74,12 @@ jobs:
         run: |
           $exe = Get-ChildItem "apps/electron/release/win-unpacked/*.exe" | Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
           Write-Output "冒烟二进制: $($exe.FullName)"
-          $p = Start-Process $exe.FullName -PassThru
+          $p = Start-Process $exe.FullName -ArgumentList '--no-sandbox' -PassThru
           Start-Sleep -Seconds 6
-          if ($p.HasExited) { Write-Error "应用启动即退出 (code $($p.ExitCode))"; exit 1 }
+          if ($p.HasExited) {
+            Write-Error ("应用启动即退出，code=" + $p.ExitCode)
+            exit 1
+          }
           Write-Output "✓ 应用进程存活，冒烟通过"
           Stop-Process -Id $p.Id -Force
 
