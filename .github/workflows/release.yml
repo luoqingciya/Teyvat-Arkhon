@@ -68,19 +68,19 @@ jobs:
             exit 1
           fi
 
-      - name: 打包产物启动冒烟（Windows）
+      - name: Smoke test packaged app (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           $exe = Get-ChildItem "apps/electron/release/win-unpacked/*.exe" | Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
-          Write-Output "冒烟二进制: $($exe.FullName)"
+          Write-Output "Binary: $($exe.FullName)"
           $p = Start-Process $exe.FullName -ArgumentList '--no-sandbox' -PassThru
-          Start-Sleep -Seconds 6
+          Start-Sleep -Seconds 8
           if ($p.HasExited) {
-            Write-Error ("应用启动即退出，code=" + $p.ExitCode)
+            Write-Error ("App exited early. code=" + $p.ExitCode)
             exit 1
           }
-          Write-Output "✓ 应用进程存活，冒烟通过"
+          Write-Output "OK: app process alive"
           Stop-Process -Id $p.Id -Force
 
       - name: GPL 合规检查（LICENSE 进产物）
