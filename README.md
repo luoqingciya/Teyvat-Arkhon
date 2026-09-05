@@ -178,7 +178,8 @@ node scripts/patch-cmake-js.mjs   # 打 MinGW 链接兼容补丁（幂等）
 | Clash / mihomo 完整 YAML | ✅ | 节点类型覆盖 ss/vmess/trojan/vless/hysteria2/tuic/ssr/http/socks5/wireguard 等，能力随内核 |
 | Base64 包装的 YAML | ✅ | 自动解码（含 base64url 变体） |
 | HTTP(S) 订阅链接 | ✅ | 携带客户端 UA，兼容多数机场 Clash 端点 |
-| v2rayN 类 URI 列表 | ⚠️ | 暂不支持，可先经订阅转换服务转成 Clash 配置 |
+| **hysteria2 单节点链接** | ✅ | `hysteria2://…` URI 自动转换为 Clash 节点导入（支持多条并列、insecure/sni/obfs/alpn 等参数） |
+| v2rayN 类 URI 列表（ss/vmess/trojan/vless） | ⚠️ | 暂不支持，可先经订阅转换服务转成 Clash 配置 |
 | Surge / Shadowrocket / sing-box / SSD | ⚠️ | 暂不支持，请使用/转换 Clash 格式 |
 
 ---

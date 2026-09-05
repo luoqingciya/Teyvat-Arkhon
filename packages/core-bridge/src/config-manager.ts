@@ -16,6 +16,7 @@ import {
   type ClashConfigSummary,
   type Profile
 } from '@teyvat-arkhon/shared'
+import { tryConvertUriProfile } from './uri-profiles'
 
 export interface ConfigManagerOptions {
   profilesDir: string
@@ -131,7 +132,9 @@ export class ConfigManager {
 
   /** 从文本内容导入订阅；url 可选（URL 导入时携带，用于刷新） */
   async importFromText(name: string, text: string, url?: string): Promise<{ profile: Profile; summary: ClashConfigSummary }> {
-    const content = decodeProfilePayload(text)
+    const decoded = decodeProfilePayload(text)
+    // 非 YAML 内容：尝试识别单节点 URI 列表（如 hysteria2://），转换未命中则按原文本校验
+    const content = tryConvertUriProfile(decoded) ?? decoded
     const summary = this.parseAndValidate(content)
 
     const id = randomUUID()

@@ -68,6 +68,24 @@ describe('ConfigManager', () => {
     expect(list).toHaveLength(1)
   })
 
+  it('hysteria2 单节点链接可被转换导入', async () => {
+    const uri =
+      'hysteria2://pass123@example.com:443/?insecure=1&sni=cdn.example.com&obfs=salamander&obfs-password=obs#HK-Hy2'
+    const { profile, summary } = await mgr.importFromText('hy2', uri)
+    expect(profile.nodeCount).toBe(1)
+    expect(summary.proxies[0]).toMatchObject({ type: 'hysteria2' })
+
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('hysteria2')
+    expect(raw).toContain('skip-cert-verify: true')
+    expect(raw).toContain('cdn.example.com')
+  })
+
+  it('混合内容的文本不会被误转，仍按 YAML 校验失败', async () => {
+    const mixed = 'hysteria2://pass@a.com:443/#A\nproxy-groups: []'
+    await expect(mgr.importFromText('mixed', mixed)).rejects.toThrow(/YAML|无法作为内核配置/)
+  })
+
   it('选择档案会写入工作配置并标记 selected', async () => {
     const { profile } = await mgr.importFromText('sub-a', SAMPLE_YAML)
     const summary = await mgr.selectProfile(profile.id)
