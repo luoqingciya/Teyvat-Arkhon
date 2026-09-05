@@ -1,6 +1,6 @@
 {
   "name": "teyvat-arkhon",
-  "version": "0.1.0",
+  "version": "0.9.0-rc",
   "private": true,
   "description": "基于 Electron + C/C++ 的跨平台代理客户端（Mihomo 核心）",
   "license": "GPL-3.0-only",

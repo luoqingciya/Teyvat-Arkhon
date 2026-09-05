@@ -1,6 +1,6 @@
 {
   "name": "@teyvat-arkhon/electron",
-  "version": "0.1.0",
+  "version": "0.9.0-rc",
   "private": true,
   "license": "GPL-3.0-only",
   "main": "out/main/index.js",
