@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "prebuild-deps": "pnpm -r --if-present --filter ./packages/** build",
+    "prebuild-deps": "pnpm -r --if-present --filter \"./packages/**\" build",
     "dev": "pnpm prebuild-deps && pnpm --filter @teyvat-arkhon/electron dev",
     "build": "pnpm prebuild-deps && pnpm --filter @teyvat-arkhon/electron build",
     "typecheck": "pnpm -r --if-present typecheck",

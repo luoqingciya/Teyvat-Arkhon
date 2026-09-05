@@ -20,7 +20,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: 构建基础包
-        run: pnpm -r --if-present --filter ./packages/** build
+        run: 'pnpm -r --if-present --filter "./packages/**" build'
       - name: 单元测试
         run: pnpm --filter @teyvat-arkhon/core-bridge exec vitest run
       - name: 类型检查
@@ -43,7 +43,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: 构建应用
-        run: pnpm --filter @teyvat-arkhon/electron build
+      - name: 构建基础包与应用
+        run: pnpm prebuild-deps && pnpm --filter @teyvat-arkhon/electron build
       - name: UI 冒烟
         run: pnpm --filter @teyvat-arkhon/electron exec playwright test
