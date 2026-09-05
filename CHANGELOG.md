@@ -1,0 +1,60 @@
+# Changelog
+
+本项目的所有重要变更均记录在此文件中。
+
+格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
+版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
+
+## [Unreleased]
+
+### Added
+- 待定：fork 内核定制特性（Teyvat Arkhon 私有内核扩展）
+
+## [0.9.0-rc] - 2026-09-05
+
+首个可发布的预览版本，完成第一~四阶段全部功能，CI 打包发布流水线全绿。
+
+### Added
+
+**内核与链路**
+- FFI 直连模式：N-API 加载 `libmihomo`（cgo `-buildmode=c-shared`），控制面进程内同步调用、零网络开销
+- 进程驱动回退：未探测到原生链路时自动切换 spawn mihomo 二进制 + RESTful API，功能等价
+- 内核源码切换至自有 fork [luoqingciya/mihomo-teyvat](https://github.com/luoqingciya/mihomo-teyvat)（v1.19.30）作为定制基线
+
+**订阅与代理**
+- 订阅管理：URL / 文本导入（自动 Base64 解码）、导入即校验、档案切换 / 刷新 / 删除
+- 代理页：策略组切换、节点表格（类型 / 延迟）、单点测速与批量测速（带逐行进度）
+- 实时监控：下载 / 上传速率曲线、累计流量、活跃连接列表（1s 轮询）、单条关闭 / 全部断开
+
+**系统能力**
+- 系统代理：Windows（注册表）/ macOS（networksetup）/ Linux（gsettings）一键开关
+- TUN 模式：配置级开关 + 热重载（Windows 依赖 Wintun）
+- Windows 系统服务托管：开机自启"免打开应用常驻"，可随时安装 / 卸载
+
+**编辑与体验**
+- 配置编辑器：CodeMirror 6 + YAML 高亮，保存前校验、运行中热重载
+- 亮 / 暗主题（暗色提瓦特基调 + 玻璃拟态）与中英双语即时切换，偏好持久化
+- 便携数据模式：`portable.txt` 或 `TEVVAT_ARKHON_PORTABLE=1` 开启，数据全部跟随运行目录
+- 自动更新：electron-updater + GitHub Releases（可用环境变量跳过）
+- 应用图标：AI 绘制（发光菱形棱晶）+ 主进程窗口图标接入
+
+**发布产物**
+- Windows NSIS 安装版（`.exe`）与**免安装 zip 版**（解压即用）
+- Linux AppImage 与 deb
+- GitHub Actions CI（单测 / 类型检查 / 构建 / Windows UI 冒烟）+ Release（win / linux 矩阵自动打包发布）
+
+### Changed
+- 根布局修复：侧边栏由顶部横条恢复为左侧竖栏，首页 2×2 卡片严格等高、控件右对齐
+- 发行流水线升级至 pnpm 11 + Node ≥ 22.13；内核资产按平台下载（windows=`zip`，linux/darwin=`gz`）
+- FFI 数据面（proxies/connections/延迟）统一走内核 external-controller REST API
+
+### Fixed
+- 修复 mihomo v1.19+ 资产格式变化（`.zip` → 平台差异化）导致的内核下载 404
+- 修复 cmake-js MinGW 链接补丁缺失闭合括号导致的 `toolset.js` 语法错误
+- 修复 choco 新版 mingw 部署路径（`ProgramData\mingw64`）与硬编码不一致导致 cgo 找不到 gcc
+- 修复 GitHub API 在 CI runner 出口 IP 下的 403 限流（请求携带 `GH_TOKEN`）
+- 修复 release 工作流缺少 `contents: write` 权限导致发布 403
+- 移除 electron-builder 非法配置字段 `includeLicenseFiles`（根 LICENSE 自动分发）
+
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.0-rc...HEAD
+[0.9.0-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.0-rc
