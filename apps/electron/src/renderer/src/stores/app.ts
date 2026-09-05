@@ -150,7 +150,7 @@ export const useAppStore = defineStore('app', {
       if (!this.running) return
       try {
         this.proxies = await window.arkhon.listProxies()
-        if (!this.selectedGroup || !this.proxies.some((p) => p.name === this.selectedGroup)) {
+        if (!this.selectedGroup || !this.proxies.some((p) => p.nodeType === 2 && p.name === this.selectedGroup)) {
           const first = this.proxies.find((p) => p.nodeType === 2)
           this.selectedGroup = first?.name ?? ''
         }

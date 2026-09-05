@@ -186,6 +186,12 @@ async function main() {
     check(!!group, 'REST 数据面返回策略组 PROXY')
     check(proxies.some((p) => p.name === 'LOCAL-UP'), '列表包含 LOCAL-UP 节点')
     check(group && group.now === 'LOCAL-UP', 'PROXY 组当前选中 LOCAL-UP')
+    // 回归：mihomo /proxies 不返回 nodeType，须按 type 推断（UI 依赖 nodeType===2 识别策略组）
+    check(group && group.nodeType === 2, 'PROXY 组 nodeType 推断为策略组(2)', `nodeType=${group && group.nodeType}`)
+    check(
+      proxies.find((p) => p.name === 'LOCAL-UP')?.nodeType === 0,
+      'LOCAL-UP 节点 nodeType 推断为节点(0)'
+    )
 
     // 规则 DOMAIN-SUFFIX,test → PROXY → 上游（CONNECT 隧道）
     const viaProxy = await requestThroughCore('http://foo.test/tunnel-probe')

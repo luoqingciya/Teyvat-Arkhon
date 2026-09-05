@@ -5,7 +5,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ConnectionInfo, DelayResult, MihomoVersion, ProxyItem } from '@teyvat-arkhon/shared'
-import { RestClient, type MihomoConnections, type MihomoProxyMap } from './rest-client'
+import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap } from './rest-client'
 import type { CoreDriver } from './driver'
 
 export interface ProcessDriverOptions {
@@ -124,7 +124,7 @@ export class ProcessCoreDriver implements CoreDriver {
     return Object.values(map.proxies).map((p) => ({
       name: p.name,
       type: p.type,
-      nodeType: p.nodeType,
+      nodeType: inferNodeType(p),
       now: p.now,
       alive: p.alive,
       history: p.history,
@@ -184,5 +184,27 @@ export class ProcessCoreDriver implements CoreDriver {
 
   async close(): Promise<void> {
     await this.stop()
+  }
+}
+
+/**
+ * mihomo REST /proxies 列表响应不返回 nodeType 字段（实测 v1.19.30），
+ * 按 type 推断其语义（数值与 mihomo 内核 NodeType 定义一致）：
+ *   Selector=2 / URLTest=1 / Fallback=3 / LoadBalance=4 / Relay=5，其余为单节点=0。
+ */
+function inferNodeType(p: MihomoProxyEntry): number {
+  switch (p.type) {
+    case 'URLTest':
+      return 1
+    case 'Selector':
+      return 2
+    case 'Fallback':
+      return 3
+    case 'LoadBalance':
+      return 4
+    case 'Relay':
+      return 5
+    default:
+      return 0
   }
 }
