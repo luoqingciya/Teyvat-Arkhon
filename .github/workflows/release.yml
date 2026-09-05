@@ -5,6 +5,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# electron-updater 需要创建 Release 并上传资产
+permissions:
+  contents: write
+
 jobs:
   package:
     name: 打包 ${{ matrix.os }}
