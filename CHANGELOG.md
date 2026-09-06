@@ -101,6 +101,7 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
+[0.9.8-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.8-rc
 [0.9.7-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.7-rc
 [0.9.6-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.6-rc
 [0.9.5-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.5-rc

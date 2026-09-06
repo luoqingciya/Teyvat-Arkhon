@@ -11,7 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-40-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
 
-> 当前预发布版本：**v0.9.5-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
+> 当前预发布版本：**v0.9.8-rc**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
