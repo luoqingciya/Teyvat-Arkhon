@@ -5,7 +5,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.8-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.9-rc...HEAD
+
+## [0.9.9-rc] - 2026-09-06
+
+### Fixed
+- **hysteria2 端口跳跃（mport）**：v2rayN 链接的 `mport=45000-50000` 现映射为 mihomo `ports` + `hop-interval`；服务端启用跳跃区间时此前仅连单端口导致完全连不上（v2rayN 正常、本应用不可用的常见根因）
+- **订阅刷新不走 URI 转换**：URL 订阅为 v2rayN URI 列表格式时，`refreshProfile`/自动更新此前按 YAML 校验必失败；现与首次导入一致（并修复 `res.text()` 二次读取异常）
+- hysteria2 `pinSHA256` 值归一为裸 hex（去除冒号分隔），兼容 mihomo/hysteria 对 `fingerprint` 按 hex 解析的实现差异
+
+验证：typecheck / 26 项单测（新增 mport 真实结构、刷新 URI 订阅用例）/ lint / electron-vite 构建 / 24 项内核 E2E 全绿。
 
 ## [0.9.8-rc] - 2026-09-06
 
@@ -101,6 +110,7 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
+[0.9.9-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.9-rc
 [0.9.8-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.8-rc
 [0.9.7-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.7-rc
 [0.9.6-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.6-rc

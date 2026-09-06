@@ -86,10 +86,27 @@ describe('ConfigManager', () => {
       'hysteria2://pass123@example.com:443/?pinSHA256=BA%3A88%3A45%3A17%3AA1&obfs=salamander&obfs-password=obs&up=100&down=250#HK-Pin'
     const { profile } = await mgr.importFromText('hy2-pin', uri)
     const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
-    expect(raw).toContain('fingerprint: BA:88:45:17:A1')
+    // 指纹归一为裸 hex（去除冒号分隔）
+    expect(raw).toContain('fingerprint: BA884517A1')
     // 纯数字带宽自动补单位，避免 mihomo yaml 解析失败
     expect(raw).toContain('up: 100 Mbps')
     expect(raw).toContain('down: 250 Mbps')
+  })
+
+  it('hysteria2 URI 携带 mport 端口跳跃时映射为 mihomo ports+hop-interval', async () => {
+    // 结构取自真实订阅链接（域名/cert 脱敏）
+    const uri =
+      'hysteria2://REDACTED-PASS@device.example.site:443?alpn=h3&fp=chrome&mport=45000-50000&obfs=salamander&obfs-password=REDACTED-OBFS&security=tls&sni=device.example.site#Test%20Node'
+    const { profile, summary } = await mgr.importFromText('hy2-real', uri)
+    expect(profile.nodeCount).toBe(1)
+    expect(summary.proxies[0]).toMatchObject({ type: 'hysteria2' })
+
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('ports: 45000-50000')
+    expect(raw).toContain("hop-interval: '30'")
+    expect(raw).toContain('obfs-password: REDACTED-OBFS')
+    expect(raw).toContain('sni: device.example.site')
+    expect(raw).toContain('name: Test Node')
   })
 
   it('混合内容的文本不会被误转，仍按 YAML 校验失败', async () => {
@@ -232,6 +249,20 @@ describe('ConfigManager', () => {
     const list = await mgr.listProfiles()
     expect(list[0].url).toBe('https://example.com/sub')
     expect(list[0].nodeCount).toBe(2)
+  })
+
+  it('刷新 v2rayN URI 订阅时同样走转换（与首次导入一致）', async () => {
+    const uriBody = 'hysteria2://pass@hy.example.com:443/?insecure=1&sni=hy.example.com#HK-Hy2'
+    const fakeFetch = (() =>
+      Promise.resolve(new Response(uriBody))) as unknown as typeof fetch
+    const { profile } = await mgr.importFromUrl('https://example.com/hy2sub', fakeFetch)
+    // 首次导入即已转换
+    const first = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(first).toContain('hysteria2')
+    // 刷新（无变化内容）仍应转换成功，而非按 YAML 校验失败
+    await mgr.refreshProfile(profile.id, fakeFetch)
+    const list = await mgr.listProfiles()
+    expect(list[0].nodeCount).toBe(1)
   })
 
   it('mergeKernelDefaults 仅在缺失时补全监听', () => {

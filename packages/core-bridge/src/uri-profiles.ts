@@ -81,8 +81,19 @@ function parseHysteria2(uri: string): ProxyDef {
   if (['1', 'true', 'yes'].includes((q.get('insecure') ?? '').toLowerCase())) p['skip-cert-verify'] = true
   // 证书指纹校验：URI 的 pinSHA256 → mihomo hysteria2 的 fingerprint 字段。
   // 自签/私签证书的服务端普遍依赖 pin 校验，丢失后内核默认走系统 CA，握手会失败导致完全连不上。
+  // 值规范化为裸 hex（去掉冒号等分隔符），兼容 mihomo/hysteria 对其按 hex 解析的实现差异。
   const pin = q.get('pinSHA256') ?? q.get('pin-sha256') ?? q.get('fingerprint')
-  if (pin) p.fingerprint = pin
+  if (pin) {
+    const normalized = pin.replace(/[^0-9a-fA-F]/g, '')
+    p.fingerprint = normalized || pin
+  }
+  // 端口跳跃：v2rayN 的 mport 参数（如 "45000-50000"）→ mihomo ports + hop-interval。
+  // 服务端在跳跃区间监听时，仅连单端口会连不上（v2rayN 正常、本应用不行的常见根因）。
+  const mport = q.get('mport')
+  if (mport) {
+    p.ports = mport
+    p['hop-interval'] = '30'
+  }
   const obfs = q.get('obfs')
   if (obfs) p.obfs = obfs
   const obfsPwd = q.get('obfs-password') ?? q.get('obfsPassword')
