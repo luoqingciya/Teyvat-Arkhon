@@ -5,7 +5,7 @@ import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/out/**', '**/node_modules/**', '**/build/**', '**/resources/core/**']
+    ignores: ['**/dist/**', '**/out/**', '**/node_modules/**', '**/build/**', '**/resources/arkhon-core/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

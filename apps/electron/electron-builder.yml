@@ -12,10 +12,10 @@ files:
   - "out/**"
   - "!**/*.map"
 
-# 内核资源：mihomo 二进制、geo 数据、wintun 驱动
+# 内核资源：arkhon 二进制、geo 数据、wintun 驱动
 extraResources:
-  - from: resources/core
-    to: core
+  - from: resources/arkhon-core
+    to: arkhon-core
     filter:
       - "**/*"
       - "!.gitkeep"
