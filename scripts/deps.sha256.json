@@ -1,8 +1,16 @@
 {
-  "_comment": "内核/geo 完整性校验哈希清单。core 表内存在的版本与平台将做强校验（SHA256 不匹配即失败）；值为 null 的平台未登记哈希，下载时打印警告并跳过严格校验（建议首次 CI 下载后把实际哈希补登记到对应平台）。geo 来自 meta-rules-dat latest，会随上游更新而变化，仅做一致性提示（不阻断下载）。",
+  "_comment": "内核压缩包（zip/gz 原文）/geo 完整性校验哈希清单。core 表内存在的版本与平台将做强校验（校验的是下载到的压缩包原文的 SHA256，与内核 release 自带 checksums.txt 完全一致）；值为 null 的平台未登记哈希，下载时打印警告并跳过严格校验（建议首次 CI 下载后把 checksums.txt 对应哈希补登记到该平台）。geo 来自 meta-rules-dat latest，会随上游更新而变化，仅做一致性提示（不阻断下载）。",
   "core": {
+    "v0.9.10-teyvat": {
+      "windows-amd64": "131e350f45b03a9d11741f479503f962ee750264bf42b4e64892834e1d01517d",
+      "windows-arm64": "57d565b14d8017f4f2876fab4c893a8d3a66afeb8b50c49760d70edbade3ddea",
+      "linux-amd64": "8de1cef183e9225d6fe501787af41690557a34b935fcade99c5fdad3542ff7df",
+      "linux-arm64": "770b6b22d7db084fd62b415e6901c579984345dd3d8f457f22bb36936ac4fd41",
+      "darwin-amd64": "38d9b4388bf6b7e65ec0b57d20698975886a1981706001d69a7db5feadc124c5",
+      "darwin-arm64": "06789f821d5681674f59b13260f5b1f35db4f478232cb47a06a54d7a8620e6a6"
+    },
     "v1.19.30": {
-      "windows-amd64": "f55b3028d9160beb9044f21b05dd7405b46524614a19642d6291492f5f985761",
+      "windows-amd64": null,
       "linux-amd64": null,
       "darwin-arm64": null,
       "darwin-amd64": null
