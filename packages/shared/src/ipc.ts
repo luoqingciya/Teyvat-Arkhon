@@ -63,6 +63,8 @@ export interface ArkhonAPI {
   removeProfile(id: string): Promise<void>
   refreshProfile(id: string): Promise<Profile>
   selectProfile(id: string): Promise<ClashConfigSummary>
+  /** 导出档案为分享 URI 列表（v2rayN 风格，每行一条节点） */
+  exportProfileUris(id: string): Promise<string>
   /** 刷新全部 URL 订阅（自动更新用），返回成功/失败数量 */
   refreshAllProfiles(): Promise<{ ok: number; failed: number }>
 

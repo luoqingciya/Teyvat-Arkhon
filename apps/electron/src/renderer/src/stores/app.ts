@@ -415,6 +415,16 @@ export const useAppStore = defineStore('app', {
       }
     },
 
+    /** 导出档案节点为分享 URI 文本（v2rayN 风格）；失败返回空串并由调用方提示 */
+    async exportProfileUris(id: string): Promise<string> {
+      try {
+        return await window.arkhon.exportProfileUris(id)
+      } catch (e) {
+        this.error = (e as Error).message
+        return ''
+      }
+    },
+
     // ---------- 订阅自动更新 ----------
 
     async refreshAutoRefresh(): Promise<void> {

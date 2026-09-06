@@ -166,14 +166,22 @@ function parseSs(uri: string): ProxyDef {
       port = pp
     }
   } else if (rawAuth) {
-    // 尝试整段 base64(cipher:password@host:port)
-    const decoded = maybeB64(uri.slice(5).split('#')[0])
-    if (decoded && decoded.includes('@')) {
-      const [auth0, rest] = splitOnce(decoded, '@')
-      const [h2, pp] = splitHostPort(rest, 8388)
-      ;[cipher, password] = splitCipherPasswordH(auth0)
-      host = h2
-      port = pp
+    // 形态 A: ss:// base64(cipher:password)@host:port —— userinfo 是纯 base64（无明文 @），host/port 在 URL 中
+    const selfDecoded = maybeB64(rawAuth)
+    if (selfDecoded && selfDecoded.includes(':') && !selfDecoded.includes('@')) {
+      ;[cipher, password] = splitCipherPasswordH(selfDecoded)
+      host = u.hostname
+      port = Number(u.port) || 8388
+    } else {
+      // 形态 C: ss:// base64(cipher:password@host:port) 整段 base64（含 @ 与端口）
+      const decoded = maybeB64(uri.slice(5).split('#')[0])
+      if (decoded && decoded.includes('@')) {
+        const [c0, rest] = splitOnce(decoded, '@')
+        const [h2, pp] = splitHostPort(rest, 8388)
+        ;[cipher, password] = splitCipherPasswordH(c0)
+        host = h2
+        port = pp
+      }
     }
   }
 

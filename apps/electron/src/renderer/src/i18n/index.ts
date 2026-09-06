@@ -94,7 +94,11 @@ const resources = {
         used: '已使用',
         refresh: '刷新',
         remove: '删除',
-        nodes: '节点'
+        nodes: '节点',
+        share: '分享',
+        shareCopied: '已复制 {{n}} 条节点链接',
+        shareEmpty: '档案内没有可分享的节点',
+        shareFailed: '复制失败'
       },
       connections: {
         title: '活跃连接',
@@ -284,7 +288,11 @@ const resources = {
         used: 'In use',
         refresh: 'Refresh',
         remove: 'Remove',
-        nodes: 'nodes'
+        nodes: 'nodes',
+        share: 'Share',
+        shareCopied: 'Copied {{n}} node links',
+        shareEmpty: 'No shareable nodes in this profile',
+        shareFailed: 'Copy failed'
       },
       connections: {
         title: 'Active Connections',

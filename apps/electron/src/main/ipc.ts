@@ -71,6 +71,7 @@ export function createIpc(
   ipcMain.handle('profiles:remove', (_e, id: string) => service.removeProfile(id))
   ipcMain.handle('profiles:refresh', (_e, id: string) => service.refreshProfile(id))
   ipcMain.handle('profiles:select', (_e, id: string) => service.selectProfile(id))
+  ipcMain.handle('profiles:export-uris', (_e, id: string) => service.exportProfileUris(id))
   ipcMain.handle('profiles:refresh-all', () => service.refreshAllUrlProfiles())
 
   ipcMain.handle('net:check', () => netChecker.run())

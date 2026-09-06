@@ -62,6 +62,7 @@ const api: ArkhonAPI = {
   removeProfile: (id) => ipcRenderer.invoke('profiles:remove', id) as Promise<void>,
   refreshProfile: (id) => ipcRenderer.invoke('profiles:refresh', id) as Promise<Profile>,
   selectProfile: (id) => ipcRenderer.invoke('profiles:select', id) as Promise<ClashConfigSummary>,
+  exportProfileUris: (id) => ipcRenderer.invoke('profiles:export-uris', id) as Promise<string>,
   refreshAllProfiles: () =>
     ipcRenderer.invoke('profiles:refresh-all') as Promise<{ ok: number; failed: number }>,
 

@@ -212,6 +212,11 @@ export class CoreService extends EventEmitter {
     return this.config.listProfiles()
   }
 
+  /** 导出档案为分享 URI 列表（v2rayN 风格，每行一条节点） */
+  exportProfileUris(id: string): Promise<string> {
+    return this.config.exportProfileUris(id)
+  }
+
   importFromUrl(url: string): Promise<{ profile: Profile; summary: ClashConfigSummary }> {
     return this.config.importFromUrl(url, this.opts.fetchImpl)
   }
