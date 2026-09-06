@@ -170,7 +170,10 @@ export class ConfigManager {
 
     const res = await fetchImpl(profile.url, { headers: { 'user-agent': 'TeyvatArkhon/0.1' } })
     if (!res.ok) throw new Error(`订阅刷新失败: HTTP ${res.status}`)
-    const content = decodeProfilePayload(await res.text())
+    // 与首次导入保持一致：URI 列表（v2rayN 订阅）需先转换为 Clash 配置再校验落盘
+    const text = await res.text()
+    const decoded = decodeProfilePayload(text)
+    const content = tryConvertUriProfile(decoded) ?? decoded
     const summary = this.parseAndValidate(content)
 
     profile.updatedAt = new Date().toISOString()
