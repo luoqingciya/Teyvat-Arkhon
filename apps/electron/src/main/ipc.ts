@@ -16,7 +16,9 @@ export function createIpc(
   netChecker: NetChecker,
   loopback: LoopbackController,
   getAutoRefresh: () => boolean,
-  setAutoRefresh: (enabled: boolean) => void
+  setAutoRefresh: (enabled: boolean) => void,
+  getExcludeKeywords: () => string[],
+  setExcludeKeywords: (keywords: string[]) => void
 ): void {
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -79,6 +81,9 @@ export function createIpc(
 
   ipcMain.handle('app:auto-refresh-get', () => getAutoRefresh())
   ipcMain.handle('app:auto-refresh-set', (_e, enabled: boolean) => setAutoRefresh(enabled))
+
+  ipcMain.handle('sub:exclude-get', () => getExcludeKeywords())
+  ipcMain.handle('sub:exclude-set', (_e, keywords: string[]) => setExcludeKeywords(Array.isArray(keywords) ? keywords : []))
 
   ipcMain.handle('system-proxy:get', async (): Promise<SystemProxyState> => systemProxy.read())
   ipcMain.handle('system-proxy:set', async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { ConfigManager, mergeKernelDefaults } from './config-manager'
+import yaml from 'js-yaml'
+import { ConfigManager, mergeKernelDefaults, applyExcludeFilter } from './config-manager'
 
 const SAMPLE_YAML = `mixed-port: 7890
 external-controller: 127.0.0.1:9090
@@ -272,6 +273,23 @@ describe('ConfigManager', () => {
 
     const unchanged = mergeKernelDefaults(SAMPLE_YAML)
     expect(unchanged.match(/mixed-port:/g)).toHaveLength(1)
+  })
+
+  it('applyExcludeFilter 按关键词剔除节点并同步清理策略组引用', () => {
+    const src =
+      'mixed-port: 7890\n' +
+      'proxies:\n' +
+      '  - {name: HK-01, type: hysteria2}\n' +
+      '  - {name: Gift-Node, type: ss}\n' +
+      '  - {name: HK-02-Trial, type: vless}\n' +
+      'proxy-groups:\n' +
+      '  - {name: PROXY, type: select, proxies: [HK-01, Gift-Node, HK-02-Trial, DIRECT]}\n'
+    const out = applyExcludeFilter(src, ['gift', 'trial'])
+    const doc = yaml.load(out) as { proxies: Array<{ name: string }>; 'proxy-groups': Array<{ proxies: string[] }> }
+    expect(doc.proxies.map((p) => p.name)).toEqual(['HK-01'])
+    expect(doc['proxy-groups'][0].proxies).toEqual(['HK-01', 'DIRECT'])
+    // 无关键词时原样返回
+    expect(applyExcludeFilter(src, [])).toBe(src)
   })
 
   it('开关 TUN：启用追加默认段、幂等、禁用可移除', async () => {

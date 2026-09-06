@@ -26,6 +26,8 @@ export interface CoreServiceOptions {
   /** 内核驱动（当前统一使用进程驱动，稳定优先；字段保留以便未来扩展） */
   driver: { mode: 'process'; options: ProcessDriverOptions }
   fetchImpl?: typeof fetch
+  /** 订阅导入/刷新的节点排除关键词（运行时读取，支持设置页动态修改） */
+  excludeKeywords?: () => string[]
 }
 
 export class CoreService extends EventEmitter {
@@ -38,7 +40,8 @@ export class CoreService extends EventEmitter {
     super()
     this.config = new ConfigManager({
       profilesDir: opts.profilesDir,
-      activeConfigFile: opts.activeConfigFile
+      activeConfigFile: opts.activeConfigFile,
+      excludeKeywords: opts.excludeKeywords
     })
   }
 

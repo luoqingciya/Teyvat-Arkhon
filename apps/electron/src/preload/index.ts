@@ -74,6 +74,14 @@ const api: ArkhonAPI = {
   getAutoRefresh: () => ipcRenderer.invoke('app:auto-refresh-get') as Promise<boolean>,
   setAutoRefresh: (enabled) => ipcRenderer.invoke('app:auto-refresh-set', enabled) as Promise<void>,
 
+  getExcludeKeywords: () => ipcRenderer.invoke('sub:exclude-get') as Promise<string[]>,
+  setExcludeKeywords: (keywords) => ipcRenderer.invoke('sub:exclude-set', keywords) as Promise<void>,
+  onProfilesChanged: (cb) => {
+    const listener = (): void => cb()
+    ipcRenderer.on('arkhon:profiles-changed', listener)
+    return () => ipcRenderer.removeListener('arkhon:profiles-changed', listener)
+  },
+
   getSystemProxy: () => ipcRenderer.invoke('system-proxy:get') as Promise<SystemProxyState>,
   setSystemProxy: (enabled) => ipcRenderer.invoke('system-proxy:set', enabled) as Promise<SystemProxyState>,
 

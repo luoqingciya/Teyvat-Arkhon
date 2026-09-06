@@ -54,6 +54,8 @@ interface AppState {
   delaySetting: { url: string; timeoutMs: number }
   /** 订阅自动更新开关（主进程持久化） */
   autoRefresh: boolean
+  /** 订阅导入/刷新时排除的节点关键词（主进程持久化） */
+  excludeKeywords: string[]
   /** 网络自检结果 */
   netProbe: NetProbeResult[] | null
   /** 网络自检进行中 */
@@ -89,6 +91,11 @@ const LOG_LIMIT = 500
 /** 批量测速的并发上限（限量并发：避免瞬时打满内核/订阅出口） */
 const TEST_CONCURRENCY = 8
 
+/** 策略组节点类型：URLTest=1 / Select=2 / Fallback=3 / LoadBalance=4 / Relay=5 */
+function isGroupNode(p: ProxyItem): boolean {
+  return p.nodeType >= 1 && p.nodeType <= 5
+}
+
 interface BatchTestState {
   running: boolean
   current: number
@@ -119,6 +126,7 @@ export const useAppStore = defineStore('app', {
     logs: [],
     delaySetting: readDelaySetting(),
     autoRefresh: false,
+    excludeKeywords: [],
     netProbe: null,
     netChecking: false,
     loopback: null,
@@ -126,11 +134,12 @@ export const useAppStore = defineStore('app', {
   }),
 
   getters: {
+    /** 策略组集：Select(2)/URLTest(1)/Fallback(3)/LoadBalance(4)/Relay(5)，均可展示/测速 */
     groups(state): ProxyItem[] {
-      return state.proxies.filter((p) => p.nodeType === 2)
+      return state.proxies.filter((p) => isGroupNode(p))
     },
     currentGroup(state): ProxyItem | undefined {
-      return state.proxies.find((p) => p.nodeType === 2 && p.name === state.selectedGroup)
+      return state.proxies.find((p) => isGroupNode(p) && p.name === state.selectedGroup)
     },
     running(state): boolean {
       return state.status.state === 'running'
@@ -156,6 +165,9 @@ export const useAppStore = defineStore('app', {
         this.logs.push(line)
         if (this.logs.length > LOG_LIMIT) this.logs.shift()
       })
+      window.arkhon.onProfilesChanged(() => {
+        void this.refreshProfiles()
+      })
       await this.refreshStatus()
       await this.refreshProfiles()
       await this.refreshSystemProxy()
@@ -165,6 +177,7 @@ export const useAppStore = defineStore('app', {
       await this.initCoreMode()
       await this.initLogs()
       await this.refreshAutoRefresh()
+      await this.refreshExcludeKeywords()
       await this.refreshLoopback()
       this.appVersion = await window.arkhon.getAppVersion()
     },
@@ -248,8 +261,8 @@ export const useAppStore = defineStore('app', {
       if (!this.running) return
       try {
         this.proxies = await window.arkhon.listProxies()
-        if (!this.selectedGroup || !this.proxies.some((p) => p.nodeType === 2 && p.name === this.selectedGroup)) {
-          const first = this.proxies.find((p) => p.nodeType === 2)
+        if (!this.selectedGroup || !this.proxies.some((p) => isGroupNode(p) && p.name === this.selectedGroup)) {
+          const first = this.proxies.find((p) => isGroupNode(p))
           this.selectedGroup = first?.name ?? ''
         }
       } catch (e) {
@@ -417,6 +430,30 @@ export const useAppStore = defineStore('app', {
       try {
         await window.arkhon.setAutoRefresh(enabled)
         this.autoRefresh = enabled
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    // ---------- 订阅节点管理 ----------
+
+    async refreshExcludeKeywords(): Promise<void> {
+      try {
+        this.excludeKeywords = await window.arkhon.getExcludeKeywords()
+      } catch {
+        this.excludeKeywords = []
+      }
+    },
+
+    /** 保存排除关键词（主进程持久化；下次导入/刷新生效） */
+    async saveExcludeKeywords(keywords: string[]): Promise<void> {
+      const cleaned = keywords
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i)
+      try {
+        await window.arkhon.setExcludeKeywords(cleaned)
+        this.excludeKeywords = cleaned
       } catch (e) {
         this.error = (e as Error).message
       }
