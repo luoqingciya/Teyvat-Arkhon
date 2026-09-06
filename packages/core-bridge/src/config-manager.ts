@@ -17,6 +17,7 @@ import {
   type Profile
 } from '@teyvat-arkhon/shared'
 import { tryConvertUriProfile } from './uri-profiles'
+import { clashProxiesToUriList } from './uri-export'
 
 export interface ConfigManagerOptions {
   profilesDir: string
@@ -128,6 +129,28 @@ export class ConfigManager {
 
   async listProfiles(): Promise<Profile[]> {
     return this.readIndex()
+  }
+
+  /**
+   * 导出档案为分享 URI 列表（v2rayN 风格，每行一条节点）。
+   * 读取档案原始 YAML 的完整 proxies（含 server/密码/uuid 等），
+   * 不支持的协议类型自动跳过；无任何可导出节点时返回空串。
+   */
+  async exportProfileUris(id: string): Promise<string> {
+    const list = await this.readIndex()
+    const profile = list.find((p) => p.id === id)
+    if (!profile) throw new Error('档案不存在')
+    const content = await fs.readFile(this.profileFile(id), 'utf-8')
+    let cfg: unknown
+    try {
+      cfg = yaml.load(content)
+    } catch {
+      throw new Error('档案 YAML 解析失败')
+    }
+    const proxies = isRecord(cfg) && Array.isArray((cfg as Record<string, unknown>).proxies)
+      ? ((cfg as Record<string, unknown>).proxies as Array<Record<string, unknown>>)
+      : []
+    return clashProxiesToUriList(proxies)
   }
 
   /** 从 URL 导入订阅：下载 → 解码 → 校验 → 落盘 */

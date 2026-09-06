@@ -5,7 +5,17 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.10-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.11-rc...HEAD
+
+## [0.9.11-rc] - 2026-09-06
+
+### Added
+- **以 URL 分享订阅**：订阅列表页每个档案新增「分享」按钮，一键将全部节点导出为 v2rayN 风格 URI 列表（ss / vmess / vless / trojan / hysteria2 / hysteria / tuic / socks5）并复制到剪贴板，对方粘贴导入即可
+
+### Fixed
+- **ss:// 导入丢失密码**：v2rayN 最常见形态 `ss://base64(cipher:password)@host:port` 导入时密码被清空，已补全解码；分享导出的 ss 节点密码可正确保留
+
+验证：typecheck / 39 项单测（新增 URI 反向转换 10 项 + 导出集成 2 项）/ lint / electron-vite 构建全绿。
 
 ## [0.9.10-rc] - 2026-09-06
 

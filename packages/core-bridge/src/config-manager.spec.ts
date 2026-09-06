@@ -130,6 +130,26 @@ describe('ConfigManager', () => {
     expect(summary.proxies[0].type).toBe(expectedType)
   })
 
+  it('exportProfileUris 导出为分享 URI 列表（含密码等敏感字段）', async () => {
+    const { profile } = await mgr.importFromText('share-src', SAMPLE_YAML)
+    const uris = await mgr.exportProfileUris(profile.id)
+    const lines = uris.split('\n').filter(Boolean)
+    // SAMPLE_YAML 含 2 个 ss/trojan 节点
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toMatch(/^ss:\/\//)
+    expect(lines[0]).toContain('@1.2.3.4:8388')
+    // ss 密码保留（base64url 解码后为 aes-256-gcm:secret）
+    const b64 = lines[0].split('//')[1].split('@')[0]
+    const decoded = Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+    expect(decoded).toBe('aes-256-gcm:secret')
+    expect(lines[1]).toMatch(/^trojan:\/\//)
+    expect(lines[1]).toContain('pw@5.6.7.8:443')
+  })
+
+  it('exportProfileUris 对不存在的档案抛错', async () => {
+    await expect(mgr.exportProfileUris('no-such-id')).rejects.toThrow(/不存在/)
+  })
+
   it('sing-box 导出 JSON 可转换导入', async () => {
     const sb = JSON.stringify({
       version: 1,

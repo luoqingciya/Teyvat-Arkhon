@@ -9,6 +9,7 @@ const { t } = useTranslation()
 const url = ref('')
 const textName = ref('')
 const textContent = ref('')
+const shareTip = ref<{ id: string; text: string } | null>(null)
 
 function fmtTime(iso: string): string {
   try {
@@ -16,6 +17,23 @@ function fmtTime(iso: string): string {
   } catch {
     return iso
   }
+}
+
+/** 将档案节点导出为分享 URI 列表并复制到剪贴板 */
+async function shareProfile(id: string): Promise<void> {
+  const text = await store.exportProfileUris(id)
+  if (!text) {
+    shareTip.value = { id, text: t('profiles.shareEmpty') }
+  } else {
+    try {
+      await navigator.clipboard.writeText(text)
+      const lines = text.split('\n').filter(Boolean).length
+      shareTip.value = { id, text: t('profiles.shareCopied', { n: lines }) }
+    } catch {
+      shareTip.value = { id, text: t('profiles.shareFailed') }
+    }
+  }
+  setTimeout(() => (shareTip.value = null), 2500)
 }
 
 async function submitUrl(): Promise<void> {
@@ -78,7 +96,9 @@ async function submitText(): Promise<void> {
             {{ p.selected ? t('profiles.used') : t('profiles.use') }}
           </button>
           <button class="btn mini" :disabled="!p.url" @click="store.refreshProfile(p.id)">{{ t('profiles.refresh') }}</button>
+          <button class="btn mini" @click="shareProfile(p.id)">{{ t('profiles.share') }}</button>
           <button class="btn mini danger" @click="store.removeProfile(p.id)">{{ t('profiles.remove') }}</button>
+          <span v-if="shareTip && shareTip.id === p.id" class="share-tip">{{ shareTip.text }}</span>
         </div>
       </div>
     </div>
@@ -187,8 +207,21 @@ async function submitText(): Promise<void> {
 }
 .p-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex: none;
+  position: relative;
+}
+.share-tip {
+  position: absolute;
+  right: 0;
+  bottom: -22px;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.16);
+  color: #34d399;
 }
 .empty {
   padding: 46px 0;
