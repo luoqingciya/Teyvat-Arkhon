@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      core-tag:
+        description: 定制内核 tag（如 v0.9.10）。留空=自动取 fork mihomo-teyvat 最新 release
+        required: false
+        default: ''
 
 # electron-updater 需要创建 Release 并上传资产
 permissions:
@@ -35,8 +40,10 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 下载内核与数据（mihomo/geo/wintun，含 sha256 校验）
-        run: node scripts/download-core.mjs v1.19.30
+      - name: 下载内核与数据（定制内核/geo/wintun，含 sha256 校验）
+        env:
+          CORE_TAG: ${{ github.event.inputs.core-tag || '' }}
+        run: node scripts/download-core.mjs
 
       - name: 构建基础包与应用
         run: |

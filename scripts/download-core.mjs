@@ -7,6 +7,12 @@
  *
  * 注: mihomo v1.19+ release 资产格式按平台不同:
  *   windows-* 为 .zip（内含 mihomo-windows-amd64.exe），linux/darwin-* 为 .gz 单文件。
+ *
+ * 源仓库：默认为定制内核 fork（luoqingciya/mihomo-teyvat），由 OWNER/REPO 控制。
+ * 需追溯上游官方 mihomo 时，改为 MetaCubeX/mihomo 即可。
+ *
+ * 完整性校验说明：这里校验的是「下载到的压缩包原文」（zip/gz）的 sha256，
+ * 即与内核 CI release 自带 checksums.txt 的哈希完全一致，直接照抄登记即可。
  */
 
 import { createWriteStream } from 'node:fs'
@@ -16,8 +22,8 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 
-const OWNER = 'MetaCubeX'
-const REPO = 'mihomo'
+const OWNER = 'luoqingciya'
+const REPO = 'mihomo-teyvat'
 const TARGET_DIR = path.resolve('apps/electron/resources/core')
 
 // 完整性校验清单（见 deps.sha256.json）：
@@ -80,7 +86,8 @@ async function main() {
   if (await fs.access(finalDest).then(() => true, () => false)) {
     console.log(`[download-core] 内核已存在 (${finalName})，跳过下载`)
   } else {
-    const tag = process.argv[2] ?? (await latestTag())
+    // 版本来源优先级：命令行参数 > CORE_TAG 环境变量 > GitHub 最新 release
+    const tag = process.argv[2] ?? process.env['CORE_TAG'] ?? (await latestTag())
     await fs.mkdir(TARGET_DIR, { recursive: true })
 
     const baseName = `mihomo-${assetName(process.platform, process.arch)}-${tag}`
@@ -91,6 +98,9 @@ async function main() {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
     const data = Buffer.from(await res.arrayBuffer())
+
+    // 在解压前对压缩包原文做完整性校验（哈希与 release 的 checksums.txt 一致）
+    verifyCore(data, tag)
 
     if (process.platform === 'win32') {
       const zipPath = path.join(TARGET_DIR, `${baseName}.zip`)
@@ -115,8 +125,6 @@ async function main() {
       await fs.chmod(finalDest, 0o755)
     }
 
-    // 完整性校验（针对解压后的 mihomo 可执行文件）
-    verifyCore(finalDest, tag)
     console.log(`[download-core] 完成: ${finalDest} (${data.length} bytes 压缩)`)
   }
 
@@ -124,18 +132,17 @@ async function main() {
   await downloadWintun()
 }
 
-/** 校验解压后的内核二进制：清单内存在该版本+平台哈希则必须匹配，否则视为下载损坏中止 */
-async function verifyCore(binaryPath, tag) {
+/** 校验下载的压缩包原文：清单内存在该版本+平台哈希则必须匹配，否则视为下载损坏中止 */
+function verifyCore(data, tag) {
   const key = assetName(process.platform, process.arch)
   const expected = SHA.core?.[tag]?.[key]
   if (!expected) {
     console.warn(
-      `[download-core] ⚠ 内核 ${tag}/${key} 未登记校验哈希，跳过严格校验（建议 CI 首次下载后补登记 deps.sha256.json）`
+      `[download-core] ⚠ 内核 ${tag}/${key} 未登记校验哈希，跳过严格校验（建议 CI 首次下载后照抄 release 的 checksums.txt 登记到 deps.sha256.json）`
     )
     return
   }
-  const bin = await fs.readFile(binaryPath)
-  const actual = sha256(bin)
+  const actual = sha256(data)
   if (actual !== expected) {
     throw new Error(
       `内核完整性校验失败 (${tag}/${key})\n期望 ${expected}\n实际 ${actual}\n可能下载损坏或版本哈希发生变更，请核对后重试`
