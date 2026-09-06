@@ -5,9 +5,9 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.7-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.8-rc...HEAD
 
-## [Unreleased]
+## [0.9.8-rc] - 2026-09-06
 
 ### Fixed（订阅转换参数完善，修复多个"v2rayN 能用、本应用连不上"场景）
 - **hysteria2 丢失 `pinSHA256` 证书指纹**：URI 的 pinSHA256 现映射为 mihomo `fingerprint` 字段；自签/私签证书服务端此前默认走系统 CA 校验导致 TLS 握手失败

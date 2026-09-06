@@ -57,9 +57,10 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           OUT="/tmp/release-notes-${VERSION}.md"
-          awk -v sec="[$VERSION]" '
-            $0 ~ "^## " sec { f=1 }
-            f && /^## / && $0 !~ "^## " sec { exit }
+          # index() 做固定字符串匹配，避免 "[0.9.8-rc]" 被正则当作字符类误匹配其他标题
+          awk -v h2="## [$VERSION]" '
+            index($0, h2) == 1 { f=1 }
+            f && index($0, "## [") == 1 && index($0, h2) != 1 { exit }
             f { print }
           ' CHANGELOG.md > "$OUT"
           if [ ! -s "$OUT" ]; then echo "未找到 [$VERSION] 段落，跳过"; exit 0; fi
