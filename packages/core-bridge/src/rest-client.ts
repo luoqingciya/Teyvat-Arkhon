@@ -87,6 +87,16 @@ export interface MihomoConnections {
   connections: MihomoConnectionEntry[]
 }
 
+/** 路由规则（GET /rules） */
+export interface MihomoRules {
+  rules: Array<{
+    type: string
+    payload: string
+    proxy: string
+    hits?: number
+  }>
+}
+
 export interface MihomoConnectionEntry {
   id: string
   metadata: {

@@ -50,6 +50,22 @@ jobs:
       - name: 打包发布
         run: pnpm --filter @teyvat-arkhon/electron exec electron-builder -- --publish always
 
+      # Release 正文：从 CHANGELOG.md 抽取当前 tag 对应版本段落，写入 release body（缺省时静默跳过）
+      - name: 写入 Release 说明（CHANGELOG）
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          OUT="/tmp/release-notes-${VERSION}.md"
+          awk -v sec="[$VERSION]" '
+            $0 ~ "^## " sec { f=1 }
+            f && /^## / && $0 !~ "^## " sec { exit }
+            f { print }
+          ' CHANGELOG.md > "$OUT"
+          if [ ! -s "$OUT" ]; then echo "未找到 [$VERSION] 段落，跳过"; exit 0; fi
+          gh release edit "${GITHUB_REF_NAME}" --notes-file "$OUT" || echo "release body 更新失败（不阻塞）"
+          rm -f "$OUT"
+
       - name: 打包产物启动冒烟（Linux）
         if: runner.os == 'Linux'
         run: |

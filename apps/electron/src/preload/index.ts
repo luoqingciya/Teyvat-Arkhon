@@ -10,6 +10,7 @@ import type {
   Profile,
   ProxyItem,
   ProxyMode,
+  RuleInfo,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -45,6 +46,7 @@ const api: ArkhonAPI = {
   uninstallService: () => ipcRenderer.invoke('service:uninstall') as Promise<SystemServiceState>,
 
   listProxies: () => ipcRenderer.invoke('proxies:list') as Promise<ProxyItem[]>,
+  listRules: () => ipcRenderer.invoke('rules:list') as Promise<RuleInfo[]>,
   selectProxy: (group, node) => ipcRenderer.invoke('proxies:select', group, node) as Promise<void>,
   testDelay: (name, url, timeoutMs) =>
     ipcRenderer.invoke('proxies:delay', name, url, timeoutMs) as Promise<DelayResult>,

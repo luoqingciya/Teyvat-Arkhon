@@ -57,6 +57,7 @@ export function createIpc(
   ipcMain.handle('service:uninstall', () => serviceManager.uninstall())
 
   ipcMain.handle('proxies:list', () => service.listProxies())
+  ipcMain.handle('rules:list', () => service.listRules())
   ipcMain.handle('proxies:select', (_e, group: string, node: string) => service.selectProxy(group, node))
   ipcMain.handle('proxies:delay', (_e, name: string, url?: string, timeoutMs?: number) =>
     service.testDelay(name, url, timeoutMs)

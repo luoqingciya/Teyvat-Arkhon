@@ -100,6 +100,18 @@ export interface TrafficSnapshot {
   connections: ConnectionInfo[]
 }
 
+/** 路由规则条目（来自 REST /rules，路由模式 rule 有效） */
+export interface RuleInfo {
+  /** 规则类型，如 DOMAIN-SUFFIX / IP-CIDR / MATCH */
+  type: string
+  /** 规则匹配目标（域名/网段/端口等） */
+  payload: string
+  /** 规则指向的代理组或节点 */
+  proxy: string
+  /** 累计命中次数（内核运行期统计，重启清零） */
+  hits: number
+}
+
 /** Windows 系统服务状态 */
 export type ServiceState = 'installed' | 'running' | 'stopped' | 'not-installed' | 'unknown'
 

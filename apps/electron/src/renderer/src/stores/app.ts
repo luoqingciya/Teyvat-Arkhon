@@ -11,6 +11,7 @@ import type {
   Profile,
   ProxyItem,
   ProxyMode,
+  RuleInfo,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -59,6 +60,8 @@ interface AppState {
   netChecking: boolean
   /** UWP 回环豁免状态 */
   loopback: LoopbackState | null
+  /** 当前路由规则（内核运行期有效） */
+  rules: RuleInfo[]
 }
 
 /** 测速配置本地持久化键 */
@@ -118,7 +121,8 @@ export const useAppStore = defineStore('app', {
     autoRefresh: false,
     netProbe: null,
     netChecking: false,
-    loopback: null
+    loopback: null,
+    rules: []
   }),
 
   getters: {
@@ -230,6 +234,7 @@ export const useAppStore = defineStore('app', {
         this.status = await window.arkhon.stopCore()
         this.proxies = []
         this.delays = {}
+        this.rules = []
       } catch (e) {
         this.error = (e as Error).message
       } finally {
@@ -247,6 +252,19 @@ export const useAppStore = defineStore('app', {
           const first = this.proxies.find((p) => p.nodeType === 2)
           this.selectedGroup = first?.name ?? ''
         }
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    /** 拉取当前生效的路由规则（rule 模式） */
+    async refreshRules(): Promise<void> {
+      if (!this.running) {
+        this.rules = []
+        return
+      }
+      try {
+        this.rules = await window.arkhon.listRules()
       } catch (e) {
         this.error = (e as Error).message
       }

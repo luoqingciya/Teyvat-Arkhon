@@ -222,6 +222,17 @@ async function main() {
     const viaDirect = await requestThroughCore(`http://127.0.0.1:${ECHO_PORT}/direct-probe`)
     check(/ECHO-OK[\s\S]*\/direct-probe/.test(viaDirect.body), 'MATCH,DIRECT 直连生效（标记命中）', `body=${viaDirect.body}`)
 
+    // 规则查看数据面：GET /rules 应包含配置的规则（UI「规则」视图的数据源）
+    // 注意：mihomo /rules 返回的 type 已是规范化的 Go 类型名（如 DomainSuffix / Match），按小写比较兼容
+    const rules = await svc.listRules()
+    check(Array.isArray(rules) && rules.length >= 2, 'REST /rules 返回规则列表', `count=${rules.length}`)
+    check(
+      rules.some((r) => r.type.toLowerCase() === 'domainsuffix' && r.payload === 'test'),
+      '规则列表包含 DOMAIN-SUFFIX,test',
+      JSON.stringify(rules.slice(0, 3))
+    )
+    check(rules.some((r) => r.type.toLowerCase() === 'match' && r.proxy === 'DIRECT'), '规则列表包含 MATCH,DIRECT', JSON.stringify(rules.slice(0, 3)))
+
     // 流量数据面：拉取 256KB 后累计 downloadTotal 应增长
     await requestThroughCore(`http://127.0.0.1:${ECHO_PORT}/big`)
     const flow = await svc.getConnections()

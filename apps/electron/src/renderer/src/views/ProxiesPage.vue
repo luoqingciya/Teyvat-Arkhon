@@ -1,13 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
 const { t } = useTranslation()
 
+/** 视图切换：节点列表 / 路由规则 */
+const view = ref<'nodes' | 'rules'>('nodes')
 /** 按延迟升序排列（未测速/超时的排在最后） */
 const sortByDelay = ref(false)
+/** 规则搜索关键词 */
+const rulesSearch = ref('')
+/** 规则是否按命中数排序 */
+const rulesSortHits = ref(false)
+
+/** 规则列表单次渲染上限（订阅规则可能上千条，避免一次渲染过多 DOM） */
+const RULES_RENDER_LIMIT = 800
+
+/** 切到规则视图时懒拉取一次 */
+watch(view, (v) => {
+  if (v === 'rules' && store.running && store.rules.length === 0) void store.refreshRules()
+})
 
 const groupNodes = computed(() => {
   const group = store.currentGroup
@@ -25,6 +39,24 @@ const groupNodes = computed(() => {
   })
 })
 
+const filteredRules = computed(() => {
+  let rules = store.rules
+  const kw = rulesSearch.value.trim().toLowerCase()
+  if (kw) {
+    rules = rules.filter(
+      (r) =>
+        r.payload.toLowerCase().includes(kw) ||
+        r.type.toLowerCase().includes(kw) ||
+        r.proxy.toLowerCase().includes(kw)
+    )
+  }
+  if (rulesSortHits.value) rules = [...rules].sort((a, b) => b.hits - a.hits)
+  return rules
+})
+
+/** 渲染时仅展示前 RULES_RENDER_LIMIT 条，超出提示可搜索 */
+const shownRules = computed(() => filteredRules.value.slice(0, RULES_RENDER_LIMIT))
+
 function delayClass(delay: number): string {
   if (delay < 200) return 'fast'
   if (delay < 800) return 'mid'
@@ -35,32 +67,54 @@ function delayClass(delay: number): string {
 <template>
   <div class="proxies">
     <div class="toolbar glass">
-      <div class="groups">
-        <span class="label">{{ t('proxies.groups') }}</span>
-        <button
-          v-for="g in store.groups"
-          :key="g.name"
-          class="chip"
-          :class="{ active: store.selectedGroup === g.name }"
-          @click="store.selectedGroup = g.name"
-        >
-          <span class="chip-now">{{ g.now ?? g.name }}</span>
-          <span class="chip-name">{{ g.name }}</span>
-        </button>
+      <div class="left">
+        <div class="tabs">
+          <button class="tab" :class="{ active: view === 'nodes' }" @click="view = 'nodes'">
+            {{ t('proxies.viewNodes') }}
+          </button>
+          <button class="tab" :class="{ active: view === 'rules' }" @click="view = 'rules'">
+            {{ t('proxies.viewRules') }}
+          </button>
+        </div>
+
+        <div v-if="view === 'nodes'" class="groups">
+          <span class="label">{{ t('proxies.groups') }}</span>
+          <button
+            v-for="g in store.groups"
+            :key="g.name"
+            class="chip"
+            :class="{ active: store.selectedGroup === g.name }"
+            @click="store.selectedGroup = g.name"
+          >
+            <span class="chip-now">{{ g.now ?? g.name }}</span>
+            <span class="chip-name">{{ g.name }}</span>
+          </button>
+        </div>
       </div>
+
       <div class="actions">
-        <button class="chip-sort" :class="{ on: sortByDelay }" @click="sortByDelay = !sortByDelay">
-          {{ t('proxies.sortByDelay') }}
-        </button>
-        <button class="btn ghost" :disabled="!store.running" @click="store.refreshProxies()">{{ t('proxies.refresh') }}</button>
-        <button class="btn primary" :disabled="!store.currentGroup?.all?.length || store.batchTest.running" @click="store.testAllNodes()">
-          <span v-if="store.batchTest.running">{{ t('proxies.testing', { cur: store.batchTest.current, total: store.batchTest.total }) }}</span>
-          <span v-else>{{ t('proxies.batchTest') }}</span>
-        </button>
+        <template v-if="view === 'nodes'">
+          <button class="chip-sort" :class="{ on: sortByDelay }" @click="sortByDelay = !sortByDelay">
+            {{ t('proxies.sortByDelay') }}
+          </button>
+          <button class="btn ghost" :disabled="!store.running" @click="store.refreshProxies()">{{ t('proxies.refresh') }}</button>
+          <button class="btn primary" :disabled="!store.currentGroup?.all?.length || store.batchTest.running" @click="store.testAllNodes()">
+            <span v-if="store.batchTest.running">{{ t('proxies.testing', { cur: store.batchTest.current, total: store.batchTest.total }) }}</span>
+            <span v-else>{{ t('proxies.batchTest') }}</span>
+          </button>
+        </template>
+        <template v-else>
+          <input v-model="rulesSearch" class="rsearch" type="search" :placeholder="t('proxies.rulesSearch')" />
+          <button class="chip-sort" :class="{ on: rulesSortHits }" @click="rulesSortHits = !rulesSortHits">
+            {{ t('proxies.rulesSortHits') }}
+          </button>
+          <button class="btn ghost" :disabled="!store.running" @click="store.refreshRules()">{{ t('proxies.refresh') }}</button>
+        </template>
       </div>
     </div>
 
-    <div class="table-wrap glass">
+    <!-- 节点视图 -->
+    <div v-if="view === 'nodes'" class="table-wrap glass">
       <div v-if="!store.running" class="empty">{{ t('proxies.empty') }}</div>
       <div v-else-if="groupNodes.length === 0" class="empty">{{ t('proxies.emptyGroup') }}</div>
       <table v-else class="nodes">
@@ -100,6 +154,38 @@ function delayClass(delay: number): string {
         </tbody>
       </table>
     </div>
+
+    <!-- 规则视图 -->
+    <div v-else class="table-wrap glass">
+      <div v-if="!store.running" class="empty">{{ t('proxies.empty') }}</div>
+      <div v-else-if="store.rules.length === 0" class="empty">{{ t('proxies.rulesEmpty') }}</div>
+      <template v-else>
+        <div class="rules-meta">
+          {{ t('proxies.rulesTotal', { count: filteredRules.length }) }}
+          <span v-if="shownRules.length < filteredRules.length" class="dim">
+            · {{ t('proxies.rulesSearch') }}
+          </span>
+        </div>
+        <table class="rules">
+          <thead>
+            <tr>
+              <th class="r-type">{{ t('proxies.type') }}</th>
+              <th class="r-payload">{{ t('proxies.node') }}</th>
+              <th class="r-proxy">Proxy</th>
+              <th class="r-hits">{{ t('proxies.rulesHits') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in shownRules" :key="i">
+              <td class="r-type"><span class="rtag">{{ r.type }}</span></td>
+              <td class="r-payload">{{ r.payload }}</td>
+              <td class="r-proxy"><span class="ptag">{{ r.proxy }}</span></td>
+              <td class="r-hits" :class="{ hot: r.hits > 0 }">{{ r.hits }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -117,6 +203,37 @@ function delayClass(delay: number): string {
   gap: 14px;
   padding: 14px 18px;
   flex-wrap: wrap;
+}
+.left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-hover);
+  border-radius: 10px;
+  padding: 3px;
+}
+.tab {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  background: rgba(79, 124, 255, 0.16);
+  color: var(--accent);
+  font-weight: 600;
 }
 .groups {
   display: flex;
@@ -160,6 +277,8 @@ function delayClass(delay: number): string {
 .actions {
   display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .chip-sort {
   padding: 8px 14px;
@@ -179,17 +298,32 @@ function delayClass(delay: number): string {
   color: var(--accent);
   background: rgba(79, 124, 255, 0.14);
 }
+.rsearch {
+  width: 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 13px;
+}
+.rsearch:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .table-wrap {
   flex: 1;
   overflow: auto;
   padding: 6px 12px;
 }
-.nodes {
+.nodes,
+.rules {
   width: 100%;
   border-collapse: collapse;
   font-size: 15px;
 }
-.nodes th {
+.nodes th,
+.rules th {
   text-align: left;
   padding: 10px 14px;
   font-size: 13px;
@@ -200,12 +334,49 @@ function delayClass(delay: number): string {
   top: 0;
   background: var(--bg-2);
 }
-.nodes td {
+.nodes td,
+.rules td {
   padding: 9px 14px;
   border-bottom: 1px solid var(--border);
 }
 .nodes tr.now {
   background: rgba(79, 124, 255, 0.08);
+}
+.rules {
+  font-size: 13.5px;
+}
+.rules-meta {
+  padding: 8px 14px 4px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.rtag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(139, 92, 246, 0.14);
+  color: #c4b5fd;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.r-payload {
+  font-family: ui-monospace, Consolas, monospace;
+  word-break: break-all;
+  color: var(--text);
+}
+.ptag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+.r-hits {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.r-hits.hot {
+  color: #fbbf24;
+  font-weight: 700;
 }
 .n-name {
   margin-left: 6px;

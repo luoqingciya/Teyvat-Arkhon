@@ -8,6 +8,7 @@ import type {
   Profile,
   ProxyItem,
   ProxyMode,
+  RuleInfo,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -52,6 +53,8 @@ export interface ArkhonAPI {
   listProxies(): Promise<ProxyItem[]>
   selectProxy(groupName: string, nodeName: string): Promise<void>
   testDelay(name: string, url?: string, timeoutMs?: number): Promise<DelayResult>
+  /** 当前生效的路由规则列表（仅 rule 模式有实际路由语义） */
+  listRules(): Promise<RuleInfo[]>
 
   // ---------- 订阅档案 ----------
   listProfiles(): Promise<Profile[]>

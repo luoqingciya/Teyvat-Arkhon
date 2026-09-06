@@ -4,7 +4,8 @@ import type {
   DelayResult,
   MihomoVersion,
   ProxyItem,
-  ProxyMode
+  ProxyMode,
+  RuleInfo
 } from '@teyvat-arkhon/shared'
 
 /** 核心驱动统一接口：当前统一使用进程驱动（稳定优先） */
@@ -34,6 +35,9 @@ export interface CoreDriver {
 
   /** 获取策略组与节点列表（扁平化） */
   getProxies(): Promise<ProxyItem[]>
+
+  /** 获取当前生效的路由规则列表（仅 rule 模式有实际路由语义） */
+  getRules(): Promise<RuleInfo[]>
 
   /** 切换策略组选中节点 */
   selectProxy(groupName: string, nodeName: string): Promise<void>

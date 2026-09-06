@@ -5,7 +5,18 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.6-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.7-rc...HEAD
+
+## [0.9.7-rc] - 2026-09-06
+
+### Added
+- **路由规则查看**：代理页新增「节点 / 规则」双视图，实时展示当前生效规则（类型 / 匹配目标 / 目标组 / 命中次数），支持关键词搜索与按命中排序（规则类型为 mihomo 规范化名，如 DomainSuffix / Match）
+
+### Changed
+- **Release 正文自动化**：release 流水线从 CHANGELOG.md 抽取当前 tag 对应版本段落，自动写入 GitHub Release 说明（免手工编辑正文；缺段落时静默跳过，更新失败不阻塞）
+- v0.9.6-rc 的 GitHub Release 正文已补录（此前为空）
+
+验证：typecheck / 20 项单测 / electron-vite 构建 / 24 项内核 E2E（含 /rules 数据面回归）/ Playwright UI 冒烟全绿。
 
 ## [0.9.6-rc] - 2026-09-06
 
@@ -80,6 +91,7 @@
 ### Fixed
 - zip 免安装版启动崩溃：pnpm strict 布局下 electron-builder 漏打包传递依赖，补齐 electron-updater / fs-extra / js-yaml 等运行时依赖闭包
 
+[0.9.7-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.7-rc
 [0.9.6-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.6-rc
 [0.9.5-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.5-rc
 [0.9.4-rc]: https://github.com/luoqingciya/Teyvat-Arkhon/releases/tag/v0.9.4-rc

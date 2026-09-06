@@ -13,7 +13,8 @@ import type {
   MihomoVersion,
   Profile,
   ProxyItem,
-  ProxyMode
+  ProxyMode,
+  RuleInfo
 } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
 import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
@@ -137,6 +138,11 @@ export class CoreService extends EventEmitter {
   listProxies(): Promise<ProxyItem[]> {
     if (!this.driver) throw new Error('内核未运行')
     return this.driver.getProxies()
+  }
+
+  listRules(): Promise<RuleInfo[]> {
+    if (!this.driver) throw new Error('内核未运行')
+    return this.driver.getRules()
   }
 
   /** 切换运行模式：内核即时生效 + 写回工作配置（内核重启后保留） */

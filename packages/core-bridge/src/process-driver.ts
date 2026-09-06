@@ -9,9 +9,10 @@ import type {
   DelayResult,
   MihomoVersion,
   ProxyItem,
-  ProxyMode
+  ProxyMode,
+  RuleInfo
 } from '@teyvat-arkhon/shared'
-import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap } from './rest-client'
+import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap, type MihomoRules } from './rest-client'
 import type { CoreDriver } from './driver'
 
 export interface ProcessDriverOptions {
@@ -170,6 +171,17 @@ export class ProcessCoreDriver implements CoreDriver {
       history: p.history,
       all: p.all,
       bot: p.bot
+    }))
+  }
+
+  /** 当前生效的路由规则（rule 模式；global/direct 模式下内核返回空洞规则） */
+  async getRules(): Promise<RuleInfo[]> {
+    const res = await this.rest.get<MihomoRules>('/rules')
+    return (res.rules ?? []).map((r) => ({
+      type: r.type,
+      payload: r.payload,
+      proxy: r.proxy,
+      hits: r.hits ?? 0
     }))
   }
 
