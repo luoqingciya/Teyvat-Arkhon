@@ -36,7 +36,7 @@
 
 **内核与链路**
 
-- **进程驱动内核（稳定优先）**：以 sidecar 方式运行 mihomo 二进制（`resources/core/mihomo-<平台>-<架构>`），控制面与数据面统一走内核内建 `external-controller` REST API（启动/停止/热重载/节点/延迟/连接）。独立进程天然隔离、升级与排障简单，跨平台行为一致。
+- **进程驱动内核（稳定优先）**：以 sidecar 方式运行 arkhon 二进制（`resources/arkhon-core/arkhon-<平台>-<架构>`），控制面与数据面统一走内核内建 `external-controller` REST API（启动/停止/热重载/节点/延迟/连接）。独立进程天然隔离、升级与排障简单，跨平台行为一致。
 
 **订阅与代理**
 
@@ -69,7 +69,7 @@
 2. **导入订阅**：打开应用 →「订阅」页 → 粘贴 Clash 订阅链接、完整 YAML 或任意节点 URI（见订阅格式）→ 导入。
 3. **启动内核**：回到「总览」页点击 **启动内核**；在「代理」页选择节点并测速；如需全局接管可开启「系统代理」或「TUN」。
 
-> 提示：TUN 模式需要管理员权限；Windows 下若缺少 `wintun.dll`，请手动放入 `resources/core` 或内核工作目录。
+> 提示：TUN 模式需要管理员权限；Windows 下若缺少 `wintun.dll`，请手动放入 `resources/arkhon-core` 或内核工作目录。
 >
 > 提示：**zip 免安装版**数据默认就在解压目录的 `data/` 下（随 exe 走的绿色便携，无需额外设置）；安装版数据在系统用户目录。
 
@@ -147,7 +147,7 @@ pnpm --filter @teyvat-arkhon/electron package:dir          # 本地打包预览�
 
 ### 内核来源
 
-下载脚本 [download-core.mjs](scripts/download-core.mjs) 从 GitHub Releases 拉取与内核版本匹配的 mihomo 二进制与 geo 数据到 `apps/electron/resources/core`。如需自定义内核，可手动替换 `resources/core/mihomo-<平台>-<架构>`（fork 定制工作副本见仓库相邻目录 `mihomo-teyvat/`）。
+下载脚本 [download-core.mjs](scripts/download-core.mjs) 从 GitHub Releases 拉取与内核版本匹配的 arkhon 二进制与 geo 数据到 `apps/electron/resources/arkhon-core`。如需自定义内核，可手动替换 `resources/arkhon-core/arkhon-<平台>-<架构>`（fork 定制工作副本见仓库相邻目录 `mihomo-teyvat/`）。
 
 ### 验证矩阵
 

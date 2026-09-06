@@ -1,15 +1,14 @@
 /**
- * 下载 mihomo 内核二进制到 apps/electron/resources/core/<平台>-<架构>/
+ * 下载 arkhon 内核二进制到 apps/electron/resources/arkhon-core/<平台>-<架构>/
  * 用法: pnpm core:download [版本号]   （缺省自动取 GitHub 最新 release）
  *
  * 产物文件名约定（与 main/index.ts coreFileName 一致）:
- *   mihomo-windows-x64.exe / mihomo-darwin-arm64 / mihomo-linux-x64 ...
+ *   arkhon-windows-x64.exe / arkhon-darwin-arm64 / arkhon-linux-x64 ...
  *
- * 注: mihomo v1.19+ release 资产格式按平台不同:
- *   windows-* 为 .zip（内含 mihomo-windows-amd64.exe），linux/darwin-* 为 .gz 单文件。
+ * 注: arkhon v1.19+ release 资产格式按平台不同:
+ *   windows-* 为 .zip（内含 arkhon-windows-amd64.exe），linux/darwin-* 为 .gz 单文件。
  *
- * 源仓库：默认为定制内核 fork（luoqingciya/mihomo-teyvat），由 OWNER/REPO 控制。
- * 需追溯上游官方 mihomo 时，改为 MetaCubeX/mihomo 即可。
+ * 源仓库：默认为定制内核 fork（luoqingciya/arkhon-core），由 OWNER/REPO 控制。
  *
  * 完整性校验说明：这里校验的是「下载到的压缩包原文」（zip/gz）的 sha256，
  * 即与内核 CI release 自带 checksums.txt 的哈希完全一致，直接照抄登记即可。
@@ -23,8 +22,8 @@ import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 
 const OWNER = 'luoqingciya'
-const REPO = 'mihomo-teyvat'
-const TARGET_DIR = path.resolve('apps/electron/resources/core')
+const REPO = 'arkhon-core'
+const TARGET_DIR = path.resolve('apps/electron/resources/arkhon-core')
 
 // 完整性校验清单（见 deps.sha256.json）：
 //   core[tag][assets]: null 表示未登记哈希，下载跳过严格校验；非 null 则必须匹配
@@ -81,7 +80,7 @@ async function unzip(zipPath, outDir) {
 }
 
 async function main() {
-  const finalName = `mihomo-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`
+  const finalName = `arkhon-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`
   const finalDest = path.join(TARGET_DIR, finalName)
   if (await fs.access(finalDest).then(() => true, () => false)) {
     console.log(`[download-core] 内核已存在 (${finalName})，跳过下载`)
@@ -90,7 +89,7 @@ async function main() {
     const tag = process.argv[2] ?? process.env['CORE_TAG'] ?? (await latestTag())
     await fs.mkdir(TARGET_DIR, { recursive: true })
 
-    const baseName = `mihomo-${assetName(process.platform, process.arch)}-${tag}`
+    const baseName = `arkhon-${assetName(process.platform, process.arch)}-${tag}`
     const url = `https://github.com/${OWNER}/${REPO}/releases/download/${tag}/${baseName}.${process.platform === 'win32' ? 'zip' : 'gz'}`
     console.log(`[download-core] 目标: ${tag}`)
     console.log(`[download-core] 下载: ${url}`)
@@ -107,8 +106,8 @@ async function main() {
       await fs.writeFile(zipPath, data)
       await unzip(zipPath, TARGET_DIR)
       await fs.rm(zipPath, { force: true })
-      // zip 内文件形如 mihomo-windows-amd64.exe
-      const src = path.join(TARGET_DIR, `mihomo-${assetName(process.platform, process.arch)}.exe`)
+      // zip 内文件形如 arkhon-windows-amd64.exe
+      const src = path.join(TARGET_DIR, `arkhon-${assetName(process.platform, process.arch)}.exe`)
       try {
         await fs.rename(src, finalDest)
       } catch {
@@ -151,7 +150,7 @@ function verifyCore(data, tag) {
   console.log(`[download-core] ✓ 内核完整性校验通过 (${key} sha256 前8位 ${actual.slice(0, 8)}…)`)
 }
 
-/** 下载 geoip/geosite 数据到 resources/core（mihomo 规则 GEOIP/GEOSITE 依赖） */
+/** 下载 geoip/geosite 数据到 resources/arkhon-core（内核规则 GEOIP/GEOSITE 依赖） */
 async function downloadGeo() {
   const GEO_REPO = 'MetaCubeX/meta-rules-dat'
   for (const name of ['geoip.dat', 'geosite.dat']) {
@@ -186,7 +185,7 @@ async function downloadGeo() {
   }
 }
 
-/** 下载 wintun 驱动到 resources/core（Windows TUN 模式需要，best-effort） */
+/** 下载 wintun 驱动到 resources/arkhon-core（Windows TUN 模式需要，best-effort） */
 async function downloadWintun() {
   if (process.platform !== 'win32') return
   const dest = path.join(TARGET_DIR, 'wintun.dll')

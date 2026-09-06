@@ -1,19 +1,13 @@
 {
   "_comment": "内核压缩包（zip/gz 原文）/geo 完整性校验哈希清单。core 表内存在的版本与平台将做强校验（校验的是下载到的压缩包原文的 SHA256，与内核 release 自带 checksums.txt 完全一致）；值为 null 的平台未登记哈希，下载时打印警告并跳过严格校验（建议首次 CI 下载后把 checksums.txt 对应哈希补登记到该平台）。geo 来自 meta-rules-dat latest，会随上游更新而变化，仅做一致性提示（不阻断下载）。",
   "core": {
-    "v0.9.10-teyvat": {
-      "windows-amd64": "131e350f45b03a9d11741f479503f962ee750264bf42b4e64892834e1d01517d",
-      "windows-arm64": "57d565b14d8017f4f2876fab4c893a8d3a66afeb8b50c49760d70edbade3ddea",
-      "linux-amd64": "8de1cef183e9225d6fe501787af41690557a34b935fcade99c5fdad3542ff7df",
-      "linux-arm64": "770b6b22d7db084fd62b415e6901c579984345dd3d8f457f22bb36936ac4fd41",
-      "darwin-amd64": "38d9b4388bf6b7e65ec0b57d20698975886a1981706001d69a7db5feadc124c5",
-      "darwin-arm64": "06789f821d5681674f59b13260f5b1f35db4f478232cb47a06a54d7a8620e6a6"
-    },
-    "v1.19.30": {
-      "windows-amd64": null,
-      "linux-amd64": null,
-      "darwin-arm64": null,
-      "darwin-amd64": null
+    "v0.9.10-arkhon": {
+      "windows-amd64": "20de3da981c8bacc62ec53dc89435f549bb33765c5055cf56727e48a9b226bb3",
+      "windows-arm64": "98120fe8460d62c82785e3bc98ded2204adec1ceaba9c1a5cfe2f87d3a7af85d",
+      "linux-amd64": "224d6d63b11e542f61ded4eb0ebe36c24927b165cb4b5ac85aaf9e43bb5d557c",
+      "linux-arm64": "c45b313d699f939c193a5f4a51291240b37adc6e190dd68b6393b1257a2ecc4b",
+      "darwin-amd64": "400db531043c40d88ab701c6f51617f9e1c04890a3f92b40f6695da69269f1b9",
+      "darwin-arm64": "da40a7c62489b5ba590713c17c1cac53eeddc2bcb6babae37bb81c4bdb63fbad"
     }
   },
   "geo": {

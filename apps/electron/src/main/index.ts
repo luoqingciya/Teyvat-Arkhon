@@ -25,16 +25,16 @@ let service: CoreService | null = null
 let mainWindow: BrowserWindow | null = null
 let trafficMonitor: TrafficMonitor | null = null
 
-/** mihomo 内核可执行文件名（示例: mihomo-windows-x64.exe / mihomo-darwin-arm64 / mihomo-linux-x64） */
+/** arkhon 内核可执行文件名（示例: arkhon-windows-x64.exe / arkhon-darwin-arm64 / arkhon-linux-x64） */
 export function coreFileName(): string {
   const suffix = process.platform === 'win32' ? '.exe' : ''
-  return `mihomo-${process.platform}-${process.arch}${suffix}`
+  return `arkhon-${process.platform}-${process.arch}${suffix}`
 }
 
-/** 内核资源目录：开发期为仓库 resources/core，打包后为 process.resourcesPath/core */
+/** 内核资源目录：开发期为仓库 resources/arkhon-core，打包后为 process.resourcesPath/arkhon-core */
 export function coreResourcesDir(): string {
-  if (app.isPackaged) return join(process.resourcesPath, 'core')
-  return join(app.getAppPath(), 'resources', 'core')
+  if (app.isPackaged) return join(process.resourcesPath, 'arkhon-core')
+  return join(app.getAppPath(), 'resources', 'arkhon-core')
 }
 
 /** mihomo 默认数据目录（与 mihomo constant.Path 取值一致） */
@@ -45,7 +45,7 @@ function mihomoDataDir(): string {
   return xdg ? join(xdg, 'mihomo') : defaultDir
 }
 
-/** 将 resources/core 中的 geo 数据播种到 mihomo 数据目录（缺失时才复制） */
+/** 将 resources/arkhon-core 中的 geo 数据播种到 mihomo 数据目录（缺失时才复制） */
 function seedGeoData(): void {
   try {
     const targetDir = mihomoDataDir()
@@ -311,7 +311,7 @@ if (!gotLock) {
       service,
       systemProxy,
       serviceManager,
-      // TUN 前置依赖探测：resources/core 或内核工作目录存在 wintun.dll 即为可用
+      // TUN 前置依赖探测：resources/arkhon-core 或内核工作目录存在 wintun.dll 即为可用
       () =>
         existsSync(join(coreResourcesDir(), 'wintun.dll')) ||
         (existsSync(userDataConfigDir()) && existsSync(join(userDataConfigDir(), 'wintun.dll'))),

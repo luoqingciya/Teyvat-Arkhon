@@ -6,7 +6,7 @@
  * 说明：mihomo v1.19 的 http 代理适配器使用 CONNECT 隧道，因此本地上游把
  * 任意 CONNECT 目标隧道到本地回显服务；/big 路径返回 256KB 用于流量断言。
  *
- * 用法: node scripts/e2e-core.cjs（需先放置 mihomo 二进制到 apps/electron/resources/core）
+ * 用法: node scripts/e2e-core.cjs（需先放置 arkhon 二进制到 apps/electron/resources/arkhon-core）
  */
 'use strict'
 
@@ -21,8 +21,8 @@ const bridge = require(path.join(ROOT, 'packages/core-bridge/dist/index.js'))
 
 const MIHOMO = path.join(
   ROOT,
-  'apps/electron/resources/core',
-  `mihomo-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`
+  'apps/electron/resources/arkhon-core',
+  `arkhon-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`
 )
 
 const MIXED_PORT = 17892
@@ -140,11 +140,11 @@ async function main() {
   await new Promise((r) => setTimeout(r, 300))
 
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'arkhon-e2e-'))
-  // mihomo 需要 geo 数据：复制 resources/core 中的 geoip/geosite 到工作目录
+  // 内核需要 geo 数据：复制 resources/arkhon-core 中的 geoip/geosite 到工作目录
   const workDir = path.join(userData, 'config')
   fs.mkdirSync(workDir, { recursive: true })
   for (const g of ['geoip.dat', 'geosite.dat']) {
-    const src = path.join(ROOT, 'apps/electron/resources/core', g)
+    const src = path.join(ROOT, 'apps/electron/resources/arkhon-core', g)
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(workDir, g))
   }
   const svc = new bridge.CoreService({

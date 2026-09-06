@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       core-tag:
-        description: 定制内核 tag（如 v0.9.10）。留空=自动取 fork mihomo-teyvat 最新 release
+        description: 定制内核 tag（如 v0.9.10-teyvat）。留空=自动取 fork arkhon-core 最新 release
         required: false
         default: ''
 
