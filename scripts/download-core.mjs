@@ -86,7 +86,8 @@ async function main() {
     console.log(`[download-core] 内核已存在 (${finalName})，跳过下载`)
   } else {
     // 版本来源优先级：命令行参数 > CORE_TAG 环境变量 > GitHub 最新 release
-    const tag = process.argv[2] ?? process.env['CORE_TAG'] ?? (await latestTag())
+    // 用 || 而非 ??：CI 会把未填的 core-tag 注入为 ''（空串），?? 不会对其兜底导致 tag 为空 404
+    const tag = process.argv[2] || process.env['CORE_TAG'] || (await latestTag())
     await fs.mkdir(TARGET_DIR, { recursive: true })
 
     const baseName = `arkhon-${assetName(process.platform, process.arch)}-${tag}`
