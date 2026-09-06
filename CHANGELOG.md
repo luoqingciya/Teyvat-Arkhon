@@ -5,7 +5,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.9-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.10-rc...HEAD
+
+## [0.9.10-rc] - 2026-09-06
+
+### Changed
+- **内嵌内核切换为专属定制内核 `arkhon-core`**（基于 MetaCubeX/mihomo 的 fork）：内核仓库、二进制/资产命名统一改为 `arkhon-*`（`luoqingciya/arkhon-core`），应用下载源、完整性校验哈希随之更新（v0.9.10-arkhon）
+- **运行模式持久化**：所选模式（规则/全局/直连）写入档案配置，重启后保持
+- **订阅自动更新**：启动时与每 6 小时周期自动刷新订阅，失败自动回退；设置页提供开关
+- **网络自检**：设置页新增一键自检（出口 IP 与流媒体服务可达性）
+- **UWP 回环豁免**：Windows 下可将 UWP 应用加入回环豁免（CheckNetIsolation）
+- 同时测速改为并发执行，按延迟排序；收藏节点可置顶
+
+### Added
+- **托盘快速切换档案**：托盘右键菜单直接切换档案并热重载
+- **订阅排除关键词**：设置页配置关键词，导入/刷新时自动剔除节点并清理组引用
+- **多格式订阅导入**：支持 hysteria2/ss/vmess/vless/trojan/hysteria URI 与 sing-box 导出、SSD、Surge 节点行
+- **日志页重构**：三栏展示（时间戳/级别/消息），支持级别过滤、关键词搜索、跟随最新
+
+### Fixed
+- **hysteria2 端口跳跃（mport）**：映射为 mihomo `ports` + `hop-interval`（此前仅连单端口导致完全连不上）
+- **订阅刷新兼容 URI 列表**：URL 订阅为 v2rayN URI 格式时刷新/自动更新不再校验失败
+- hysteria2 `pinSHA256` 归一为裸 hex，兼容 mihomo/hysteria fingerprint 解析差异
+
+验证：typecheck / 26 项单测 / lint（含新增 DOM 全局）/ electron-vite 构建 / 24 项内核 E2E / UI 冒烟全绿。
 
 ## [0.9.9-rc] - 2026-09-06
 
