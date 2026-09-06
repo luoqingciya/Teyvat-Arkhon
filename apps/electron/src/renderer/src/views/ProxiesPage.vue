@@ -10,10 +10,35 @@ const { t } = useTranslation()
 const view = ref<'nodes' | 'rules'>('nodes')
 /** 按延迟升序排列（未测速/超时的排在最后） */
 const sortByDelay = ref(false)
+/** 节点搜索关键词 */
+const nodeSearch = ref('')
 /** 规则搜索关键词 */
 const rulesSearch = ref('')
 /** 规则是否按命中数排序 */
 const rulesSortHits = ref(false)
+
+/** 收藏节点（localStorage 持久化） */
+const FAV_KEY = 'arkhon-node-favs'
+const favs = ref<string[]>(readFavs())
+function readFavs(): string[] {
+  try {
+    const raw = localStorage.getItem(FAV_KEY)
+    const arr = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+function persistFavs(): void {
+  localStorage.setItem(FAV_KEY, JSON.stringify(favs.value))
+}
+function isFav(name: string): boolean {
+  return favs.value.includes(name)
+}
+function toggleFav(name: string): void {
+  favs.value = isFav(name) ? favs.value.filter((x) => x !== name) : [...favs.value, name]
+  persistFavs()
+}
 
 /** 规则列表单次渲染上限（订阅规则可能上千条，避免一次渲染过多 DOM） */
 const RULES_RENDER_LIMIT = 800
@@ -26,16 +51,27 @@ watch(view, (v) => {
 const groupNodes = computed(() => {
   const group = store.currentGroup
   if (!group?.all) return []
-  const nodes = group.all.map((name) => {
-    const p = store.proxies.find((x) => x.name === name)
-    const delay = store.delays[name]
-    return { name, type: p?.type ?? '', delay }
-  })
-  if (!sortByDelay.value) return nodes
+  const kw = nodeSearch.value.trim().toLowerCase()
+  const nodes = group.all
+    .filter((name) => {
+      if (!kw) return true
+      const p = store.proxies.find((x) => x.name === name)
+      return name.toLowerCase().includes(kw) || (p?.type ?? '').toLowerCase().includes(kw)
+    })
+    .map((name) => {
+      const p = store.proxies.find((x) => x.name === name)
+      const delay = store.delays[name]
+      return { name, type: p?.type ?? '', delay, fav: isFav(name) }
+    })
   return [...nodes].sort((a, b) => {
-    const da = a.delay?.delay ?? Number.POSITIVE_INFINITY
-    const db = b.delay?.delay ?? Number.POSITIVE_INFINITY
-    return da - db
+    // 收藏置顶优先
+    if (a.fav !== b.fav) return a.fav ? -1 : 1
+    if (sortByDelay.value) {
+      const da = a.delay?.delay ?? Number.POSITIVE_INFINITY
+      const db = b.delay?.delay ?? Number.POSITIVE_INFINITY
+      return da - db
+    }
+    return 0
   })
 })
 
@@ -56,6 +92,9 @@ const filteredRules = computed(() => {
 
 /** 渲染时仅展示前 RULES_RENDER_LIMIT 条，超出提示可搜索 */
 const shownRules = computed(() => filteredRules.value.slice(0, RULES_RENDER_LIMIT))
+
+/** 当前组是否为 Select 类型（仅其支持手动切换节点） */
+const isSelectView = computed(() => store.currentGroup?.nodeType === 2)
 
 function delayClass(delay: number): string {
   if (delay < 200) return 'fast'
@@ -94,6 +133,7 @@ function delayClass(delay: number): string {
 
       <div class="actions">
         <template v-if="view === 'nodes'">
+          <input v-model="nodeSearch" class="rsearch" type="search" :placeholder="t('proxies.nodeSearch')" />
           <button class="chip-sort" :class="{ on: sortByDelay }" @click="sortByDelay = !sortByDelay">
             {{ t('proxies.sortByDelay') }}
           </button>
@@ -129,6 +169,9 @@ function delayClass(delay: number): string {
         <tbody>
           <tr v-for="n in groupNodes" :key="n.name" :class="{ now: store.currentGroup?.now === n.name }">
             <td class="c-name">
+              <button class="fav" :class="{ on: n.fav }" :title="t('proxies.fav')" @click="toggleFav(n.name)">
+                {{ n.fav ? '★' : '☆' }}
+              </button>
               <span class="now-dot" v-if="store.currentGroup?.now === n.name">●</span>
               <span class="n-name">{{ n.name }}</span>
             </td>
@@ -142,13 +185,16 @@ function delayClass(delay: number): string {
             </td>
             <td class="c-act">
               <button class="btn mini" @click="store.testNode(n.name)">{{ t('proxies.test') }}</button>
-              <button
-                class="btn mini primary"
-                :disabled="store.currentGroup?.now === n.name"
-                @click="store.switchNode(n.name)"
-              >
-                {{ store.currentGroup?.now === n.name ? t('proxies.selected') : t('proxies.switch') }}
-              </button>
+              <template v-if="isSelectView">
+                <button
+                  class="btn mini primary"
+                  :disabled="store.currentGroup?.now === n.name"
+                  @click="store.switchNode(n.name)"
+                >
+                  {{ store.currentGroup?.now === n.name ? t('proxies.selected') : t('proxies.switch') }}
+                </button>
+              </template>
+              <span v-else class="dim auto-tag">{{ t('proxies.autoPick') }}</span>
             </td>
           </tr>
         </tbody>
@@ -410,6 +456,28 @@ function delayClass(delay: number): string {
 .c-act {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+.fav {
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0 2px;
+  line-height: 1;
+}
+.fav:hover {
+  color: #fbbf24;
+}
+.fav.on {
+  color: #fbbf24;
+}
+.auto-tag {
+  font-size: 12px;
+  font-style: italic;
+  user-select: none;
+  white-space: nowrap;
 }
 .empty {
   flex: 1;

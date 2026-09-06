@@ -108,6 +108,33 @@ function writeAutoRefresh(enabled: boolean): void {
   }
 }
 
+// ---------- 订阅排除关键词（持久化到 settings.json，导入/刷新时过滤节点） ----------
+
+function readExcludeKeywords(): string[] {
+  try {
+    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { excludeKeywords?: string[] }
+    return Array.isArray(j.excludeKeywords) ? j.excludeKeywords.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeExcludeKeywords(keywords: string[]): void {
+  try {
+    const file = settingsFilePath()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
+    } catch {
+      /* 首次写入 */
+    }
+    j.excludeKeywords = keywords
+    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
+  } catch (e) {
+    console.warn('[teyvat-arkhon] 保存订阅排除关键词失败:', (e as Error).message)
+  }
+}
+
 // ---------- 系统托盘 ----------
 /** 应用图标：打包后取自 resources/icon.png（extraResources 复制），开发期用 build/icon.png */
 function appIconPath(): string {
@@ -117,11 +144,56 @@ function appIconPath(): string {
 let tray: Tray | null = null
 let isQuitting = false
 
+/** 当前主窗口（托盘显示/快速切换用） */
+let trayTargetWin: BrowserWindow | null = null
+
+/** 重建托盘右键菜单：档案快速切换（勾选当前使用中）+ 显示/退出 */
+async function rebuildTrayMenu(): Promise<void> {
+  if (!tray || !service) return
+  const items: Electron.MenuItemConstructorOptions[] = []
+  let profiles: Array<{ id: string; name: string; selected?: boolean }> = []
+  try {
+    profiles = await service.listProfiles()
+  } catch {
+    /* 内核/配置异常时降级为仅基础菜单 */
+  }
+  if (profiles.length) {
+    items.push({ label: '快速切换档案', enabled: false })
+    for (const p of profiles.slice(0, 12)) {
+      items.push({
+        label: p.name,
+        type: 'radio',
+        checked: p.selected === true,
+        click: () => {
+          void service?.selectProfile(p.id).catch(() => undefined)
+          void rebuildTrayMenu()
+          // 通知渲染端刷新订阅列表（托盘切换不经过窗口操作）
+          for (const w of BrowserWindow.getAllWindows()) {
+            w.webContents.send('arkhon:profiles-changed')
+          }
+        }
+      })
+    }
+    items.push({ type: 'separator' })
+  }
+  items.push({
+    label: '显示主窗口',
+    click: () => {
+      if (trayTargetWin) trayTargetWin.show()
+      for (const w of BrowserWindow.getAllWindows()) w.show()
+    }
+  })
+  items.push({ type: 'separator' })
+  items.push({ label: '退出', click: () => { isQuitting = true; app.quit() } })
+  tray.setContextMenu(Menu.buildFromTemplate(items))
+}
+
 function createTray(win: BrowserWindow): void {
   const icon = nativeImage.createFromPath(appIconPath())
   if (icon.isEmpty()) return
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Teyvat Arkhon')
+  trayTargetWin = win
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '显示主窗口', click: () => { win.show(); win.focus() } },
@@ -129,6 +201,7 @@ function createTray(win: BrowserWindow): void {
       { label: '退出', click: () => { isQuitting = true; app.quit() } }
     ])
   )
+  void rebuildTrayMenu()
   tray.on('click', () => {
     if (win.isVisible()) win.hide()
     else { win.show(); win.focus() }
@@ -183,6 +256,7 @@ async function bootstrapService(): Promise<CoreService> {
   const svc = new CoreService({
     profilesDir: join(app.getPath('userData'), 'profiles'),
     activeConfigFile: join(configDir, 'config.yaml'),
+    excludeKeywords: readExcludeKeywords,
     driver: {
       mode: 'process',
       options: {
@@ -244,7 +318,9 @@ if (!gotLock) {
       netChecker,
       loopback,
       readAutoRefresh,
-      setAutoRefresh
+      setAutoRefresh,
+      readExcludeKeywords,
+      writeExcludeKeywords
     )
     // 已开启自动更新的用户：启动即进入定时刷新节奏
     if (readAutoRefresh()) subscriptionSync.start()

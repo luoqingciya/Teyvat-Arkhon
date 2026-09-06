@@ -26,6 +26,18 @@ const delayUrl = ref(store.delaySetting.url)
 const delayTimeout = ref(String(store.delaySetting.timeoutMs))
 const delaySaved = ref(false)
 
+/** 订阅排除关键词（逗号分隔输入） */
+const excludeInput = ref(store.excludeKeywords.join(', '))
+const excludeSaved = ref(false)
+
+function saveExclude(): void {
+  void store.saveExcludeKeywords(excludeInput.value.split(',')).then(() => {
+    excludeInput.value = store.excludeKeywords.join(', ')
+    excludeSaved.value = true
+    setTimeout(() => (excludeSaved.value = false), 2000)
+  })
+}
+
 function saveDelay(): void {
   store.saveDelaySetting(delayUrl.value.trim(), Number(delayTimeout.value) || 5000)
   delayUrl.value = store.delaySetting.url
@@ -145,6 +157,20 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
       <button class="btn" :disabled="store.busy" @click="store.refreshAllProfiles()">
         {{ t('settings.refreshNow') }}
       </button>
+      <div class="field">
+        <span class="row-label">{{ t('settings.excludeHint') }}</span>
+        <div class="field-row">
+          <input
+            v-model="excludeInput"
+            class="input"
+            type="text"
+            :placeholder="t('settings.excludePlaceholder')"
+          />
+          <button class="btn" :disabled="store.busy" @click="saveExclude">
+            {{ excludeSaved ? t('settings.excludeSaved') : t('settings.excludeSave') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="card glass">

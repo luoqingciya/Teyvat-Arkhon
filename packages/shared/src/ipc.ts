@@ -79,6 +79,13 @@ export interface ArkhonAPI {
   /** 自动刷新是否开启（主进程持久化） */
   getAutoRefresh(): Promise<boolean>
   setAutoRefresh(enabled: boolean): Promise<void>
+  /** 订阅档案被外部变更（如托盘快速切换）时通知渲染进程刷新 */
+  onProfilesChanged(cb: () => void): () => void
+
+  // ---------- 订阅节点管理 ----------
+  /** 导入/刷新时排除的节点关键词（逗号分隔，主进程持久化） */
+  getExcludeKeywords(): Promise<string[]>
+  setExcludeKeywords(keywords: string[]): Promise<void>
 
   // ---------- 系统代理 ----------
   getSystemProxy(): Promise<SystemProxyState>

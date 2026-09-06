@@ -646,6 +646,7 @@ export function buildClashYaml(proxies: ProxyDef[]): string {
     'mixed-port': 7890,
     'external-controller': '127.0.0.1:9090',
     mode: 'rule',
+    'log-level': 'info',
     proxies,
     'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: [...proxies.map((p) => p.name), 'DIRECT'] }],
     rules: ['MATCH,PROXY']

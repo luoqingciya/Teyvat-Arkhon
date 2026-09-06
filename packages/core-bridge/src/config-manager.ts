@@ -21,6 +21,8 @@ import { tryConvertUriProfile } from './uri-profiles'
 export interface ConfigManagerOptions {
   profilesDir: string
   activeConfigFile: string
+  /** 订阅导入/刷新时的节点排除关键词（对 URI 转换产物生效，运行时读取以支持动态配置） */
+  excludeKeywords?: () => string[]
 }
 
 const DEFAULT_MIXED_PORT = 7890
@@ -30,10 +32,23 @@ const TUN_DEFAULT = 'tun: {enable: true, stack: mixed, mtu: 1500, auto-route: tr
 export class ConfigManager {
   private readonly profilesDir: string
   private readonly activeConfigFile: string
+  private readonly excludeKeywords: () => string[]
 
   constructor(opts: ConfigManagerOptions) {
     this.profilesDir = opts.profilesDir
     this.activeConfigFile = opts.activeConfigFile
+    this.excludeKeywords = opts.excludeKeywords ?? (() => [])
+  }
+
+  /** 对 URI 转换产物应用排除关键词（节点名包含任一关键词即剔除；同步清理组引用） */
+  private filterConverted(content: string): string {
+    const converted = tryConvertUriProfile(content)
+    if (converted === null) return content
+    const kws = this.excludeKeywords()
+      .map((k) => k.trim().toLowerCase())
+      .filter(Boolean)
+    if (!kws.length) return converted
+    return applyExcludeFilter(converted, kws)
   }
 
   /** 初始化目录结构与索引（幂等） */
@@ -133,8 +148,8 @@ export class ConfigManager {
   /** 从文本内容导入订阅；url 可选（URL 导入时携带，用于刷新） */
   async importFromText(name: string, text: string, url?: string): Promise<{ profile: Profile; summary: ClashConfigSummary }> {
     const decoded = decodeProfilePayload(text)
-    // 非 YAML 内容：尝试识别单节点 URI 列表（如 hysteria2://），转换未命中则按原文本校验
-    const content = tryConvertUriProfile(decoded) ?? decoded
+    // 非 YAML 内容：尝试识别单节点 URI 列表（如 hysteria2://），转换并应用排除关键词；未命中则按原文本校验
+    const content = this.filterConverted(decoded)
     const summary = this.parseAndValidate(content)
 
     const id = randomUUID()
@@ -170,10 +185,10 @@ export class ConfigManager {
 
     const res = await fetchImpl(profile.url, { headers: { 'user-agent': 'TeyvatArkhon/0.1' } })
     if (!res.ok) throw new Error(`订阅刷新失败: HTTP ${res.status}`)
-    // 与首次导入保持一致：URI 列表（v2rayN 订阅）需先转换为 Clash 配置再校验落盘
+    // 与首次导入保持一致：URI 列表（v2rayN 订阅）需先转换为 Clash 配置再校验落盘，并应用排除关键词
     const text = await res.text()
     const decoded = decodeProfilePayload(text)
-    const content = tryConvertUriProfile(decoded) ?? decoded
+    const content = this.filterConverted(decoded)
     const summary = this.parseAndValidate(content)
 
     profile.updatedAt = new Date().toISOString()
@@ -297,6 +312,48 @@ export function mergeKernelDefaults(content: string): string {
   if (block.length === 0) return content
   const sep = content.endsWith('\n') ? '' : '\n'
   return content + sep + block.join('\n') + '\n'
+}
+
+/**
+ * 从转换产物中剔除节点名包含任一关键词的节点，并同步清理策略组引用。
+ * 仅处理含 proxies 映射的 Clash 配置；解析失败或无法识别时原样返回。
+ */
+export function applyExcludeFilter(content: string, keywords: string[]): string {
+  const kws = keywords.map((k) => k.trim().toLowerCase()).filter(Boolean)
+  if (!kws.length) return content
+  let doc: unknown
+  try {
+    doc = yaml.load(content)
+  } catch {
+    return content
+  }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return content
+  const cfg = doc as Record<string, unknown>
+  if (!Array.isArray(cfg.proxies)) return content
+
+  const all = cfg.proxies as Array<Record<string, unknown>>
+  const kept = all.filter((p) => {
+    if (!p || typeof p !== 'object') return true
+    const name = String(p.name ?? '').toLowerCase()
+    return !kws.some((k) => name.includes(k))
+  })
+  if (kept.length === all.length) return content
+
+  // 记录被剔除的节点名，仅从策略组引用中移除它们（DIRECT 等内置策略/其它组引用保留）
+  const removedNames = new Set<string>()
+  for (const p of all) {
+    if (p && typeof p === 'object' && !kept.includes(p)) removedNames.add(String(p.name ?? ''))
+  }
+  cfg.proxies = kept
+
+  if (Array.isArray(cfg['proxy-groups'])) {
+    for (const g of cfg['proxy-groups'] as Array<Record<string, unknown>>) {
+      if (g && Array.isArray(g.proxies)) {
+        g.proxies = (g.proxies as unknown[]).filter((n) => !removedNames.has(String(n)))
+      }
+    }
+  }
+  return yaml.dump(cfg)
 }
 
 async function exists(p: string): Promise<boolean> {
