@@ -81,6 +81,17 @@ describe('ConfigManager', () => {
     expect(raw).toContain('cdn.example.com')
   })
 
+  it('hysteria2 URI 携带 pinSHA256 时映射为 mihomo fingerprint（否则自签证书握手失败）', async () => {
+    const uri =
+      'hysteria2://pass123@example.com:443/?pinSHA256=BA%3A88%3A45%3A17%3AA1&obfs=salamander&obfs-password=obs&up=100&down=250#HK-Pin'
+    const { profile } = await mgr.importFromText('hy2-pin', uri)
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('fingerprint: BA:88:45:17:A1')
+    // 纯数字带宽自动补单位，避免 mihomo yaml 解析失败
+    expect(raw).toContain('up: 100 Mbps')
+    expect(raw).toContain('down: 250 Mbps')
+  })
+
   it('混合内容的文本不会被误转，仍按 YAML 校验失败', async () => {
     const mixed = 'hysteria2://pass@a.com:443/#A\nproxy-groups: []'
     await expect(mgr.importFromText('mixed', mixed)).rejects.toThrow(/YAML|无法作为内核配置/)
@@ -121,6 +132,58 @@ describe('ConfigManager', () => {
     expect(profile.nodeCount).toBe(2)
     const types = summary.proxies.map((p) => p.type).sort()
     expect(types).toEqual(['ss', 'vless'])
+  })
+
+  it('vless reality 带 flow 与 grpc serviceName 正确落盘（flow 不依赖 encryption）', async () => {
+    const uri =
+      'vless://uuid-0001@vl.example.com:443?type=grpc&serviceName=naive&security=reality&sni=gh.example&pbk=PUB&sid=AB12&flow=xtls-rprx-vision#VL-R'
+    const { profile } = await mgr.importFromText('vless-r', uri)
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('flow: xtls-rprx-vision')
+    expect(raw).toContain('reality-opts:')
+    expect(raw).toContain('public-key: PUB')
+    expect(raw).toContain('short-id: AB12')
+    // grpc service-name 参数不得被当成 Host（此前会丢失导致连不上）
+    expect(raw).toContain('grpc-service-name: naive')
+  })
+
+  it('trojan grpc serviceName 参数正确落盘', async () => {
+    const uri = 'trojan://pass-tj@tj.example.com:443?type=grpc&serviceName=gst#TJ-G'
+    const { profile } = await mgr.importFromText('trojan-g', uri)
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('grpc-service-name: gst')
+  })
+
+  it('sing-box vless flow 与 tuic congestion-controller 正确落盘', async () => {
+    const sb = JSON.stringify({
+      outbounds: [
+        {
+          type: 'vless',
+          tag: 'SB-VL-FLOW',
+          server: 'sb.example.com',
+          server_port: 443,
+          uuid: 'aaa-bbb',
+          flow: 'xtls-rprx-vision',
+          tls: { enabled: true, server_name: 'sb.example.com' }
+        },
+        {
+          type: 'tuic',
+          tag: 'SB-TUIC',
+          server: 'tuic.example.com',
+          server_port: 443,
+          uuid: 'ccc-ddd',
+          password: 'tpass',
+          congestion_control: 'bbr',
+          tls: { enabled: true, server_name: 'tuic.example.com', alpn: ['h3'], utls: { enabled: true, fingerprint: 'chrome' } }
+        }
+      ]
+    })
+    const { profile } = await mgr.importFromText('singbox2', sb)
+    const raw = await fs.readFile(path.join(profilesDir, `${profile.id}.yaml`), 'utf-8')
+    expect(raw).toContain('flow: xtls-rprx-vision')
+    expect(raw).toContain('congestion-controller: bbr')
+    expect(raw).toContain('client-fingerprint: chrome')
+    expect(raw).toContain('alpn:')
   })
 
   it('SSD JSON 可转换导入', async () => {

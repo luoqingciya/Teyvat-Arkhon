@@ -79,16 +79,21 @@ function parseHysteria2(uri: string): ProxyDef {
   const sni = q.get('sni') ?? q.get('peer')
   if (sni) p.sni = sni
   if (['1', 'true', 'yes'].includes((q.get('insecure') ?? '').toLowerCase())) p['skip-cert-verify'] = true
+  // 证书指纹校验：URI 的 pinSHA256 → mihomo hysteria2 的 fingerprint 字段。
+  // 自签/私签证书的服务端普遍依赖 pin 校验，丢失后内核默认走系统 CA，握手会失败导致完全连不上。
+  const pin = q.get('pinSHA256') ?? q.get('pin-sha256') ?? q.get('fingerprint')
+  if (pin) p.fingerprint = pin
   const obfs = q.get('obfs')
   if (obfs) p.obfs = obfs
   const obfsPwd = q.get('obfs-password') ?? q.get('obfsPassword')
   if (obfsPwd) p['obfs-password'] = obfsPwd
   const alpn = q.get('alpn')
   if (alpn) p.alpn = alpn.split(',').map((s) => s.trim()).filter(Boolean)
+  // hysteria2 的 up/down 为带宽字符串（如 "100 Mbps"），纯数字需要补单位
   const up = q.get('up')
-  if (up) p.up = up
+  if (up) p.up = appendMbps(up)
   const down = q.get('down')
-  if (down) p.down = down
+  if (down) p.down = appendMbps(down)
 
   return p
 }
@@ -307,7 +312,6 @@ function applyVlessTrojanExtras(p: ProxyDef, q: URLSearchParams, host: string): 
   const security = q.get('security') ?? 'none'
   const sni = q.get('sni') ?? q.get('peer')
   const fp = q.get('fp') ?? q.get('fingerprint')
-  const encryption = q.get('encryption')
 
   if (security === 'tls') {
     p.tls = true
@@ -321,11 +325,9 @@ function applyVlessTrojanExtras(p: ProxyDef, q: URLSearchParams, host: string): 
     const sid = q.get('sid') ?? q.get('short-id')
     if (pbk || sid) p['reality-opts'] = { 'public-key': pbk ?? '', 'short-id': sid ?? '' }
   }
-  if (security !== 'none' && encNonNone(encryption)) {
-    // vless flow
-    const flow = q.get('flow')
-    if (flow) p.flow = flow
-  }
+  // vless flow：reality 节点标配 xtls-rprx-vision，独立读取（不依赖 encryption 参数，链接里通常没有）
+  const flow = q.get('flow')
+  if (flow) p.flow = flow
   const alpn = q.get('alpn')
   if (alpn) p.alpn = alpn.split(',').map((s2) => s2.trim()).filter(Boolean)
   const insecure = (q.get('allowInsecure') ?? q.get('insecure') ?? '').toLowerCase()
@@ -334,14 +336,12 @@ function applyVlessTrojanExtras(p: ProxyDef, q: URLSearchParams, host: string): 
   const type = q.get('type') ?? q.get('net')
   const hostH = q.get('host')
   const path = q.get('path')
-  applyTransport(p, type ?? 'tcp', hostH ?? '', path ?? '')
+  // grpc 传输的 service-name 参数（v2rayN 用 serviceName / service_name）
+  const serviceName = q.get('serviceName') ?? q.get('service_name') ?? ''
+  applyTransport(p, type ?? 'tcp', hostH ?? '', path ?? '', serviceName)
 }
 
-function encNonNone(v: string | null): boolean {
-  return v !== null && v !== '' && v !== 'none'
-}
-
-function applyTransport(p: ProxyDef, net: string, hostH: string, path: string): void {
+function applyTransport(p: ProxyDef, net: string, hostH: string, path: string, serviceName = ''): void {
   if (net === 'ws' || net === 'websocket') {
     p.network = 'ws'
     const opts: Record<string, unknown> = {}
@@ -350,7 +350,8 @@ function applyTransport(p: ProxyDef, net: string, hostH: string, path: string): 
     if (Object.keys(opts).length) p['ws-opts'] = opts
   } else if (net === 'grpc') {
     p.network = 'grpc'
-    if (hostH) p['grpc-opts'] = { 'grpc-service-name': hostH }
+    const name = serviceName || hostH
+    if (name) p['grpc-opts'] = { 'grpc-service-name': name }
   } else if (net === 'http' || net === 'h2') {
     p.network = 'http'
     const opts: Record<string, unknown> = {}
@@ -384,7 +385,8 @@ function parseTrojan(uri: string): ProxyDef {
   const type = q.get('type') ?? q.get('net')
   const hostH = q.get('host')
   const path = q.get('path')
-  applyTransport(p, type ?? 'tcp', hostH ?? '', path ?? '')
+  const serviceName = q.get('serviceName') ?? q.get('service_name') ?? ''
+  applyTransport(p, type ?? 'tcp', hostH ?? '', path ?? '', serviceName)
   // trojan 用 ws 时服务端 host 放在 ws host
   return p
 }
@@ -472,13 +474,19 @@ function singBoxOutbounds(outbounds: Array<Record<string, unknown>>): ProxyDef[]
     } else if (type === 'tuic') {
       p.uuid = str(ob.uuid)
       p.password = str(ob.password)
-      if (tls.disable_sni && str(ob.alpn)) p.alpn = [str(ob.alpn)]
+      // 拥塞控制（cubic / new_reno / bbr，mihomo tuic 字段）
+      const cc = str(ob.congestion_control)
+      if (cc) p['congestion-controller'] = cc
     } else if (type === 'shadowsocks') {
       p.cipher = str(ob.method) || 'aes-256-gcm'
       p.password = str(ob.password)
     } else {
       // vless / vmess / trojan
       p.uuid = str(ob.uuid)
+      if (type === 'vless') {
+        const flow = str(ob.flow)
+        if (flow) p.flow = flow
+      }
       if (type === 'vmess') {
         p.alterId = 0
         p.cipher = 'auto'

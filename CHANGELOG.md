@@ -7,6 +7,16 @@
 
 [Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.7-rc...HEAD
 
+## [Unreleased]
+
+### Fixed（订阅转换参数完善，修复多个"v2rayN 能用、本应用连不上"场景）
+- **hysteria2 丢失 `pinSHA256` 证书指纹**：URI 的 pinSHA256 现映射为 mihomo `fingerprint` 字段；自签/私签证书服务端此前默认走系统 CA 校验导致 TLS 握手失败
+- **vless reality 丢失 `flow`**：`flow=xtls-rprx-vision` 不再依赖 encryption 参数，reality 节点可正常连接
+- **vless/trojan grpc 丢失 `serviceName`**：grpc-service-name 优先取 `serviceName`/`service_name` 参数（此前误用 host 导致 grpc 节点连不上）
+- sing-box 导出补齐 vless `flow` 与 tuic `congestion_control` 映射；hysteria2 `up`/`down` 纯数字自动补带宽单位
+
+验证：typecheck / 24 项单测（新增 pinSHA256、reality+flow+grpc、trojan grpc、sing-box flow/tuic 用例）/ lint / electron-vite 构建全绿。
+
 ## [0.9.7-rc] - 2026-09-06
 
 ### Added

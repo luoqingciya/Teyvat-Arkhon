@@ -153,7 +153,7 @@ pnpm --filter @teyvat-arkhon/electron package:dir          # 本地打包预览�
 
 | 层 | 工具 | 覆盖 |
 | --- | --- | --- |
-| 单元 | Vitest | 配置解析/订阅导入（含 URI 转换）/TUN 开关/档案管理/模式持久化（20 项） |
+| 单元 | Vitest | 配置解析/订阅导入（含 URI 转换与全参数映射）/TUN 开关/档案管理/模式持久化（24 项） |
 | 集成 | `core:e2e` | 进程驱动全链路：导入→启停→路由→流量累计→热重载→模式切换→规则数据面（24 项） |
 | UI | Playwright (_electron) | 启动渲染、导航、设置页可达 |
 | CI | GitHub Actions | ubuntu 测试矩阵 + windows UI 冒烟 + tag 打包发布 |
@@ -167,8 +167,8 @@ pnpm --filter @teyvat-arkhon/electron package:dir          # 本地打包预览�
 | Clash / mihomo 完整 YAML | ✅ | 节点类型覆盖 ss/vmess/trojan/vless/hysteria2/tuic/ssr/http/socks5/wireguard 等，能力随内核 |
 | Base64 包装的 YAML | ✅ | 自动解码（含 base64url 变体） |
 | HTTP(S) 订阅链接 | ✅ | 携带客户端 UA，兼容多数机场 Clash 端点 |
-| **单节点 URI（ss/vmess/vless/trojan/hysteria2）** | ✅ | 粘贴即导，自动转 Clash 节点并生成策略组；支持 base64 与参数形式（ws/grpc/tls/reality/obfs 等） |
-| **sing-box 导出 JSON** | ✅ | 识别 `outbounds` 数组，转换 vless/vmess/trojan/ss/hysteria2/tuic |
+| **单节点 URI（ss/vmess/vless/trojan/hysteria2）** | ✅ | 粘贴即导，自动转 Clash 节点并生成策略组；支持 base64 与参数形式：ws/grpc/**reality（含 flow）**/tls/obfs、**hysteria2 pinSHA256 证书指纹**、grpc `serviceName` 等 |
+| **sing-box 导出 JSON** | ✅ | 识别 `outbounds` 数组，转换 vless/vmess/trojan/ss/hysteria2/tuic（含 vless flow、tuic 拥塞控制、utls 指纹） |
 | **SSD（shadowsocksD）** | ✅ | 标准 SSD JSON（servers 数组）自动转 ss 节点 |
 | **Surge 节点行** | ✅ | `Name = ss/trojan/hy2, …` 基础格式 |
 | Shadowrocket | ✅ | 其导出为 v2rayN URI，走 URI 导入 |
