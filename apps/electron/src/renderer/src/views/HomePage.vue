@@ -199,6 +199,13 @@ function drawChart(): void {
   gap: 20px;
   padding: 30px 34px;
 }
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(520px 200px at 88% -30%, rgba(56, 189, 248, 0.14), transparent 62%);
+}
 .hero::after {
   content: '';
   position: absolute;
@@ -209,6 +216,20 @@ function drawChart(): void {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(79, 124, 255, 0.18), transparent 65%);
   pointer-events: none;
+  animation: heroGlow 6s ease-in-out infinite;
+}
+@keyframes heroGlow {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.hero-text {
+  position: relative;
+  z-index: 1;
 }
 .hero-text h1 {
   margin: 0 0 6px;
@@ -225,6 +246,8 @@ function drawChart(): void {
   color: var(--text-dim);
 }
 .power {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;

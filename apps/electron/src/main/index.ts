@@ -229,7 +229,6 @@ async function createWindow(): Promise<void> {
 
   win.once('ready-to-show', () => {
     win.show()
-    win.maximize()
   })
   win.on('close', (e) => {
     // 关闭主窗口时最小化到系统托盘；托盘菜单"退出"才真正结束进程

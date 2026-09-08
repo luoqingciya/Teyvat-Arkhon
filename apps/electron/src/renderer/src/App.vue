@@ -18,13 +18,15 @@ const store = useAppStore()
     <Sidebar />
     <div class="main-col">
       <main class="content">
-        <HomePage v-if="store.activeView === 'home'" />
-        <ProxiesPage v-else-if="store.activeView === 'proxies'" />
-        <ProfilesPage v-else-if="store.activeView === 'profiles'" />
-        <ConnectionsPage v-else-if="store.activeView === 'connections'" />
-        <ConfigEditorPage v-else-if="store.activeView === 'config'" />
-        <SettingsPage v-else-if="store.activeView === 'settings'" />
-        <LogsPage v-else-if="store.activeView === 'logs'" />
+        <transition name="page" mode="out-in">
+          <HomePage v-if="store.activeView === 'home'" key="home" />
+          <ProxiesPage v-else-if="store.activeView === 'proxies'" key="proxies" />
+          <ProfilesPage v-else-if="store.activeView === 'profiles'" key="profiles" />
+          <ConnectionsPage v-else-if="store.activeView === 'connections'" key="connections" />
+          <ConfigEditorPage v-else-if="store.activeView === 'config'" key="config" />
+          <SettingsPage v-else-if="store.activeView === 'settings'" key="settings" />
+          <LogsPage v-else-if="store.activeView === 'logs'" key="logs" />
+        </transition>
       </main>
       <StatusBar />
     </div>
@@ -55,5 +57,18 @@ const store = useAppStore()
   min-height: 0;
   padding: 20px 26px;
   overflow: auto;
+}
+/* 页面切换过渡 */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

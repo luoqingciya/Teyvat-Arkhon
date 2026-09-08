@@ -28,7 +28,20 @@ const items: Array<{ key: ViewKey; icon: string }> = [
 <template>
   <aside class="sidebar glass">
     <div class="brand">
-      <div class="brand-mark">◇</div>
+      <div class="brand-mark">
+        <svg viewBox="0 0 40 40" width="26" height="26" aria-hidden="true">
+          <defs>
+            <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#9db8ff" />
+              <stop offset="1" stop-color="#7ae7ff" />
+            </linearGradient>
+          </defs>
+          <path d="M20 2 24 14 36 18 24 22 20 34 16 22 4 18 16 14Z" fill="url(#brand-grad)" />
+          <circle cx="34" cy="6" r="1.8" fill="#e8edf6" opacity="0.85" />
+          <circle cx="36.5" cy="15" r="1.1" fill="#e8edf6" opacity="0.6" />
+          <circle cx="6" cy="32" r="1.3" fill="#e8edf6" opacity="0.5" />
+        </svg>
+      </div>
       <div>
         <div class="brand-name">Teyvat Arkhon</div>
         <div class="brand-sub">{{ t('home.title') }}</div>
@@ -48,7 +61,11 @@ const items: Array<{ key: ViewKey; icon: string }> = [
         <span>{{ t(`nav.${it.key}`) }}</span>
       </button>
     </nav>
-    <div class="foot">v{{ store.appVersion || '0.1.0' }} · GPL-3.0</div>
+    <div class="foot">
+      <span class="version">v{{ store.appVersion || '0.1.0' }}</span>
+      <span class="dash">·</span>
+      <span>GPL-3.0</span>
+    </div>
   </aside>
 </template>
 
@@ -75,10 +92,12 @@ const items: Array<{ key: ViewKey; icon: string }> = [
   flex: none;
   display: grid;
   place-items: center;
-  font-size: 26px;
-  color: #0b1120;
-  background: linear-gradient(135deg, #4f7cff, #38bdf8);
-  border-radius: 12px;
+  border-radius: 13px;
+  background: linear-gradient(140deg, rgba(79, 124, 255, 0.22), rgba(56, 189, 248, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(122, 166, 255, 0.35), 0 4px 14px rgba(56, 120, 255, 0.18);
+}
+.brand-mark svg {
+  filter: drop-shadow(0 0 6px rgba(122, 199, 255, 0.35));
 }
 .brand-name {
   font-size: 16px;
@@ -93,7 +112,7 @@ const items: Array<{ key: ViewKey; icon: string }> = [
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 .nav-item {
   position: relative;
@@ -107,7 +126,7 @@ const items: Array<{ key: ViewKey; icon: string }> = [
   color: var(--text-dim);
   font-size: 15px;
   cursor: pointer;
-  transition: background 0.18s, color 0.18s;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
 }
 .nav-item::before {
   content: '';
@@ -121,9 +140,6 @@ const items: Array<{ key: ViewKey; icon: string }> = [
   background: linear-gradient(180deg, #4f7cff, #38bdf8);
   transition: transform 0.18s;
 }
-.nav-item.active::before {
-  transform: translateY(-50%) scaleY(1);
-}
 .nav-item:hover {
   background: var(--bg-hover);
   color: var(--text);
@@ -133,10 +149,27 @@ const items: Array<{ key: ViewKey; icon: string }> = [
   color: var(--accent);
   box-shadow: inset 0 0 0 1px rgba(79, 124, 255, 0.35);
 }
+.nav-item.active::before {
+  transform: translateY(-50%) scaleY(1);
+  box-shadow: 0 0 8px rgba(79, 124, 255, 0.55);
+}
+.nav-item:not(.active):hover {
+  transform: translateX(2px);
+}
 .foot {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-faint);
   padding: 0 8px;
+}
+.foot .version {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.foot .dash {
+  opacity: 0.6;
 }
 </style>
