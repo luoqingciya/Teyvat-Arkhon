@@ -5,7 +5,23 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.12-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...HEAD
+
+## [1.0.0] - 2026-09-08
+
+首个正式版！经过 0.9.x 系列预发布迭代，核心链路与日常体验已稳定。
+
+### Changed
+- **默认窗口化启动**：应用不再启动即最大化，以 1180×780 标准窗口开启
+- **界面优雅化**：侧边栏品牌换提瓦特星芒图形、玻璃卡片顶部高光与悬浮动效、导航激活辉光、加载页过渡动画、滚动条纤细化
+
+### 自 0.6.0 以来的主要能力沉淀
+- **专属定制内核 `arkhon-core`**（MetaCubeX/mihomo fork）：只读 REST 扩展（/usage、/delay/latest）、hy2 错误日志可读化、默认参数调优；应用下载源/校验哈希对齐
+- **核心功能**：进程驱动内核、订阅多格式导入（URI/sing-box/SSD/Surge）、系统代理、TUN 模式、系统服务托管、托盘常驻与档案快速切换
+- **日常体验**：节点搜索/收藏置顶、并发测速、日志页结构化展示、网络自检、UWP 回环豁免、订阅自动更新与排除关键词、以 URL 分享订阅
+- **工程**：便携数据模式、自动更新、wintun.dll 进入打包产物、Linux/Windows 冒烟测试
+
+验证：typecheck / 39 项单测 / lint / electron-vite 构建 / 24 项内核 E2E / UI 冒烟全绿。
 
 ## [0.9.12-rc] - 2026-09-08
 
