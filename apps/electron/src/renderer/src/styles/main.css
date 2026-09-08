@@ -32,12 +32,40 @@ body {
 
 /* 玻璃卡片 */
 .glass {
+  position: relative;
   background: linear-gradient(160deg, rgba(30, 41, 59, 0.55), rgba(15, 23, 42, 0.72));
   border: 1px solid var(--border);
   border-radius: 16px;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 10px 34px rgba(2, 6, 23, 0.35);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), border-color 0.22s, box-shadow 0.22s;
+}
+/* 顶部高光描边，加强玻璃质感 */
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.07), transparent 36px);
+  opacity: 0.65;
+}
+.glass:hover {
+  border-color: rgba(148, 163, 184, 0.26);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.42);
+}
+[data-theme='light'] .glass {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(247, 250, 252, 0.9));
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 30px rgba(30, 58, 138, 0.08);
+}
+[data-theme='light'] .glass:hover {
+  border-color: rgba(15, 23, 42, 0.2);
+}
+[data-theme='light'] .glass::after {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), transparent 36px);
 }
 
 /* 通用按钮 */
@@ -89,14 +117,6 @@ body {
   outline-offset: 2px;
 }
 
-/* 卡片轻抬升 */
-.glass:hover {
-  border-color: rgba(148, 163, 184, 0.26);
-}
-[data-theme='light'] .glass:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-}
-
 /* ---------- 亮色主题 ---------- */
 [data-theme='light'] {
   --bg: #eef2f9;
@@ -115,12 +135,6 @@ body {
   color: var(--text);
 }
 
-[data-theme='light'] .glass {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(247, 250, 252, 0.9));
-  border-color: rgba(15, 23, 42, 0.12);
-  box-shadow: 0 10px 30px rgba(30, 58, 138, 0.08);
-}
-
 [data-theme='light'] .app {
   background:
     radial-gradient(1200px 600px at 85% -10%, rgba(47, 107, 255, 0.1), transparent 60%),
@@ -133,11 +147,14 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.22);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -145,4 +162,7 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.4);
   background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
