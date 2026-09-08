@@ -5,7 +5,14 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.11-rc...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v0.9.12-rc...HEAD
+
+## [0.9.12-rc] - 2026-09-08
+
+### Fixed
+- **TUN 模式 wintun.dll 缺失**：wintun 下载解压后路径探测硬编码错误（实际结构 `wintun/bin/amd64/`，此前写死 `amd64/`），导致 wintun.dll 从未进入打包产物、所有版本 TUN 均提示缺驱动；已改多候选路径 + 递归兜底，并修复 `existsSync is not a function`
+
+验证：typecheck / 39 项单测 / lint / electron-vite 构建全绿；本机实测 wintun.dll 下载成功。
 
 ## [0.9.11-rc] - 2026-09-06
 
