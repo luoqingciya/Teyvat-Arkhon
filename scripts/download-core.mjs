@@ -205,13 +205,47 @@ async function downloadWintun() {
     file.end()
     await new Promise((r) => file.on('finish', r))
     await unzip(zipPath, path.join(TARGET_DIR, 'wintun-tmp'))
-    await fs.copyFile(path.join(TARGET_DIR, 'wintun-tmp', 'amd64', 'wintun.dll'), dest)
+    // wintun-0.14.1.zip 解压结构为 wintun/bin/{amd64,arm64,arm}/wintun.dll；
+    // 兼容不同版本/来源的目录层级，做多候选路径探测
+    const tmp = path.join(TARGET_DIR, 'wintun-tmp')
+    const exists = (p) => fs.access(p).then(() => true, () => false)
+    const candidates = [
+      path.join(tmp, 'wintun', 'bin', 'amd64', 'wintun.dll'),
+      path.join(tmp, 'amd64', 'wintun.dll'),
+      path.join(tmp, 'bin', 'amd64', 'wintun.dll'),
+      path.join(tmp, 'wintun', 'amd64', 'wintun.dll')
+    ]
+    let src = null
+    for (const p of candidates) {
+      if (await exists(p)) {
+        src = p
+        break
+      }
+    }
+    src ??= await findDllRecursive(tmp)
+    if (!src) throw new Error('wintun.zip 内未找到 amd64/wintun.dll')
+    await fs.copyFile(src, dest)
     await fs.rm(zipPath, { force: true })
-    await fs.rm(path.join(TARGET_DIR, 'wintun-tmp'), { recursive: true, force: true })
+    await fs.rm(tmp, { recursive: true, force: true })
     console.log('[download-core] wintun.dll 完成')
   } catch (e) {
     console.warn(`[download-core] wintun.dll 下载失败（可稍后手动放置）: ${e instanceof Error ? e.message : String(e)}`)
   }
+}
+
+/** 递归查找某 amd64/wintun.dll（候选路径兜底，避免依赖 zip 内部结构） */
+async function findDllRecursive(dir) {
+  if (!(await fs.stat(dir)).isDirectory()) return null
+  for (const ent of await fs.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name)
+    if (ent.isDirectory()) {
+      const hit = await findDllRecursive(full)
+      if (hit) return hit
+    } else if (ent.name === 'wintun.dll' && path.basename(path.dirname(full)) === 'amd64') {
+      return full
+    }
+  }
+  return null
 }
 
 main().catch((e) => {
