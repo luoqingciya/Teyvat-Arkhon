@@ -191,17 +191,36 @@ export class ProcessCoreDriver implements CoreDriver {
 
   async testDelay(name: string, url = 'https://www.gstatic.com/generate_204', timeoutMs = 5000): Promise<DelayResult> {
     const q = new URLSearchParams({ timeout: String(timeoutMs), url })
+    let groupError: unknown
     try {
       const res = await this.rest.get<{ delay?: number }>(`/proxies/${encodeURIComponent(name)}/delay?${q}`)
       if (typeof res.delay === 'number') return { node: name, delay: res.delay }
       throw new Error('未返回延迟数据')
     } catch (e) {
+      groupError = e
+    }
+    try {
       // 策略组使用 group 端点
-      const groupRes = await this.rest.get<{ delay?: number }>(
-        `/group/${encodeURIComponent(name)}/delay?${q}`
-      )
+      const groupRes = await this.rest.get<{ delay?: number }>(`/group/${encodeURIComponent(name)}/delay?${q}`)
       if (typeof groupRes.delay === 'number') return { node: name, delay: groupRes.delay }
-      return { node: name, delay: -1, error: (e as Error).message }
+    } catch {
+      /* 节点与组端点均失败 */
+    }
+    return { node: name, delay: -1, error: groupError instanceof Error ? groupError.message : String(groupError) }
+  }
+
+  /** 全部节点最近一次延迟测试快照（读取内核 /delay/latest 缓存，不触发测速） */
+  async listDelaySnapshot(): Promise<Record<string, number | null>> {
+    try {
+      const res = await this.rest.get<{ proxies: Record<string, { delay?: number | null }> }>('/delay/latest')
+      const out: Record<string, number | null> = {}
+      for (const [name, entry] of Object.entries(res.proxies ?? {})) {
+        out[name] = typeof entry.delay === 'number' && entry.delay > 0 ? entry.delay : null
+      }
+      return out
+    } catch {
+      // 定制端点缺失/内核未启用时降级为空快照，不阻塞页面
+      return {}
     }
   }
 

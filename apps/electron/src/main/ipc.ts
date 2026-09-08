@@ -18,7 +18,9 @@ export function createIpc(
   getAutoRefresh: () => boolean,
   setAutoRefresh: (enabled: boolean) => void,
   getExcludeKeywords: () => string[],
-  setExcludeKeywords: (keywords: string[]) => void
+  setExcludeKeywords: (keywords: string[]) => void,
+  getAutoStart: () => boolean,
+  setAutoStart: (enabled: boolean) => boolean
 ): void {
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -64,6 +66,7 @@ export function createIpc(
   ipcMain.handle('proxies:delay', (_e, name: string, url?: string, timeoutMs?: number) =>
     service.testDelay(name, url, timeoutMs)
   )
+  ipcMain.handle('proxies:delay-snapshot', () => service.listDelaySnapshot())
 
   ipcMain.handle('profiles:list', () => service.listProfiles())
   ipcMain.handle('profiles:import-url', (_e, url: string) => service.importFromUrl(url))
@@ -88,6 +91,9 @@ export function createIpc(
 
   ipcMain.handle('system-proxy:get', async (): Promise<SystemProxyState> => systemProxy.read())
   ipcMain.handle('system-proxy:set', async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))
+
+  ipcMain.handle('app:auto-start-get', () => getAutoStart())
+  ipcMain.handle('app:auto-start-set', (_e, enabled: boolean) => setAutoStart(enabled === true))
 
   ipcMain.handle('app:version', () => app.getVersion())
 

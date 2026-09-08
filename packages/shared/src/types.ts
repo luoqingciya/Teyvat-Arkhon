@@ -21,6 +21,18 @@ export interface ProxyItem {
   bot?: boolean
 }
 
+/** 订阅配额信息（来自 subscription-userinfo 响应头，仅 URL 订阅） */
+export interface ProfileSubInfo {
+  /** 已用上传字节 */
+  upload?: number
+  /** 已用下载字节 */
+  download?: number
+  /** 总可用流量字节 */
+  total?: number
+  /** 到期时间戳（秒） */
+  expire?: number
+}
+
 /** 订阅配置档案 */
 export interface Profile {
   id: string
@@ -33,6 +45,8 @@ export interface Profile {
   selected: boolean
   /** 解析出的节点数量 */
   nodeCount?: number
+  /** 订阅流量/到期信息（URL 订阅携带 subscription-userinfo 时解析） */
+  subInfo?: ProfileSubInfo
 }
 
 /** 解析后的核心配置摘要 */

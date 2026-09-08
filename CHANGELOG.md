@@ -5,7 +5,22 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.1.0] - 2026-09-08
+
+### Added
+- **开机自启**：设置页新增开关，一键配置登录自启（系统登录项，Windows/macOS），自启后最小化到托盘
+- **托盘增强**：托盘右键菜单新增「系统代理」开关与「代理模式」（规则/全局/直连）快速切换
+- **订阅配额展示**：URL 订阅解析 `subscription-userinfo` 响应头，订阅列表展示已用/总流量进度条与到期倒计时，刷新自动更新
+- **延迟快照应用化**：代理页直接呈现各节点最近一次测速缓存（定制端点 `/delay/latest`），切页/进页即时可见，无需重复测速
+
+### Changed
+- 关闭「启动内核」时同步关闭「系统代理」，避免残留系统代理指向已停止的内核
+- 单节点/策略组测速更稳健：组端点异常时返回错误结果而非抛错
+
+验证：typecheck / 45 项单测（含订阅配额解析 6 项新增）/ lint / electron-vite 构建 / E2E 27 项 / 内核 `/delay/latest` 路由单测 全绿。
 
 ## [1.0.0] - 2026-09-08
 

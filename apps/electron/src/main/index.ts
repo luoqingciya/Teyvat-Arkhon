@@ -3,9 +3,10 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import * as os from 'node:os'
 import { join } from 'node:path'
 import { CoreService } from '@teyvat-arkhon/core-bridge'
+import type { ProxyMode } from '@teyvat-arkhon/shared'
 import { createIpc } from './ipc'
 import { createNetChecker } from './net-check'
-import { createSystemProxyController } from './system-proxy'
+import { createSystemProxyController, type SystemProxyController } from './system-proxy'
 import { createServiceManager } from './system-service'
 import { createLoopbackController } from './system-loopback'
 import { createSubscriptionSync } from './subscription-sync'
@@ -135,6 +136,47 @@ function writeExcludeKeywords(keywords: string[]): void {
   }
 }
 
+// ---------- 开机自启（系统登录项，独立于 Windows 服务托管） ----------
+
+function readAutoStart(): boolean {
+  try {
+    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { autoStart?: boolean }
+    return j.autoStart === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 设置开机自启。
+ * - win32/darwin：electron app.setLoginItemSettings（注册表/LaunchAgent）
+ * - linux：XDG autostart .desktop（handled by login item API in newer Electron, fallback 无操作）
+ * 失败不抛错，返回当前实际状态。
+ */
+function applyAutoStart(enabled: boolean): boolean {
+  try {
+    if (process.platform === 'win32' || process.platform === 'darwin') {
+      app.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: true
+      })
+    }
+    const file = settingsFilePath()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
+    } catch {
+      /* 首次写入 */
+    }
+    j.autoStart = enabled
+    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
+    return true
+  } catch (e) {
+    console.warn('[teyvat-arkhon] 设置开机自启失败:', (e as Error).message)
+    return false
+  }
+}
+
 // ---------- 系统托盘 ----------
 /** 应用图标：打包后取自 resources/icon.png（extraResources 复制），开发期用 build/icon.png */
 function appIconPath(): string {
@@ -147,7 +189,15 @@ let isQuitting = false
 /** 当前主窗口（托盘显示/快速切换用） */
 let trayTargetWin: BrowserWindow | null = null
 
-/** 重建托盘右键菜单：档案快速切换（勾选当前使用中）+ 显示/退出 */
+/** 托盘增强所需的控制器（系统代理/模式切换），createTray 时注入 */
+let traySystemProxy: SystemProxyController | null = null
+
+/** 内核模式中文名（托盘菜单硬编码文案，与渲染端一致） */
+function modeLabel(mode: ProxyMode): string {
+  return mode === 'rule' ? '规则' : mode === 'global' ? '全局' : '直连'
+}
+
+/** 重建托盘右键菜单：档案快速切换（勾选当前使用中）+ 系统代理开关 + 模式切换 + 显示/退出 */
 async function rebuildTrayMenu(): Promise<void> {
   if (!tray || !service) return
   const items: Electron.MenuItemConstructorOptions[] = []
@@ -157,6 +207,46 @@ async function rebuildTrayMenu(): Promise<void> {
   } catch {
     /* 内核/配置异常时降级为仅基础菜单 */
   }
+  // -------- 代理模式（勾选当前） --------
+  let currentMode: ProxyMode | undefined
+  try {
+    currentMode = await service.getMode()
+  } catch {
+    /* 未运行 */
+  }
+  items.push({ label: '代理模式', enabled: false })
+  for (const m of ['rule', 'global', 'direct'] as ProxyMode[]) {
+    items.push({
+      label: modeLabel(m),
+      type: 'radio',
+      checked: currentMode === m,
+      click: () => {
+        if (!service) return
+        void service.setMode(m).catch(() => undefined)
+      }
+    })
+  }
+  items.push({ type: 'separator' })
+  // -------- 系统代理开关 --------
+  let sysProxyOn = false
+  try {
+    sysProxyOn = (await traySystemProxy?.read())?.enabled === true
+  } catch {
+    /* 读取失败视为关闭 */
+  }
+  items.push({
+    label: sysProxyOn ? '系统代理：已开启' : '系统代理：已关闭',
+    type: 'checkbox',
+    checked: sysProxyOn,
+    click: (item) => {
+      if (!traySystemProxy) return
+      void traySystemProxy
+        .set(item.checked)
+        .then(() => rebuildTrayMenu())
+        .catch(() => undefined)
+    }
+  })
+  items.push({ type: 'separator' })
   if (profiles.length) {
     items.push({ label: '快速切换档案', enabled: false })
     for (const p of profiles.slice(0, 12)) {
@@ -188,12 +278,13 @@ async function rebuildTrayMenu(): Promise<void> {
   tray.setContextMenu(Menu.buildFromTemplate(items))
 }
 
-function createTray(win: BrowserWindow): void {
+function createTray(win: BrowserWindow, systemProxy: SystemProxyController): void {
   const icon = nativeImage.createFromPath(appIconPath())
   if (icon.isEmpty()) return
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Teyvat Arkhon')
   trayTargetWin = win
+  traySystemProxy = systemProxy
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '显示主窗口', click: () => { win.show(); win.focus() } },
@@ -207,7 +298,7 @@ function createTray(win: BrowserWindow): void {
     else { win.show(); win.focus() }
   })
 }
-async function createWindow(): Promise<void> {
+async function createWindow(systemProxy: SystemProxyController): Promise<void> {
   const win = new BrowserWindow({
     width: 1180,
     height: 780,
@@ -239,7 +330,7 @@ async function createWindow(): Promise<void> {
   win.on('closed', () => {
     mainWindow = null
   })
-  createTray(win)
+  createTray(win, systemProxy)
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     await win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -319,7 +410,9 @@ if (!gotLock) {
       readAutoRefresh,
       setAutoRefresh,
       readExcludeKeywords,
-      writeExcludeKeywords
+      writeExcludeKeywords,
+      readAutoStart,
+      applyAutoStart
     )
     // 已开启自动更新的用户：启动即进入定时刷新节奏
     if (readAutoRefresh()) subscriptionSync.start()
@@ -329,10 +422,10 @@ if (!gotLock) {
 
     setupAutoUpdater()
 
-    await createWindow()
+    await createWindow(systemProxy)
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) void createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow(systemProxy)
     })
   })
 }

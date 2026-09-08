@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import yaml from 'js-yaml'
-import { ConfigManager, mergeKernelDefaults, applyExcludeFilter } from './config-manager'
+import { ConfigManager, mergeKernelDefaults, applyExcludeFilter, parseSubscriptionUserinfo } from './config-manager'
 
 const SAMPLE_YAML = `mixed-port: 7890
 external-controller: 127.0.0.1:9090
@@ -351,6 +351,74 @@ describe('ConfigManager', () => {
     await mgr.setActiveMode('direct')
     c = await fs.readFile(activeFile, 'utf-8')
     expect(/^\s*mode:\s*direct\s*$/m.test(c)).toBe(true)
+  })
+
+  // ---------- 订阅配额信息（subscription-userinfo） ----------
+
+  it('parseSubscriptionUserinfo: 解析标准响应头', () => {
+    const res = new Response('', {
+      headers: { 'subscription-userinfo': 'upload=104857600; download=209715200; total=1099511627776; expire=1800000000' }
+    })
+    expect(parseSubscriptionUserinfo(res)).toEqual({
+      upload: 104857600,
+      download: 209715200,
+      total: 1099511627776,
+      expire: 1800000000
+    })
+  })
+
+  it('parseSubscriptionUserinfo: 缺失时返回 undefined，部分字段可解析', () => {
+    expect(parseSubscriptionUserinfo(new Response(''))).toBeUndefined()
+    const partial = new Response('', { headers: { 'subscription-userinfo': 'download=1024; whatever=1' } })
+    expect(parseSubscriptionUserinfo(partial)).toEqual({ download: 1024 })
+  })
+
+  it('parseSubscriptionUserinfo: 非数字值与大小写不敏感键被忽略', () => {
+    const res = new Response('', {
+      headers: { 'subscription-userinfo': 'upload=abc; Total=2048; EXPIRE=1600000000' }
+    })
+    expect(parseSubscriptionUserinfo(res)).toEqual({ total: 2048, expire: 1600000000 })
+  })
+
+  it('URL 导入解析 userinfo 并写入档案索引', async () => {
+    const fakeFetch = (() =>
+      Promise.resolve(
+        new Response(SAMPLE_YAML, {
+          status: 200,
+          headers: { 'subscription-userinfo': 'upload=100; download=200; total=1000; expire=1800000000' }
+        })
+      )) as unknown as typeof fetch
+    const { profile } = await mgr.importFromUrl('https://example.com/sub', fakeFetch)
+    expect(profile.subInfo).toEqual({ upload: 100, download: 200, total: 1000, expire: 1800000000 })
+
+    // 索引持久化，listProfiles 返回同样数据
+    const list = await mgr.listProfiles()
+    expect(list[0].subInfo).toEqual(profile.subInfo)
+  })
+
+  it('刷新时更新 userinfo；响应头缺失时保留旧值', async () => {
+    const withHeader = (() =>
+      Promise.resolve(
+        new Response(SAMPLE_YAML, { status: 200, headers: { 'subscription-userinfo': 'download=500; total=999' } })
+      )) as unknown as typeof fetch
+    const noHeader = (() => Promise.resolve(new Response(SAMPLE_YAML, { status: 200 }))) as unknown as typeof fetch
+
+    const { profile } = await mgr.importFromUrl('https://example.com/sub', withHeader)
+    expect(profile.subInfo).toEqual({ download: 500, total: 999 })
+
+    await mgr.refreshProfile(profile.id, noHeader)
+    const after = await mgr.listProfiles()
+    // 无响应头时保留旧配额信息，避免刷新频繁导致信息丢失
+    expect(after[0].subInfo).toEqual({ download: 500, total: 999 })
+
+    await mgr.refreshProfile(profile.id, withHeader)
+    const refreshed = await mgr.listProfiles()
+    expect(refreshed[0].subInfo).toEqual({ download: 500, total: 999 })
+  })
+
+  it('本地文本导入不携带 subInfo', async () => {
+    const { profile } = await mgr.importFromText('local', SAMPLE_YAML)
+    expect(profile.subInfo).toBeUndefined()
   })
 })
 

@@ -54,6 +54,8 @@ interface AppState {
   delaySetting: { url: string; timeoutMs: number }
   /** 订阅自动更新开关（主进程持久化） */
   autoRefresh: boolean
+  /** 开机自启开关（系统登录项，主进程持久化） */
+  autoStart: boolean
   /** 订阅导入/刷新时排除的节点关键词（主进程持久化） */
   excludeKeywords: string[]
   /** 网络自检结果 */
@@ -126,6 +128,7 @@ export const useAppStore = defineStore('app', {
     logs: [],
     delaySetting: readDelaySetting(),
     autoRefresh: false,
+    autoStart: false,
     excludeKeywords: [],
     netProbe: null,
     netChecking: false,
@@ -177,6 +180,7 @@ export const useAppStore = defineStore('app', {
       await this.initCoreMode()
       await this.initLogs()
       await this.refreshAutoRefresh()
+      await this.refreshAutoStart()
       await this.refreshExcludeKeywords()
       await this.refreshLoopback()
       this.appVersion = await window.arkhon.getAppVersion()
@@ -248,6 +252,14 @@ export const useAppStore = defineStore('app', {
         this.proxies = []
         this.delays = {}
         this.rules = []
+        // 内核停止后系统代理失去转发目标，同步关闭避免"代理已开但内核未跑"的断网状态
+        if (this.systemProxy.enabled) {
+          try {
+            this.systemProxy = await window.arkhon.setSystemProxy(false)
+          } catch {
+            this.systemProxy = { enabled: false }
+          }
+        }
       } catch (e) {
         this.error = (e as Error).message
       } finally {
@@ -265,8 +277,23 @@ export const useAppStore = defineStore('app', {
           const first = this.proxies.find((p) => isGroupNode(p))
           this.selectedGroup = first?.name ?? ''
         }
+        // 合并内核延迟快照：只补已有测速结果，不覆盖本次会话新测值，避免整页全量重测
+        await this.mergeDelaySnapshot()
       } catch (e) {
         this.error = (e as Error).message
+      }
+    },
+
+    /** 读取内核最近一次测速快照并合并进 delays（不触发测速） */
+    async mergeDelaySnapshot(): Promise<void> {
+      try {
+        const snap = await window.arkhon.listDelaySnapshot()
+        for (const [name, delay] of Object.entries(snap)) {
+          if (delay === null) continue
+          if (!this.delays[name]) this.delays[name] = { node: name, delay }
+        }
+      } catch {
+        // 定制端点缺失时静默跳过
       }
     },
 
@@ -440,6 +467,25 @@ export const useAppStore = defineStore('app', {
       try {
         await window.arkhon.setAutoRefresh(enabled)
         this.autoRefresh = enabled
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    // ---------- 开机自启 ----------
+
+    async refreshAutoStart(): Promise<void> {
+      try {
+        this.autoStart = await window.arkhon.getAutoStart()
+      } catch {
+        this.autoStart = false
+      }
+    },
+
+    /** 切换开机自启（写系统登录项；返回实际生效状态） */
+    async setAutoStart(enabled: boolean): Promise<void> {
+      try {
+        this.autoStart = await window.arkhon.setAutoStart(enabled)
       } catch (e) {
         this.error = (e as Error).message
       }

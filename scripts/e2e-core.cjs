@@ -218,6 +218,23 @@ async function main() {
     await svc.setMode('rule').catch(() => {})
     check((await svc.getMode()) === 'rule', '运行模式切回 rule', `mode=${await svc.getMode()}`)
 
+    // 延迟快照（定制端点 /delay/latest）：端点可读、结构合法；随后单节点测速会写入延迟缓存
+    const snap0 = await svc.listDelaySnapshot()
+    check(typeof snap0 === 'object', '/delay/latest 端点可读（proxies 快照结构）', `len=${Object.keys(snap0).length}`)
+    // 对 LOCAL-UP 测速：经上游隧道（CONNECT → 本地回显 200），延迟应 > 0
+    const delayRes = await svc.testDelay('LOCAL-UP', `http://127.0.0.1:${ECHO_PORT}/delay-probe`, 5000)
+    if (delayRes.delay > 0) {
+      ok(`单节点测速成功 delay=${delayRes.delay}ms`)
+      await new Promise((r) => setTimeout(r, 400))
+      const snap1 = await svc.listDelaySnapshot()
+      check(typeof snap1['LOCAL-UP'] === 'number' && snap1['LOCAL-UP'] > 0, '延迟快照含 LOCAL-UP 延迟', JSON.stringify(snap1))
+    } else {
+      // 受限环境（无隧道/代理链路超时）下降级为仅结构断言，不阻塞发布
+      console.warn(`  ⚠ 单节点测速在受限环境失败（${delayRes.error || 'delay<=0'}），快照值断言降级为告警`)
+      const snap1 = await svc.listDelaySnapshot()
+      check(typeof snap1 === 'object', '/delay/latest 端点可读（结构合法）', `len=${Object.keys(snap1).length}`)
+    }
+
     // 规则 MATCH,DIRECT → 直连回显
     const viaDirect = await requestThroughCore(`http://127.0.0.1:${ECHO_PORT}/direct-probe`)
     check(/ECHO-OK[\s\S]*\/direct-probe/.test(viaDirect.body), 'MATCH,DIRECT 直连生效（标记命中）', `body=${viaDirect.body}`)

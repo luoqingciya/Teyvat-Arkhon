@@ -174,6 +174,24 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
     </div>
 
     <div class="card glass">
+      <h3>{{ t('settings.autoStart') }}</h3>
+      <p class="hint">{{ t('settings.autoStartHint') }}</p>
+      <div class="switch-row">
+        <span class="row-label">{{ t('settings.autoStartOn') }}</span>
+        <button
+          class="switch"
+          :class="{ on: store.autoStart }"
+          role="switch"
+          :aria-checked="store.autoStart"
+          :disabled="store.busy"
+          @click="store.setAutoStart(!store.autoStart)"
+        >
+          <span class="knob"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card glass">
       <h3>{{ t('settings.netCheck') }}</h3>
       <p class="hint">{{ t('settings.netCheckHint') }}</p>
       <button class="btn primary" :disabled="store.netChecking" @click="store.runNetCheck()">

@@ -175,6 +175,12 @@ export class CoreService extends EventEmitter {
     return this.driver.testDelay(name, url, timeoutMs)
   }
 
+  /** 全部节点最近一次延迟快照（读取内核缓存，不触发测速） */
+  listDelaySnapshot(): Promise<Record<string, number | null>> {
+    if (!this.driver) return Promise.resolve({})
+    return this.driver.listDelaySnapshot()
+  }
+
   getConnections(): Promise<{
     downloadTotal: number
     uploadTotal: number

@@ -24,9 +24,17 @@ test('应用可启动并渲染主界面', async () => {
     // 默认进入总览页：内核状态卡片可见
     await expect(window.locator('.hero-text h1')).toBeVisible()
 
+    // 导航到订阅页：导入卡片与空态列表可见
+    await window.locator('.nav-item').nth(2).click()
+    await expect(window.locator('h3', { hasText: '导入订阅' })).toBeVisible()
+    await expect(window.locator('.empty')).toBeVisible()
+
     // 导航到设置页（第 6 项，最后一个是日志页）
     await window.locator('.nav-item').nth(5).click()
     await expect(window.locator('h3', { hasText: '外观与语言' })).toBeVisible()
+    // 设置页含自启/自动更新/网络自检等卡片
+    await expect(window.locator('h3', { hasText: '开机自启' })).toBeVisible()
+    await expect(window.locator('h3', { hasText: '订阅自动更新' })).toBeVisible()
 
     // 状态栏存在
     await expect(window.locator('.statusbar')).toBeVisible()
