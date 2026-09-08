@@ -14,7 +14,8 @@ import yaml from 'js-yaml'
 import {
   decodeProfilePayload,
   type ClashConfigSummary,
-  type Profile
+  type Profile,
+  type ProfileSubInfo
 } from '@teyvat-arkhon/shared'
 import { tryConvertUriProfile } from './uri-profiles'
 import { clashProxiesToUriList } from './uri-export'
@@ -165,11 +166,21 @@ export class ConfigManager {
     if (!res.ok) {
       throw new Error(`订阅下载失败: HTTP ${res.status}`)
     }
-    return this.importFromText(urlTextToName(url), decodeProfilePayload(await res.text()), url)
+    return this.importFromText(
+      urlTextToName(url),
+      decodeProfilePayload(await res.text()),
+      url,
+      parseSubscriptionUserinfo(res)
+    )
   }
 
-  /** 从文本内容导入订阅；url 可选（URL 导入时携带，用于刷新） */
-  async importFromText(name: string, text: string, url?: string): Promise<{ profile: Profile; summary: ClashConfigSummary }> {
+  /** 从文本内容导入订阅；url 可选（URL 导入时携带，用于刷新），subInfo 可选（URL 导入时解析配额头） */
+  async importFromText(
+    name: string,
+    text: string,
+    url?: string,
+    subInfo?: ProfileSubInfo
+  ): Promise<{ profile: Profile; summary: ClashConfigSummary }> {
     const decoded = decodeProfilePayload(text)
     // 非 YAML 内容：尝试识别单节点 URI 列表（如 hysteria2://），转换并应用排除关键词；未命中则按原文本校验
     const content = this.filterConverted(decoded)
@@ -182,7 +193,8 @@ export class ConfigManager {
       url,
       updatedAt: new Date().toISOString(),
       selected: false,
-      nodeCount: summary.proxies.length
+      nodeCount: summary.proxies.length,
+      subInfo
     }
 
     const list = await this.readIndex()
@@ -216,6 +228,7 @@ export class ConfigManager {
 
     profile.updatedAt = new Date().toISOString()
     profile.nodeCount = summary.proxies.length
+    profile.subInfo = parseSubscriptionUserinfo(res) ?? profile.subInfo
     await fs.writeFile(this.profileFile(id), content, 'utf-8')
     await this.writeIndex(list)
     return profile
@@ -386,6 +399,32 @@ async function exists(p: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * 解析订阅服务商返回的 subscription-userinfo 响应头。
+ * 常见格式：`upload=123; download=456; total=1024; expire=1700000000`
+ * 无法识别或缺少可读字段时返回 undefined。
+ */
+export function parseSubscriptionUserinfo(res: Response): ProfileSubInfo | undefined {
+  const raw = res.headers.get('subscription-userinfo')
+  if (!raw) return undefined
+  const out: ProfileSubInfo = {}
+  const isNum = (s: string): boolean => /^\d+$/.test(s)
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=')
+    if (idx <= 0) continue
+    const key = part.slice(0, idx).trim().toLowerCase()
+    const value = part.slice(idx + 1).trim()
+    if (key === 'upload' && isNum(value)) out.upload = Number(value)
+    else if (key === 'download' && isNum(value)) out.download = Number(value)
+    else if (key === 'total' && isNum(value)) out.total = Number(value)
+    else if (key === 'expire' && isNum(value)) out.expire = Number(value)
+  }
+  if (out.upload === undefined && out.download === undefined && out.total === undefined && out.expire === undefined) {
+    return undefined
+  }
+  return out
 }
 
 function escapeRegExp(s: string): string {

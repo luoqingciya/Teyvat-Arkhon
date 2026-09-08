@@ -98,7 +98,10 @@ const resources = {
         share: '分享',
         shareCopied: '已复制 {{n}} 条节点链接',
         shareEmpty: '档案内没有可分享的节点',
-        shareFailed: '复制失败'
+        shareFailed: '复制失败',
+        usedOfTotal: '已用 {{used}} / {{total}}',
+        expiresIn: '{{days}} 天后到期',
+        expired: '已到期'
       },
       connections: {
         title: '活跃连接',
@@ -176,6 +179,9 @@ const resources = {
         autoRefreshHint: '启动时立即刷新全部 URL 订阅，之后每 6 小时自动刷新一次；失败保留旧配置，成功自动热重载。',
         autoRefreshOn: '启用自动更新',
         refreshNow: '立即刷新',
+        autoStart: '开机自启',
+        autoStartHint: '登录系统时自动启动应用并最小化到托盘（使用系统登录项）。',
+        autoStartOn: '启用开机自启',
         excludeHint: '导入/刷新订阅时按关键词剔除节点（名称包含即跳过），逗号分隔；对单节点 URI 订阅生效。',
         excludePlaceholder: '如：Gift, Expire, 试用',
         excludeSave: '保存排除',
@@ -292,7 +298,10 @@ const resources = {
         share: 'Share',
         shareCopied: 'Copied {{n}} node links',
         shareEmpty: 'No shareable nodes in this profile',
-        shareFailed: 'Copy failed'
+        shareFailed: 'Copy failed',
+        usedOfTotal: 'Used {{used}} / {{total}}',
+        expiresIn: 'Expires in {{days}}d',
+        expired: 'Expired'
       },
       connections: {
         title: 'Active Connections',
@@ -375,6 +384,9 @@ const resources = {
         autoRefreshHint: 'Refresh all URL subscriptions on startup, then every 6 hours. Failed refreshes keep the old config; successes hot-reload.',
         autoRefreshOn: 'Enable auto-refresh',
         refreshNow: 'Refresh now',
+        autoStart: 'Launch at Login',
+        autoStartHint: 'Start the app automatically when you log in (minimized to tray, using the system login item).',
+        autoStartOn: 'Launch at login',
         excludeHint: 'Skip nodes whose name contains any keyword during subscription import/refresh (comma-separated); applies to URI-format subscriptions.',
         excludePlaceholder: 'e.g. Gift, Expire, Trial',
         excludeSave: 'Save exclusions',

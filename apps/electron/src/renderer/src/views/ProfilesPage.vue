@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
+import type { ProfileSubInfo } from '@teyvat-arkhon/shared'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
@@ -17,6 +18,35 @@ function fmtTime(iso: string): string {
   } catch {
     return iso
   }
+}
+
+/** 字节 -> 人类可读（B/KB/MB/GB/TB） */
+function fmtBytes(n: number): string {
+  if (n >= 1024 ** 4) return `${(n / 1024 ** 4).toFixed(2)} TB`
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(2)} GB`
+  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(2)} MB`
+  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${n} B`
+}
+
+/** 已用流量字节（upload + download），无数据返回 null */
+function usedBytes(s: ProfileSubInfo | undefined): number | null {
+  if (!s || (s.upload === undefined && s.download === undefined)) return null
+  return (s.upload ?? 0) + (s.download ?? 0)
+}
+
+function quotaPct(s: ProfileSubInfo | undefined): number {
+  const used = usedBytes(s)
+  if (used === null || !s?.total || s.total <= 0) return 0
+  return Math.min(100, Math.round((used / s.total) * 100))
+}
+
+/** 到期文案：>0 天显示剩余天数，已过期显示"已到期"；无到期信息返回 null */
+function expireText(s: ProfileSubInfo | undefined): string | null {
+  if (!s || s.expire === undefined || s.expire <= 0) return null
+  const days = (s.expire * 1000 - Date.now()) / 86400000
+  if (days < 0) return t('profiles.expired')
+  return t('profiles.expiresIn', { days: Math.ceil(days) })
 }
 
 /** 将档案节点导出为分享 URI 列表并复制到剪贴板 */
@@ -89,6 +119,19 @@ async function submitText(): Promise<void> {
             <span>{{ fmtTime(p.updatedAt) }}</span>
             <span v-if="p.url" class="sep">·</span>
             <span v-if="p.url" class="p-url">{{ p.url }}</span>
+          </div>
+          <div v-if="usedBytes(p.subInfo) !== null || expireText(p.subInfo)" class="p-quota">
+            <div v-if="usedBytes(p.subInfo) !== null" class="quota-line">
+              <span class="quota-text">
+                {{ t('profiles.usedOfTotal', { used: fmtBytes(usedBytes(p.subInfo)!), total: p.subInfo?.total ? fmtBytes(p.subInfo.total) : '∞' }) }}
+              </span>
+              <div v-if="p.subInfo?.total" class="quota-bar">
+                <div class="quota-fill" :class="{ warn: quotaPct(p.subInfo) > 80 }" :style="{ width: quotaPct(p.subInfo) + '%' }"></div>
+              </div>
+            </div>
+            <span v-if="expireText(p.subInfo)" class="quota-expire" :class="{ overdue: expireText(p.subInfo) === t('profiles.expired') }">
+              {{ expireText(p.subInfo) }}
+            </span>
           </div>
         </div>
         <div class="p-actions">
@@ -204,6 +247,51 @@ async function submitText(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.p-quota {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 460px;
+}
+.quota-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.quota-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.quota-bar {
+  flex: 1;
+  min-width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.quota-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #38bdf8, #34d399);
+  transition: width 0.3s;
+}
+.quota-fill.warn {
+  background: linear-gradient(90deg, #fbbf24, #f87171);
+}
+.quota-expire {
+  font-size: 12px;
+  color: var(--text-faint);
+  flex: none;
+}
+.quota-expire.overdue {
+  color: #f87171;
 }
 .p-actions {
   display: flex;

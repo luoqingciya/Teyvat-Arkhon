@@ -45,6 +45,9 @@ export interface CoreDriver {
   /** 测试节点/组延迟 */
   testDelay(name: string, url?: string, timeoutMs?: number): Promise<DelayResult>
 
+  /** 全部节点最近一次延迟测试快照（读取内核缓存，不触发测速）。值为 null 表示未测过 */
+  listDelaySnapshot(): Promise<Record<string, number | null>>
+
   /** 获取活跃连接与累计流量 */
   getConnections(): Promise<{ downloadTotal: number; uploadTotal: number; connections: ConnectionInfo[] }>
 

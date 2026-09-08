@@ -53,6 +53,8 @@ export interface ArkhonAPI {
   listProxies(): Promise<ProxyItem[]>
   selectProxy(groupName: string, nodeName: string): Promise<void>
   testDelay(name: string, url?: string, timeoutMs?: number): Promise<DelayResult>
+  /** 全部节点最近一次延迟快照（读取内核缓存，不触发测速） */
+  listDelaySnapshot(): Promise<Record<string, number | null>>
   /** 当前生效的路由规则列表（仅 rule 模式有实际路由语义） */
   listRules(): Promise<RuleInfo[]>
 
@@ -92,6 +94,12 @@ export interface ArkhonAPI {
   // ---------- 系统代理 ----------
   getSystemProxy(): Promise<SystemProxyState>
   setSystemProxy(enabled: boolean): Promise<SystemProxyState>
+
+  // ---------- 开机自启 ----------
+  /** 开机自启是否开启（系统登录项，主进程持久化） */
+  getAutoStart(): Promise<boolean>
+  /** 设置开机自启，返回操作后的实际状态 */
+  setAutoStart(enabled: boolean): Promise<boolean>
 
   // ---------- 应用 ----------
   getAppVersion(): Promise<string>

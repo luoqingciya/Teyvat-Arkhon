@@ -50,6 +50,8 @@ const api: ArkhonAPI = {
   selectProxy: (group, node) => ipcRenderer.invoke('proxies:select', group, node) as Promise<void>,
   testDelay: (name, url, timeoutMs) =>
     ipcRenderer.invoke('proxies:delay', name, url, timeoutMs) as Promise<DelayResult>,
+  listDelaySnapshot: () =>
+    ipcRenderer.invoke('proxies:delay-snapshot') as Promise<Record<string, number | null>>,
 
   listProfiles: () => ipcRenderer.invoke('profiles:list') as Promise<Profile[]>,
   importProfileFromUrl: (url) =>
@@ -85,6 +87,9 @@ const api: ArkhonAPI = {
 
   getSystemProxy: () => ipcRenderer.invoke('system-proxy:get') as Promise<SystemProxyState>,
   setSystemProxy: (enabled) => ipcRenderer.invoke('system-proxy:set', enabled) as Promise<SystemProxyState>,
+
+  getAutoStart: () => ipcRenderer.invoke('app:auto-start-get') as Promise<boolean>,
+  setAutoStart: (enabled) => ipcRenderer.invoke('app:auto-start-set', enabled) as Promise<boolean>,
 
   getAppVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   getDataInfo: () =>
