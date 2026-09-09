@@ -5,6 +5,8 @@ import StatusBar from './components/StatusBar.vue'
 import HomePage from './views/HomePage.vue'
 import ProxiesPage from './views/ProxiesPage.vue'
 import ProfilesPage from './views/ProfilesPage.vue'
+import RulesPage from './views/RulesPage.vue'
+import DnsPage from './views/DnsPage.vue'
 import ConnectionsPage from './views/ConnectionsPage.vue'
 import ConfigEditorPage from './views/ConfigEditorPage.vue'
 import SettingsPage from './views/SettingsPage.vue'
@@ -22,6 +24,8 @@ const store = useAppStore()
           <HomePage v-if="store.activeView === 'home'" key="home" />
           <ProxiesPage v-else-if="store.activeView === 'proxies'" key="proxies" />
           <ProfilesPage v-else-if="store.activeView === 'profiles'" key="profiles" />
+          <RulesPage v-else-if="store.activeView === 'rules'" key="rules" />
+          <DnsPage v-else-if="store.activeView === 'dns'" key="dns" />
           <ConnectionsPage v-else-if="store.activeView === 'connections'" key="connections" />
           <ConfigEditorPage v-else-if="store.activeView === 'config'" key="config" />
           <SettingsPage v-else-if="store.activeView === 'settings'" key="settings" />

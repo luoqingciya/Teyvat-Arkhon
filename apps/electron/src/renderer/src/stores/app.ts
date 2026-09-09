@@ -18,7 +18,7 @@ import type {
 } from '@teyvat-arkhon/shared'
 import { applyTheme, readTheme, type Theme } from '../theme'
 
-export type ViewKey = 'home' | 'proxies' | 'profiles' | 'connections' | 'config' | 'settings' | 'logs'
+export type ViewKey = 'home' | 'proxies' | 'profiles' | 'rules' | 'dns' | 'connections' | 'config' | 'settings' | 'logs'
 
 interface AppState {
   status: CoreStatus

@@ -14,11 +14,28 @@ import yaml from 'js-yaml'
 import {
   decodeProfilePayload,
   type ClashConfigSummary,
+  type DnsPresetMeta,
+  type DnsSettings,
   type Profile,
-  type ProfileSubInfo
+  type ProfileSubInfo,
+  type RuleDebugResult,
+  type RuleEditorState,
+  type RuleEntry,
+  type RuleLineValidation,
+  type RuleProvider,
+  type RuleProviderPreview
 } from '@teyvat-arkhon/shared'
 import { tryConvertUriProfile } from './uri-profiles'
 import { clashProxiesToUriList } from './uri-export'
+import {
+  applyRulesToConfig,
+  debugRulesMatch,
+  parseProvidersMap,
+  parseRulesArray,
+  strategyNamesOfSummary,
+  validateRules as validateRuleLines
+} from './rules-editor'
+import { applyDnsToConfig, listDnsPresetMetas, parseDnsSettings, validateDnsSettings } from './dns-editor'
 
 export interface ConfigManagerOptions {
   profilesDir: string
@@ -311,6 +328,109 @@ export class ConfigManager {
     }
     return this.parseAndValidate(next)
   }
+
+  /** 读取当前工作配置的 dns 段，解析为结构化编辑状态（文件缺失返回默认空态） */
+  async readActiveDns(): Promise<DnsSettings> {
+    if (!(await exists(this.activeConfigFile))) return emptyDns()
+    let cfg: unknown
+    try {
+      cfg = yaml.load(await fs.readFile(this.activeConfigFile, 'utf-8'))
+    } catch {
+      return emptyDns()
+    }
+    if (!isRecord(cfg)) return emptyDns()
+    return parseDnsSettings(cfg)
+  }
+
+  /** 将结构化 dns 段序列化写回工作配置（文本级替换，保留其它内容） */
+  async writeActiveDns(settings: DnsSettings): Promise<ClashConfigSummary> {
+    if (!(await exists(this.activeConfigFile))) throw new Error('没有可用的工作配置，请先选择订阅')
+    const issues = validateDnsSettings(settings)
+    if (issues.length) throw new Error(`DNS 配置不合法：${issues[0]}`)
+    const raw = await fs.readFile(this.activeConfigFile, 'utf-8')
+    const { text } = applyDnsToConfig(raw, settings)
+    await fs.writeFile(this.activeConfigFile, text, 'utf-8')
+    return this.parseAndValidate(text)
+  }
+
+  /** 列出所有内置 DNS 分流预设元信息 */
+  listDnsPresets(): DnsPresetMeta[] {
+    return listDnsPresetMetas()
+  }
+
+  // ---------- 可视化分流规则编辑器 ----------
+
+  /** 读取当前工作配置的 rules 与 rule-providers，解析为结构化编辑状态（文件缺失返回空态） */
+  async readActiveRules(): Promise<RuleEditorState> {
+    if (!(await exists(this.activeConfigFile))) return { rules: [], providers: [] }
+    let cfg: unknown
+    try {
+      cfg = yaml.load(await fs.readFile(this.activeConfigFile, 'utf-8'))
+    } catch {
+      return { rules: [], providers: [] }
+    }
+    if (!isRecord(cfg)) return { rules: [], providers: [] }
+    return {
+      rules: parseRulesArray((cfg as Record<string, unknown>).rules),
+      providers: parseProvidersMap((cfg as Record<string, unknown>)['rule-providers'])
+    }
+  }
+
+  /** 将结构化 rules/rule-providers 序列化写回工作配置（文本级替换，保留其它内容）并热重载 */
+  async writeActiveRules(state: RuleEditorState): Promise<ClashConfigSummary> {
+    if (!(await exists(this.activeConfigFile))) throw new Error('没有可用的工作配置，请先选择订阅')
+    const raw = await fs.readFile(this.activeConfigFile, 'utf-8')
+    const { text } = applyRulesToConfig(raw, state.rules ?? [], state.providers ?? [])
+    await fs.writeFile(this.activeConfigFile, text, 'utf-8')
+    return this.parseAndValidate(text)
+  }
+
+  /** 校验一段规则：返回逐条结果（strategy 引用按当前工作配置的节点/组名判定） */
+  async validateRuleLines(rules: RuleEntry[]): Promise<RuleLineValidation[]> {
+    const summary = await this.getActiveSummary()
+    return validateRuleLines(rules, strategyNamesOfSummary(summary))
+  }
+
+  /**
+   * 预览规则集内容（前 N 行 + 总行数）：
+   *  - http 型：下载远程内容（仅展示，不落盘）
+   *  - file 型：读取配置目录下的本地文件
+   */
+  async previewRuleProvider(provider: RuleProvider): Promise<RuleProviderPreview> {
+    const name = provider.name || '未命名规则集'
+    let content = ''
+    if (provider.type === 'file') {
+      const rel = provider.file ?? ''
+      const filePath = path.isAbsolute(rel) ? rel : path.join(path.dirname(this.activeConfigFile), rel)
+      try {
+        content = await fs.readFile(filePath, 'utf-8')
+      } catch (e) {
+        return { name, remote: false, count: 0, lines: [], error: `读取本地规则集失败: ${(e as Error).message}` }
+      }
+    } else {
+      const url = provider.url ?? ''
+      if (!url) return { name, remote: true, count: 0, lines: [], error: '缺少远程规则集 URL' }
+      try {
+        const res = await fetch(url)
+        if (!res.ok) {
+          return { name, remote: true, count: 0, lines: [], error: `下载失败: HTTP ${res.status}` }
+        }
+        content = await res.text()
+      } catch (e) {
+        return { name, remote: true, count: 0, lines: [], error: `下载失败: ${(e as Error).message}` }
+      }
+    }
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+    return { name, remote: provider.type === 'http', count: lines.length, lines: lines.slice(0, 30) }
+  }
+
+  /** 对目标做规则命中调试（尽力匹配） */
+  debugRuleMatch(target: string, rules: RuleEntry[]): RuleDebugResult {
+    return debugRulesMatch(target, rules ?? [])
+  }
 }
 
 function numberVal(v: unknown): number | undefined {
@@ -429,4 +549,18 @@ export function parseSubscriptionUserinfo(res: Response): ProfileSubInfo | undef
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 默认空 DNS 状态（不写入配置，仅编辑期占位） */
+function emptyDns(): DnsSettings {
+  return {
+    enable: false,
+    enhancedMode: 'redir-host',
+    ipv6: false,
+    fakeIpRange: '198.18.0.1/16',
+    defaultNameserver: [],
+    nameserver: [],
+    fallback: [],
+    nameserverPolicy: []
+  }
 }

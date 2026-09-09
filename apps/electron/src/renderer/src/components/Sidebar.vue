@@ -12,6 +12,8 @@ const items: Array<{ key: ViewKey; icon: string }> = [
     icon: 'M7 4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9l-4-5H7zm9 7h-4V7l4 4zM8 13h4v5H8v-5z'
   },
   { key: 'profiles', icon: 'M6 3h9l4 4v14H6V3zm8 1.5V8h3.5L14 4.5zM8 12h8v1.5H8V12zm0 3.5h8V17H8v-1.5z' },
+  { key: 'rules', icon: 'M4 5h16v2.5l-6 6V21h-4v-7.5l-6-6V5zM7 6l5 5 5-5' },
+  { key: 'dns', icon: 'M12 3a9 9 0 1 0 9 9H12V3zM12 3v8h8M5.5 12a6.5 6.5 0 0 0 9.2 5.9A6.5 6.5 0 0 0 12 5.5' },
   { key: 'connections', icon: 'M6 10.5h12l-1.2-2H7.2L6 10.5zM4.6 7h14.8l1.6 2.6-2.3 8.9h-14L2.9 9.6zM9 13h6v1.5H9z' },
   { key: 'config', icon: 'M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z' },
   {
