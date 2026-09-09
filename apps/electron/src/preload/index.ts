@@ -5,12 +5,19 @@ import type {
   ConnectionInfo,
   CoreStatus,
   DelayResult,
+  DnsPresetMeta,
+  DnsSettings,
   LoopbackState,
   NetProbeResult,
   Profile,
   ProxyItem,
   ProxyMode,
+  RuleDebugResult,
+  RuleEditorState,
   RuleInfo,
+  RuleLineValidation,
+  RulePresetMeta,
+  RuleProviderPreview,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -36,6 +43,21 @@ const api: ArkhonAPI = {
   getActiveConfig: () => ipcRenderer.invoke('config:get-active') as Promise<string>,
   saveActiveConfig: (content) =>
     ipcRenderer.invoke('config:save-active', content) as Promise<ClashConfigSummary>,
+
+  getRuleEditorState: () => ipcRenderer.invoke('rules:editor-get') as Promise<RuleEditorState>,
+  saveRuleEditorState: (state) =>
+    ipcRenderer.invoke('rules:editor-save', state) as Promise<ClashConfigSummary>,
+  validateRuleLines: (rules) => ipcRenderer.invoke('rules:validate', rules) as Promise<RuleLineValidation[]>,
+  previewRuleProvider: (provider) =>
+    ipcRenderer.invoke('rules:provider-preview', provider) as Promise<RuleProviderPreview>,
+  debugRuleHit: (target, rules) =>
+    ipcRenderer.invoke('rules:debug-hit', target, rules) as Promise<RuleDebugResult>,
+  listRulePresets: () => ipcRenderer.invoke('rules:presets') as Promise<RulePresetMeta[]>,
+
+  getDnsState: () => ipcRenderer.invoke('dns:get') as Promise<DnsSettings>,
+  saveDnsState: (settings) =>
+    ipcRenderer.invoke('dns:save', settings) as Promise<ClashConfigSummary>,
+  listDnsPresets: () => ipcRenderer.invoke('dns:presets') as Promise<DnsPresetMeta[]>,
 
   getTunEnabled: () => ipcRenderer.invoke('core:get-tun') as Promise<boolean>,
   setTunEnabled: (enabled) =>

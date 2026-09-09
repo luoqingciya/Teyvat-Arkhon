@@ -5,8 +5,25 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.2.0] - 2026-09-09
+
+### Added
+- **可视化分流规则编辑器**：新增「分流规则」页，四类 Tab 一体化管理生效配置的 `rules` 与 `rule-providers`
+  - **规则编辑**：表格化编辑规则（类型/目标/策略），支持上下移、删除、行级校验（类型合法性、三段格式、策略引用），实时展示内核命中数；保存即文本级替换工作配置并热重载，与「配置」页 YAML 双写双同步
+  - **规则集管理**：远程 HTTP / 本地文件两种 rule-provider 的增删与在线预览，规则中可 `RULE-SET,<名称>` 引用
+  - **内置分流预设**：本地局域网直连、广告拦截、流媒体/AI 走代理、中国大陆直连等模板一键套用（直连预设自动插至 MATCH 之前）
+  - **规则命中调试**：输入域名/IP 逐步模拟匹配，标出命中的第一条与顺序；GEOIP/GEOSITE/规则集等需内核数据的项明确标注"交内核判定"
+- **DNS 分流联动**：新增「DNS 分流」页，可视化配置解析通道与域名级策略，解决"规则能到但 DNS 解析不对"这一分流生效的前提
+  - **解析通道**：启用开关、IPv6 优先、增强模式（redir-host / fake-ip）、fake-ip 地址池、default-nameserver / nameserver / fallback 多行编辑，校验并热重载
+  - **域名策略**：nameserver-policy 图形化增删改（如 `.cn → 223.5.5.5`、`geosite:cn → 114.114.114.114`）
+  - **内置 DNS 分流预设**：fake-ip + 国内直连兜底、redir-host 公平分流、极简直连三套模板一键套用
+  - 字段全部对齐内核 `RawDNS`，保存即写回工作配置 `dns:` 段并热重载
+
+验证：typecheck / 单测（新增 dns-editor 9 项 + rules-editor 解析/校验/调试若干）/ electron-vite 构建 / UI 冒烟（导航项 8→9，新增 DNS 分流页断言）全绿。
 
 ## [1.1.0] - 2026-09-08
 

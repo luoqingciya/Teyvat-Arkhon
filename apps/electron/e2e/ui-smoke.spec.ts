@@ -19,7 +19,7 @@ test('应用可启动并渲染主界面', async () => {
 
     // 品牌与导航
     await expect(window.locator('.brand-name')).toHaveText('Teyvat Arkhon')
-    await expect(window.locator('.nav-item')).toHaveCount(7)
+    await expect(window.locator('.nav-item')).toHaveCount(9)
 
     // 默认进入总览页：内核状态卡片可见
     await expect(window.locator('.hero-text h1')).toBeVisible()
@@ -29,8 +29,18 @@ test('应用可启动并渲染主界面', async () => {
     await expect(window.locator('h3', { hasText: '导入订阅' })).toBeVisible()
     await expect(window.locator('.empty')).toBeVisible()
 
-    // 导航到设置页（第 6 项，最后一个是日志页）
-    await window.locator('.nav-item').nth(5).click()
+    // 导航到分流规则页：页面头与 4 个 Tab 可见（未选档案时显示引导空态）
+    await window.locator('.nav-item').nth(3).click()
+    await expect(window.locator('h3', { hasText: '分流规则' })).toBeVisible()
+    await expect(window.locator('.tab')).toHaveCount(4)
+
+    // 导航到 DNS 分流页：页面头与 3 个 Tab 可见
+    await window.locator('.nav-item').nth(4).click()
+    await expect(window.locator('h3', { hasText: 'DNS 分流' })).toBeVisible()
+    await expect(window.locator('.tab')).toHaveCount(3)
+
+    // 导航到设置页（第 7 项，最后一个是日志页）
+    await window.locator('.nav-item').nth(7).click()
     await expect(window.locator('h3', { hasText: '外观与语言' })).toBeVisible()
     // 设置页含自启/自动更新/网络自检等卡片
     await expect(window.locator('h3', { hasText: '开机自启' })).toBeVisible()

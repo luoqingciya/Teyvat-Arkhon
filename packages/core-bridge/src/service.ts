@@ -10,12 +10,22 @@ import type {
   CoreState,
   CoreStatus,
   DelayResult,
+  DnsPresetMeta,
+  DnsSettings,
   MihomoVersion,
   Profile,
   ProxyItem,
   ProxyMode,
-  RuleInfo
+  RuleDebugResult,
+  RuleEditorState,
+  RuleEntry,
+  RuleInfo,
+  RuleLineValidation,
+  RulePresetMeta,
+  RuleProvider,
+  RuleProviderPreview
 } from '@teyvat-arkhon/shared'
+import { RULE_PRESETS } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
 import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
 import { ConfigManager } from './config-manager'
@@ -289,6 +299,59 @@ export class CoreService extends EventEmitter {
   /** 当前工作配置是否启用 TUN */
   async getTunEnabled(): Promise<boolean> {
     return (await this.config.getActiveSummary())?.tunEnabled ?? false
+  }
+
+  // ---------- 可视化分流规则编辑器 ----------
+
+  /** 读取当前工作配置的 rules 与 rule-providers（结构化编辑状态） */
+  getRuleEditorState(): Promise<RuleEditorState> {
+    return this.config.readActiveRules()
+  }
+
+  /** 保存结构化 rules/rule-providers 到工作配置并热重载（内核运行中时） */
+  async saveRuleEditorState(state: RuleEditorState): Promise<ClashConfigSummary> {
+    const summary = await this.config.writeActiveRules(state)
+    await this.reloadActive()
+    return summary
+  }
+
+  /** 逐条校验规则（按当前工作配置的节点/组名做策略引用检查） */
+  validateRuleLines(rules: RuleEntry[]): Promise<RuleLineValidation[]> {
+    return this.config.validateRuleLines(rules)
+  }
+
+  /** 预览规则集内容（http 远程 / file 本地） */
+  previewRuleProvider(provider: RuleProvider): Promise<RuleProviderPreview> {
+    return this.config.previewRuleProvider(provider)
+  }
+
+  /** 对目标做规则命中调试（尽力匹配） */
+  debugRuleMatch(target: string, rules: RuleEntry[]): RuleDebugResult {
+    return this.config.debugRuleMatch(target, rules)
+  }
+
+  /** 内置分流预设模板元信息列表 */
+  listRulePresets(): RulePresetMeta[] {
+    return RULE_PRESETS.map(({ id, name, desc }) => ({ id, name, desc }))
+  }
+
+  // ---------- DNS 分流联动 ----------
+
+  /** 读取当前工作配置的 dns 段（结构化编辑状态） */
+  getDnsState(): Promise<DnsSettings> {
+    return this.config.readActiveDns()
+  }
+
+  /** 保存结构化 dns 段到工作配置并热重载（内核运行中时） */
+  async saveDnsState(settings: DnsSettings): Promise<ClashConfigSummary> {
+    const summary = await this.config.writeActiveDns(settings)
+    await this.reloadActive()
+    return summary
+  }
+
+  /** 内置 DNS 分流预设模板元信息列表 */
+  listDnsPresets(): DnsPresetMeta[] {
+    return this.config.listDnsPresets()
   }
 }
 

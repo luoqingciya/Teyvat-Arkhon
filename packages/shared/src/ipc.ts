@@ -8,7 +8,14 @@ import type {
   Profile,
   ProxyItem,
   ProxyMode,
+  RuleDebugResult,
+  RuleEditorState,
   RuleInfo,
+  RuleLineValidation,
+  RulePresetMeta,
+  RuleProviderPreview,
+  DnsPresetMeta,
+  DnsSettings,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot
@@ -39,6 +46,27 @@ export interface ArkhonAPI {
   // ---------- 配置编辑器 ----------
   getActiveConfig(): Promise<string>
   saveActiveConfig(content: string): Promise<ClashConfigSummary>
+
+  // ---------- 可视化分流规则编辑器 ----------
+  /** 读取当前工作配置中的 rules 和 rule-providers，解析为结构化 */
+  getRuleEditorState(): Promise<RuleEditorState>
+  /** 将结构化 rules 和 rule-providers 序列化后写入工作配置并热重载 */
+  saveRuleEditorState(state: RuleEditorState): Promise<ClashConfigSummary>
+  /** 对当前结构化规则做行级校验（空串不报错，但给警告提示） */
+  validateRuleLines(rules: { type: string; payload: string; proxy: string }[]): Promise<RuleLineValidation[]>
+  /** 预览规则集（远程 HTTP 规则集或本地规则集）返回前 N 行，用于编辑校验 */
+  previewRuleProvider(provider: { type: 'http' | 'file'; url?: string; file?: string }): Promise<RuleProviderPreview>
+  /** 对目标域名/IP 做规则命中调试（模拟匹配顺序逐步检测） */
+  debugRuleHit(target: string, rules: { type: string; payload: string; proxy: string }[]): Promise<RuleDebugResult>
+  /** 返回所有内置分流预设的元信息 */
+  listRulePresets(): Promise<RulePresetMeta[]>
+
+  /** 读取当前工作配置中的 dns 段，解析为结构化状态 */
+  getDnsState(): Promise<DnsSettings>
+  /** 将结构化 dns 段序列化后写入工作配置并热重载 */
+  saveDnsState(settings: DnsSettings): Promise<ClashConfigSummary>
+  /** 返回所有内置 DNS 分流预设的元信息 */
+  listDnsPresets(): Promise<DnsPresetMeta[]>
 
   // ---------- TUN 模式 ----------
   getTunEnabled(): Promise<boolean>

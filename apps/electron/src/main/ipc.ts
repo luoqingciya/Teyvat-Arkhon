@@ -53,6 +53,19 @@ export function createIpc(
   ipcMain.handle('config:get-active', () => service.getActiveConfig())
   ipcMain.handle('config:save-active', (_e, content: string) => service.saveActiveConfig(content))
 
+  // 可视化分流规则编辑器
+  ipcMain.handle('rules:editor-get', () => service.getRuleEditorState())
+  ipcMain.handle('rules:editor-save', (_e, state) => service.saveRuleEditorState(state))
+  ipcMain.handle('rules:validate', (_e, rules) => service.validateRuleLines(rules))
+  ipcMain.handle('rules:provider-preview', (_e, provider) => service.previewRuleProvider(provider))
+  ipcMain.handle('rules:debug-hit', (_e, target: string, rules) => service.debugRuleMatch(target, rules))
+  ipcMain.handle('rules:presets', () => service.listRulePresets())
+
+  // DNS 分流联动
+  ipcMain.handle('dns:get', () => service.getDnsState())
+  ipcMain.handle('dns:save', (_e, settings) => service.saveDnsState(settings))
+  ipcMain.handle('dns:presets', () => service.listDnsPresets())
+
   ipcMain.handle('core:get-tun', () => service.getTunEnabled())
   ipcMain.handle('core:set-tun', (_e, enabled: boolean) => service.setTunEnabled(enabled))
 

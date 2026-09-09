@@ -12,7 +12,7 @@ export type Lang = 'zh-CN' | 'en-US'
 const resources = {
   'zh-CN': {
     translation: {
-      nav: { home: '总览', proxies: '代理', profiles: '订阅', connections: '连接', config: '配置', settings: '设置', logs: '日志' },
+      nav: { home: '总览', proxies: '代理', profiles: '订阅', connections: '连接', config: '配置', settings: '设置', logs: '日志', rules: '分流规则', dns: 'DNS 分流' },
       status: {
         stopped: '已停止',
         starting: '启动中',
@@ -207,12 +207,116 @@ const resources = {
         license: '协议',
         licenseText: '许可证文本'
       },
-      common: { apply: '应用', cancel: '取消', save: '保存' }
+      common: { apply: '应用', cancel: '取消', save: '保存' },
+      rules: {
+        title: '分流规则',
+        hint: '可视化编辑生效配置的 rules 与 rule-providers，保存即热重载。与「配置」页的 YAML 编辑双写同一份工作配置。',
+        tabs: { editor: '规则编辑', providers: '规则集', presets: '预设模板', debug: '命中调试' },
+        editor: {
+          noConfig: '暂无生效配置。请先在「订阅」页导入并选为一个档案作为当前使用。',
+          placeholder: '暂无规则。点击"添加规则"开始构建。',
+          type: '类型',
+          payload: '目标',
+          proxy: '策略',
+          hits: '命中',
+          actions: '操作',
+          up: '上移',
+          down: '下移',
+          remove: '删除',
+          add: '添加规则',
+          save: '保存规则',
+          validate: '校验',
+          saved: '已保存并热重载',
+          allOk: '全部规则格式合法',
+          issues: '存在 {{n}} 条待确认项（详见提示）',
+          noStrategy: '策略不存在',
+          noPayload: '缺少匹配目标',
+          emptyType: '类型为空',
+          matcherHint: 'MATCH 建议放在末尾',
+          matchFirst: '（已匹配，其后规则不生效）'
+        },
+        providers: {
+          title: '规则集（rule-providers）',
+          hint: '远程 HTTP 或本地文件规则集。规则中可用「RULE-SET,<规则集名>」引用。',
+          noConfig: '暂无生效配置，无法管理规则集。',
+          empty: '尚未配置规则集。',
+          name: '名称',
+          typeRemote: '远程(HTTP)',
+          typeLocal: '本地(文件)',
+          behaviorDomain: '域名',
+          behaviorIp: 'IP 网段',
+          url: 'URL',
+          path: '路径',
+          interval: '刷新(分)',
+          add: '新增规则集',
+          remove: '删除',
+          preview: '预览',
+          previewTitle: '规则集预览',
+          count: '共 {{count}} 条',
+          error: '获取失败'
+        },
+        presets: {
+          title: '内置分流预设',
+          hint: '一键将常见分流场景模板插入到规则列表顶部，之后可继续手工调整。',
+          apply: '应用',
+          policyPrompt: '该模板需要指定目标策略（代理组/节点名）用于替换 {name} 占位：',
+          applied: '已应用模板 "{{name}}"'
+        },
+        debug: {
+          title: '规则命中调试',
+          hint: '输入域名或 IP，模拟按顺序匹配规则，标出命中的第一条。GEOIP/GEOSITE/规则集等需内核数据，其余按静态度量尽力匹配。',
+          target: '目标域名 / IP',
+          run: '开始调试',
+          matched: '命中',
+          none: '未命中任何规则',
+          method: '匹配方式',
+          step: '#',
+          rule: '规则'
+        }
+      },
+      dns: {
+        title: 'DNS 分流',
+        hint: '配置解析通道（nameserver / fallback）与域名级策略（nameserver-policy），决定域名用国内还是国外 DNS 解析，是分流规则生效的前提。保存即热重载，与「配置」页双写同一份工作配置。',
+        tabs: { basic: '解析通道', policy: '域名策略', presets: '预设模板' },
+        basic: {
+          noConfig: '暂无生效配置。请先在「订阅」页导入并选为一个档案作为当前使用。',
+          enable: '启用 DNS 配置',
+          ipv6: '优先 IPv6',
+          mode: '增强模式',
+          modeRedir: 'redir-host（保留真实 IP）',
+          modeFake: 'fake-ip（虚拟 IP，加速+抗污染）',
+          fakeIpRange: 'fake-ip 地址池',
+          defaultNs: '默认解析（内核回退用，纯地址）',
+          nameserver: '主用解析（nameserver）',
+          fallback: '兜底解析（fallback）',
+          addNs: '添加',
+          save: '保存并热重载',
+          saved: '已保存并热重载',
+          placeholders: {
+            server: '如 https://doh.pub/dns-query 或 223.5.5.5'
+          }
+        },
+        policy: {
+          title: '域名级解析策略（nameserver-policy）',
+          hint: '将特定域名/后缀/geosite 指向指定解析通道。例如 `.cn → 223.5.5.5`、`geosite:cn → 114.114.114.114`。',
+          empty: '暂无策略。添加后域名将统一走主用解析。',
+          domain: '域名 / 后缀 / geosite',
+          server: '解析通道',
+          add: '新增策略',
+          remove: '删除'
+        },
+        presets: {
+          title: '内置 DNS 分流预设',
+          hint: '一键套用常见 DNS 分流模板，随后可手工微调。',
+          apply: '应用模板',
+          applied: '已套用模板 "{{name}}"'
+        }
+      },
     }
   },
   'en-US': {
     translation: {
-      nav: { home: 'Home', proxies: 'Proxies', profiles: 'Subscriptions', connections: 'Connections', config: 'Config', settings: 'Settings', logs: 'Logs' },
+      nav: { home: 'Home', proxies: 'Proxies', profiles: 'Subscriptions', connections: 'Connections', config: 'Config', settings: 'Settings', logs: 'Logs', rules: 'Rules', dns: 'DNS Split' },
       status: {
         stopped: 'Stopped',
         starting: 'Starting',
@@ -412,7 +516,111 @@ const resources = {
         license: 'License',
         licenseText: 'License text'
       },
-      common: { apply: 'Apply', cancel: 'Cancel', save: 'Save' }
+      common: { apply: 'Apply', cancel: 'Cancel', save: 'Save' },
+      rules: {
+        title: 'Routing Rules',
+        hint: 'Visually edit the `rules` and `rule-providers` of the active config. Saving hot-reloads. It writes the same working config as the YAML editor in "Config".',
+        tabs: { editor: 'Editor', providers: 'Rule Sets', presets: 'Templates', debug: 'Trace' },
+        editor: {
+          noConfig: 'No active config. Import a subscription and set it as current in "Subscriptions" first.',
+          placeholder: 'No rules yet. Click "Add rule" to start.',
+          type: 'Type',
+          payload: 'Payload',
+          proxy: 'Policy',
+          hits: 'Hits',
+          actions: 'Actions',
+          up: 'Up',
+          down: 'Down',
+          remove: 'Remove',
+          add: 'Add rule',
+          save: 'Save rules',
+          validate: 'Validate',
+          saved: 'Saved and hot-reloaded',
+          allOk: 'All rules are valid',
+          issues: '{{n}} item(s) need attention (see hints)',
+          noStrategy: 'Policy not found',
+          noPayload: 'Payload missing',
+          emptyType: 'Type is empty',
+          matcherHint: 'MATCH should be last',
+          matchFirst: '(matched earlier; later rules inactive)'
+        },
+        providers: {
+          title: 'Rule Sets (rule-providers)',
+          hint: 'Remote HTTP or local file rule providers. Reference them in rules with "RULE-SET,<name>".',
+          noConfig: 'No active config to manage rule sets.',
+          empty: 'No rule providers configured.',
+          name: 'Name',
+          typeRemote: 'Remote (HTTP)',
+          typeLocal: 'Local (file)',
+          behaviorDomain: 'Domain',
+          behaviorIp: 'IP CIDR',
+          url: 'URL',
+          path: 'Path',
+          interval: 'Refresh (min)',
+          add: 'Add rule set',
+          remove: 'Remove',
+          preview: 'Preview',
+          previewTitle: 'Rule set preview',
+          count: '{{count}} entries',
+          error: 'Failed to fetch'
+        },
+        presets: {
+          title: 'Built-in Templates',
+          hint: 'Insert a common routing scenario template to the top of the rule list, then fine-tune manually.',
+          apply: 'Apply',
+          policyPrompt: 'This template needs a target policy (proxy group / node) to replace {name}:',
+          applied: 'Template "{{name}}" applied'
+        },
+        debug: {
+          title: 'Rule Trace',
+          hint: 'Enter a domain or IP and simulate matching in order to find the first hit. GEOIP/GEOSITE/rule sets need kernel data; others are matched best-effort.',
+          target: 'Target domain / IP',
+          run: 'Run trace',
+          matched: 'Matched',
+          none: 'No rule matched',
+          method: 'Method',
+          step: '#',
+          rule: 'Rule'
+        }
+      },
+      dns: {
+        title: 'DNS Split',
+        hint: 'Configure resolver channels (nameserver / fallback) and per-domain policies (nameserver-policy) that decide whether a domain resolves via domestic or foreign DNS. Saving hot-reloads and writes the same working config as the YAML editor in "Config".',
+        tabs: { basic: 'Resolvers', policy: 'Domain Policy', presets: 'Presets' },
+        basic: {
+          noConfig: 'No active config. Import a subscription in the "Subscriptions" page and select it first.',
+          enable: 'Enable DNS config',
+          ipv6: 'Prefer IPv6',
+          mode: 'Enhanced mode',
+          modeRedir: 'redir-host (keep real IP)',
+          modeFake: 'fake-ip (virtual IP, faster + anti-pollution)',
+          fakeIpRange: 'fake-ip pool',
+          defaultNs: 'Default resolvers (fallback addresses for the core)',
+          nameserver: 'Primary resolvers (nameserver)',
+          fallback: 'Fallback resolvers (fallback)',
+          addNs: 'Add',
+          save: 'Save & hot-reload',
+          saved: 'Saved & hot-reloaded',
+          placeholders: {
+            server: 'e.g. https://doh.pub/dns-query or 223.5.5.5'
+          }
+        },
+        policy: {
+          title: 'Per-domain resolver policy (nameserver-policy)',
+          hint: 'Route specific domains/suffixes/geosite to a chosen resolver channel, e.g. `.cn → 223.5.5.5`, `geosite:cn → 114.114.114.114`.',
+          empty: 'No policy yet. Domains will use the primary resolver.',
+          domain: 'Domain / suffix / geosite',
+          server: 'Resolver channel',
+          add: 'Add policy',
+          remove: 'Remove'
+        },
+        presets: {
+          title: 'Built-in DNS split presets',
+          hint: 'Apply a common DNS split template in one click, then fine-tune manually.',
+          apply: 'Apply preset',
+          applied: 'Preset "{{name}}" applied'
+        }
+      },
     }
   }
 }
