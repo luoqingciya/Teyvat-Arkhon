@@ -16,17 +16,23 @@
 
 import { type App } from 'electron'
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 export const PORTABLE_MARKER = 'portable.txt'
 export const PORTABLE_DATA_DIR = 'data'
-/** NSIS 卸载注册表键名（electron-builder 默认取 appId，写入 HKCU 或 HKLM） */
-const APP_ID = 'com.teyvat.arkhon'
+/** electron-builder productName（NSIS 注册表 DisplayName 用） */
+const PRODUCT_NAME = 'Teyvat Arkhon'
 
-/** 应用可执行/运行根目录（打包为 exe 同级，开发期为仓库 apps/electron） */
+/**
+ * 应用可执行/运行根目录：
+ *  - 打包后 = exe 所在目录（安装根目录）。
+ *    注意：app.getAppPath() 打包后指向 resources/app.asar，dirname 会取到 resources，
+ *    导致便携判定/数据目录整体错位（历史 bug），必须用 process.execPath。
+ *  - 开发期 = 仓库 apps/electron。
+ */
 export function appRootDir(appHandle: App): string {
-  if (appHandle.isPackaged) return dirname(appHandle.getAppPath())
+  if (appHandle.isPackaged) return dirname(process.execPath)
   return appHandle.getAppPath()
 }
 
@@ -44,34 +50,29 @@ function dirWritable(dir: string): boolean {
 
 /**
  * Windows NSIS 安装版探测（区分安装版与手动解压的 zip 便携包）：
- *  - 注册表卸载键存在（HKCU 或 HKLM）
+ *  - 注册表卸载键（electron-builder 卸载键名为 GUID 且不可预测），
+ *    按 DisplayName 全文搜索 "Teyvat Arkhon" 命中（HKCU 与 HKLM）
  *  - 或安装目录存在 Uninstall <产品名>.exe
  * 安装版即使安装目录可写也禁用"自动便携"，避免自动更新卸载时整目录删除丢数据。
  */
 export function isNsisWindowsInstall(appHandle: App): boolean {
   if (process.platform !== 'win32' || !appHandle.isPackaged) return false
-  try {
-    const cache = execFileSync('reg', ['query', `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${APP_ID}`], {
-      stdio: 'ignore',
-      windowsHide: true
-    })
-    if (cache.length > 0) return true
-  } catch {
-    /* 键不存在 */
+  const uninstallKey = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+  for (const root of ['HKCU', 'HKLM']) {
+    try {
+      const out = execFileSync(
+        'reg',
+        ['query', `${root}\\${uninstallKey}`, '/s', '/f', PRODUCT_NAME],
+        { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+      )
+      if (/Teyvat Arkhon/i.test(out)) return true
+    } catch {
+      /* 无匹配 */
+    }
   }
+  // 卸载程序痕迹兜底（oneClick: false 会产生 "Uninstall <产品名>.exe"，位于 exe 同级）
   try {
-    execFileSync('reg', ['query', `HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${APP_ID}`], {
-      stdio: 'ignore',
-      windowsHide: true
-    })
-    return true
-  } catch {
-    /* 键不存在 */
-  }
-  // 卸载程序痕迹兜底（oneClick: false 会产生 "Uninstall <产品名>.exe"）
-  try {
-    const root = appRootDir(appHandle)
-    return readdirSync(root).some((f) => /^uninstall.*\.exe$/i.test(f))
+    return readdirSync(appRootDir(appHandle)).some((f) => /^uninstall.*\.exe$/i.test(f))
   } catch {
     return false
   }
@@ -92,19 +93,12 @@ export function isPortableMode(appHandle: App, env = process.env): boolean {
 }
 
 /**
- * 未设置 userData 前系统默认的数据目录（Windows: %APPDATA%\<产品名>）。
- * 便携模式下 app.getPath('userData') 已被重定向，迁移目标需取此原始路径。
- */
-export function defaultUserDataDir(appHandle: App): string {
-  return join(appHandle.getPath('appData'), appHandle.getName())
-}
-
-/**
- * 便携数据迁移（退出时调用）：旧版安装版曾被误判为便携、数据在运行目录 data/ 下，
- * 修复判定后新版本使用系统 userData。退出前把 data/ 迁到系统目录，
- * 使自动更新（NSIS 卸载安装目录）与正常升级都不再丢失配置。
- * 触发条件：NSIS 安装版 + 运行目录存在 data/（即曾被误判便携）+ 非显式便携标记。
- * 安全策略：目标目录不存在或为空才迁移；成功后删除源目录。
+ * 便携数据迁移：旧版曾因路径 bug 把数据写到安装目录的 data/（含 resources/data），
+ * 新版本改为系统 userData。本函数把遗留 data 并入当前 userData，成功后删除源目录，
+ * 使自动更新（NSIS 卸载）与正常升级都不再丢配置。
+ * 候选源：exe 同级 data/ 与 resources/data/（历史误判便携的落点）。
+ * 安全策略：目标已有真实订阅（profiles/index.json 非空）时跳过（保护现有数据；
+ * 源仅为空壳/缓存时视为无数据）。可在启动与退出时各调一次（幂等）。
  */
 export function migratePortableData(appHandle: App): { migrated: boolean; note: string } {
   if (process.platform !== 'win32' || !appHandle.isPackaged) {
@@ -122,18 +116,24 @@ export function migratePortableData(appHandle: App): { migrated: boolean; note: 
   } catch {
     /* 目录不可达按无标记处理 */
   }
-  const src = join(root, PORTABLE_DATA_DIR)
-  if (!existsSync(src)) return { migrated: false, note: '无便携数据目录' }
-  const dest = defaultUserDataDir(appHandle)
+  // 候选源：仅保留含 profiles 的遗留数据目录（防误迁空壳缓存）
+  const srcs = [join(root, PORTABLE_DATA_DIR), join(root, 'resources', PORTABLE_DATA_DIR)].filter((s) =>
+    existsSync(join(s, 'profiles'))
+  )
+  if (srcs.length === 0) return { migrated: false, note: '无便携数据目录' }
+  const dest = appHandle.getPath('userData')
   try {
-    const destEmpty = !existsSync(dest) || readdirSync(dest).length === 0
-    if (!destEmpty) return { migrated: false, note: '系统数据目录已有内容，跳过迁移以保护现有数据' }
+    // 目标已有真实订阅：跳过（用户可能已在新目录配置）
+    const idx = join(dest, 'profiles', 'index.json')
+    if (existsSync(idx) && statSync(idx).size > 2) {
+      return { migrated: false, note: '目标数据目录已有订阅，跳过迁移以保护现有数据' }
+    }
     mkdirSync(dest, { recursive: true })
-    cpSync(src, dest, { recursive: true, force: true })
-    rmSync(src, { recursive: true, force: true })
+    for (const s of srcs) cpSync(s, dest, { recursive: true, force: true })
+    for (const s of srcs) rmSync(s, { recursive: true, force: true })
     return { migrated: true, note: `便携数据已迁移至 ${dest}` }
   } catch (e) {
-    return { migrated: false, note: `迁移失败（保留原目录，下次退出重试）: ${(e as Error).message}` }
+    return { migrated: false, note: `迁移失败（保留原目录，下次重试）: ${(e as Error).message}` }
   }
 }
 
@@ -150,6 +150,19 @@ export function bootstrapDataDir(appHandle: App): { dataDir: string; portable: b
     process.env['XDG_CONFIG_HOME'] = dataDir
   }
   appHandle.setPath('userData', dataDir)
+  // 安装版启动兜底：将历史误判便携遗留的 data（exe 同级或 resources/）并入系统 userData。
+  // 必须在 setPath 之后执行，让应用从首次启动就能读到迁移后的数据（幂等，成功即删源）。
+  if (!portable) {
+    try {
+      const r = migratePortableData(appHandle)
+      if (r.migrated) console.log('[teyvat-arkhon] %s', r.note)
+      else if (r.note !== '无便携数据目录' && r.note !== '非 NSIS 安装版，无需迁移') {
+        console.log('[teyvat-arkhon] 数据迁移跳过: %s', r.note)
+      }
+    } catch (e) {
+      console.warn('[teyvat-arkhon] 启动数据迁移异常:', (e as Error).message)
+    }
+  }
   return { dataDir, portable }
 }
 
