@@ -4,6 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import yaml from 'js-yaml'
 import { ConfigManager, mergeKernelDefaults, applyExcludeFilter, parseSubscriptionUserinfo } from './config-manager'
+import { buildClashYaml } from './uri-profiles'
 
 const SAMPLE_YAML = `mixed-port: 7890
 external-controller: 127.0.0.1:9090
@@ -286,13 +287,28 @@ describe('ConfigManager', () => {
     expect(list[0].nodeCount).toBe(1)
   })
 
-  it('mergeKernelDefaults 仅在缺失时补全监听', () => {
+  it('mergeKernelDefaults 仅在缺失时补全监听与稳定性防线', () => {
     const out = mergeKernelDefaults('mode: rule')
     expect(out).toContain('mixed-port: 7890')
     expect(out).toContain('127.0.0.1:9090')
+    // 稳定性防线：keep-alive / tcp-concurrent / unified-delay
+    expect(out).toContain('keep-alive-interval: 30')
+    expect(out).toContain('keep-alive-idle: 120')
+    expect(out).toContain('tcp-concurrent: true')
+    expect(out).toContain('unified-delay: true')
 
     const unchanged = mergeKernelDefaults(SAMPLE_YAML)
     expect(unchanged.match(/mixed-port:/g)).toHaveLength(1)
+    // SAMPLE_YAML 缺失的新字段会被追加（仅一次）
+    expect(unchanged.match(/tcp-concurrent:/g)).toHaveLength(1)
+  })
+
+  it('mergeKernelDefaults 不覆盖订阅自带的稳定性字段', () => {
+    const out = mergeKernelDefaults('mode: rule\nkeep-alive-interval: 15\ntcp-concurrent: false\n')
+    expect(out.match(/keep-alive-interval:/g)).toHaveLength(1)
+    expect(out).toContain('keep-alive-interval: 15')
+    expect(out).toContain('tcp-concurrent: false')
+    expect(out).toContain('unified-delay: true')
   })
 
   it('applyExcludeFilter 按关键词剔除节点并同步清理策略组引用', () => {
@@ -419,6 +435,31 @@ describe('ConfigManager', () => {
   it('本地文本导入不携带 subInfo', async () => {
     const { profile } = await mgr.importFromText('local', SAMPLE_YAML)
     expect(profile.subInfo).toBeUndefined()
+  })
+})
+
+describe('buildClashYaml 自动切换组', () => {
+  it('多节点时生成 AUTO url-test 组并置于 PROXY 首位', () => {
+    const text = buildClashYaml([
+      { name: 'HK-01', type: 'ss', server: '1.1.1.1', port: 8388, cipher: 'aes-256-gcm', password: 'x' },
+      { name: 'JP-01', type: 'trojan', server: '2.2.2.2', port: 443, password: 'y' }
+    ])
+    const doc = yaml.load(text) as {
+      'proxy-groups': Array<{ name: string; type: string; proxies: string[]; interval?: number }>
+    }
+    const auto = doc['proxy-groups'].find((g) => g.name === 'AUTO')
+    expect(auto).toMatchObject({ type: 'url-test', interval: 300, proxies: ['HK-01', 'JP-01'] })
+    const proxy = doc['proxy-groups'].find((g) => g.name === 'PROXY')
+    expect(proxy?.proxies).toEqual(['AUTO', 'HK-01', 'JP-01', 'DIRECT'])
+  })
+
+  it('单节点时不生成 AUTO 组', () => {
+    const text = buildClashYaml([
+      { name: 'Solo', type: 'ss', server: '1.1.1.1', port: 8388, cipher: 'aes-256-gcm', password: 'x' }
+    ])
+    const doc = yaml.load(text) as { 'proxy-groups': Array<{ name: string; proxies: string[] }> }
+    expect(doc['proxy-groups'].some((g) => g.name === 'AUTO')).toBe(false)
+    expect(doc['proxy-groups'][0].proxies).toEqual(['Solo', 'DIRECT'])
   })
 })
 

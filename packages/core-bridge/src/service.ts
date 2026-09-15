@@ -38,7 +38,18 @@ export interface CoreServiceOptions {
   fetchImpl?: typeof fetch
   /** 订阅导入/刷新的节点排除关键词（运行时读取，支持设置页动态修改） */
   excludeKeywords?: () => string[]
+  /** geosite.dat / geoip.dat 候选目录（规则命中调试本地判定用） */
+  geodataDirs?: string[]
 }
+
+/** 意外退出自动重启的退避间隔（第 1~5 次） */
+const RESTART_BACKOFF_MS = [2_000, 4_000, 8_000, 16_000, 30_000]
+const MAX_RESTART_ATTEMPTS = 5
+/** 连续运行该时长后重置退避计数（短命崩溃循环保护） */
+const STABLE_UPTIME_MS = 60_000
+/** 假死探测间隔与判定阈值 */
+const WATCHDOG_INTERVAL_MS = 30_000
+const WATCHDOG_MAX_FAILS = 3
 
 export class CoreService extends EventEmitter {
   private readonly config: ConfigManager
@@ -46,12 +57,22 @@ export class CoreService extends EventEmitter {
   private state: CoreState = 'stopped'
   private version: MihomoVersion | undefined
 
+  // ---------- 稳定性守护 ----------
+  /** 用户主动停止标记：true 时进程退出不触发自动重启 */
+  private intentionalStop = false
+  private restartTimer: NodeJS.Timeout | null = null
+  private restartAttempts = 0
+  private stableTimer: NodeJS.Timeout | null = null
+  private watchdogTimer: NodeJS.Timeout | null = null
+  private watchdogFails = 0
+
   constructor(private readonly opts: CoreServiceOptions) {
     super()
     this.config = new ConfigManager({
       profilesDir: opts.profilesDir,
       activeConfigFile: opts.activeConfigFile,
-      excludeKeywords: opts.excludeKeywords
+      excludeKeywords: opts.excludeKeywords,
+      geodataDirs: opts.geodataDirs
     })
   }
 
@@ -80,6 +101,9 @@ export class CoreService extends EventEmitter {
     const active = await this.config.getActiveSummary()
     if (!active) throw new Error('还未导入任何订阅配置，请先在"订阅"页导入')
 
+    // 用户手动启动：取消未决的自动重启计划，重新开始
+    this.clearRestartTimer()
+    this.intentionalStop = false
     this.setState('starting')
     try {
       const driver = this.buildDriver(active)
@@ -87,6 +111,8 @@ export class CoreService extends EventEmitter {
       this.driver = driver
       await this.syncVersion()
       this.setState('running')
+      this.beginStableWindow()
+      this.startWatchdog()
     } catch (e) {
       this.setState('error')
       this.emit('error', e)
@@ -96,6 +122,10 @@ export class CoreService extends EventEmitter {
   }
 
   async stop(): Promise<CoreStatus> {
+    this.intentionalStop = true
+    this.clearRestartTimer()
+    this.clearStableTimer()
+    this.stopWatchdog()
     if (this.state === 'stopped' || !this.driver) {
       this.setState('stopped')
       return this.status()
@@ -132,9 +162,142 @@ export class CoreService extends EventEmitter {
       externalController: cleanController(active.externalController, opts.externalController),
       secret: active.secret ?? opts.secret,
       fetchImpl: this.opts.fetchImpl,
-      onExit: () => this.setState('stopped'),
+      onExit: (code) => {
+        this.stopWatchdog()
+        this.clearStableTimer()
+        if (this.intentionalStop || !this.driver) {
+          this.setState('stopped')
+          return
+        }
+        // 意外退出：进入自动重启退避链路
+        void this.handleUnexpectedExit(code)
+      },
       onLog: (line) => this.emit('core-log', line)
     })
+  }
+
+  // ---------- 稳定性守护 ----------
+
+  private clearRestartTimer(): void {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer)
+      this.restartTimer = null
+    }
+  }
+
+  private clearStableTimer(): void {
+    if (this.stableTimer) {
+      clearTimeout(this.stableTimer)
+      this.stableTimer = null
+    }
+  }
+
+  /** 连续稳定运行 60s 后重置退避计数：新崩溃重新从最短间隔开始 */
+  private beginStableWindow(): void {
+    this.clearStableTimer()
+    this.stableTimer = setTimeout(() => {
+      this.stableTimer = null
+      this.restartAttempts = 0
+    }, STABLE_UPTIME_MS)
+    this.stableTimer.unref?.()
+  }
+
+  private async handleUnexpectedExit(code: number | null): Promise<void> {
+    if (this.restartAttempts >= MAX_RESTART_ATTEMPTS) {
+      this.restartAttempts = 0
+      this.setState('error')
+      this.emit(
+        'error',
+        new Error(`内核意外退出（code=${code}），自动重启 ${MAX_RESTART_ATTEMPTS} 次仍失败，已停止重试。请检查内核日志或手动启动。`)
+      )
+      return
+    }
+    const attempt = ++this.restartAttempts
+    const delay = RESTART_BACKOFF_MS[Math.min(attempt - 1, RESTART_BACKOFF_MS.length - 1)]
+    this.emit(
+      'error',
+      new Error(`内核意外退出（code=${code}），${delay / 1000}s 后自动重启（第 ${attempt}/${MAX_RESTART_ATTEMPTS} 次）`)
+    )
+    this.setState('starting')
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null
+      void this.restartNow()
+    }, delay)
+    this.restartTimer.unref?.()
+  }
+
+  /** 按退避计划重启内核（复用当前驱动实例） */
+  private async restartNow(): Promise<void> {
+    if (this.intentionalStop) return
+    const driver = this.driver
+    if (!driver) return
+    try {
+      await driver.start(this.opts.activeConfigFile)
+      await this.syncVersion()
+      this.setState('running')
+      this.beginStableWindow()
+      this.startWatchdog()
+    } catch (e) {
+      this.emit('error', e)
+      // 重启失败：继续退避（handleUnexpectedExit 会检查次数上限）
+      void this.handleUnexpectedExit(null)
+    }
+  }
+
+  /** 假死 watchdog：进程存活但 REST 无响应时强制重启 */
+  private startWatchdog(): void {
+    this.stopWatchdog()
+    this.watchdogFails = 0
+    this.watchdogTimer = setInterval(() => void this.watchdogTick(), WATCHDOG_INTERVAL_MS)
+    this.watchdogTimer.unref?.()
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer)
+      this.watchdogTimer = null
+    }
+  }
+
+  private async watchdogTick(): Promise<void> {
+    if (this.state !== 'running' || !this.driver) return
+    await this.registerProbe(await this.probeOnce())
+  }
+
+  /** 立即健康探测（休眠唤醒后由主进程触发）；连续失败达到阈值则强制重启 */
+  async probeHealth(): Promise<boolean> {
+    if (this.state !== 'running' || !this.driver) return false
+    const ok = await this.probeOnce()
+    await this.registerProbe(ok)
+    return ok
+  }
+
+  private async probeOnce(): Promise<boolean> {
+    try {
+      await this.driver!.getVersion()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async registerProbe(ok: boolean): Promise<void> {
+    if (ok) {
+      this.watchdogFails = 0
+      return
+    }
+    this.watchdogFails++
+    if (this.watchdogFails < WATCHDOG_MAX_FAILS) return
+    this.watchdogFails = 0
+    this.emit('error', new Error('内核连续无响应（疑似假死），正在强制重启内核'))
+    const driver = this.driver
+    if (!driver) return
+    try {
+      // close() → 进程退出 → onExit（非主动停止）→ 自动重启链路
+      await driver.close()
+    } catch {
+      /* kill 失败时由 onExit 兜底 */
+    }
   }
 
   private async syncVersion(): Promise<void> {
@@ -325,9 +488,24 @@ export class CoreService extends EventEmitter {
     return this.config.previewRuleProvider(provider)
   }
 
-  /** 对目标做规则命中调试（尽力匹配） */
-  debugRuleMatch(target: string, rules: RuleEntry[]): RuleDebugResult {
-    return this.config.debugRuleMatch(target, rules)
+  /**
+   * 安装远程规则集：下载 → 落盘 providers/ → 合并写入 rule-providers（规则不变）。
+   * 内核运行中时热重载使 rule-provider 立即生效。
+   */
+  async installRuleProvider(provider: {
+    name: string
+    behavior: RuleProvider['behavior']
+    url: string
+    interval?: number
+  }): Promise<RuleEditorState> {
+    const state = await this.config.installRuleProvider(provider)
+    await this.reloadActive()
+    return state
+  }
+
+  /** 对目标做规则命中调试（geosite/geoip/规则集本地真实判定） */
+  debugRuleMatch(target: string, rules: RuleEntry[], providers?: RuleProvider[]): Promise<RuleDebugResult> {
+    return this.config.debugRuleMatch(target, rules, providers)
   }
 
   /** 内置分流预设模板元信息列表 */

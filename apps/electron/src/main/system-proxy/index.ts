@@ -17,6 +17,8 @@ export interface SystemProxyControllerOptions {
   isCoreRunning: () => boolean
   /** 当前生效的本地代理端口（取自内核配置 mixed-port） */
   getHttpPort: () => Promise<number>
+  /** 代理设置成功应用后的回调（守护用：记录期望态） */
+  onApplied?: (enabled: boolean) => void
 }
 
 /**
@@ -25,7 +27,7 @@ export interface SystemProxyControllerOptions {
 export function createSystemProxyController(
   options: SystemProxyControllerOptions
 ): SystemProxyController {
-  const { isCoreRunning, getHttpPort } = options
+  const { isCoreRunning, getHttpPort, onApplied } = options
   const impl: PlatformSystemProxy =
     process.platform === 'win32'
       ? new WindowsSystemProxy()
@@ -40,7 +42,9 @@ export function createSystemProxyController(
         throw new Error('内核未运行，无法开启系统代理')
       }
       const httpPort = await getHttpPort()
-      return impl.apply(enabled, httpPort)
+      const state = await impl.apply(enabled, httpPort)
+      onApplied?.(state.enabled)
+      return state
     }
   }
 }

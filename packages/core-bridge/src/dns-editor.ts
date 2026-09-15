@@ -41,8 +41,11 @@ export function parseDnsSettings(cfg: Record<string, unknown> | null | undefined
     enhancedMode: (d['enhanced-mode'] as DnsSettings['enhancedMode']) ?? 'redir-host',
     ipv6: d.ipv6 === true,
     fakeIpRange: String(d['fake-ip-range'] ?? '198.18.0.1/16'),
+    fakeIpFilter: strArr(d['fake-ip-filter']),
     defaultNameserver: strArr(d['default-nameserver']),
     nameserver: strArr(d.nameserver),
+    proxyServerNameserver: strArr(d['proxy-server-nameserver']),
+    respectRules: d['respect-rules'] === true,
     fallback: strArr(d.fallback),
     nameserverPolicy: policy
   }
@@ -57,6 +60,10 @@ export function buildDnsBlock(s: DnsSettings): string {
   lines.push(`  ipv6: ${yamlBoolean(s.ipv6)}`)
   lines.push(`  enhanced-mode: ${s.enhancedMode}`)
   lines.push(`  fake-ip-range: ${s.fakeIpRange || '198.18.0.1/16'}`)
+  if (s.fakeIpFilter.length) {
+    lines.push('  fake-ip-filter:')
+    s.fakeIpFilter.forEach((f) => lines.push(`    - '${f}'`))
+  }
   if (s.defaultNameserver.length) {
     lines.push('  default-nameserver:')
     s.defaultNameserver.forEach((a) => lines.push(`    - ${a}`))
@@ -64,6 +71,13 @@ export function buildDnsBlock(s: DnsSettings): string {
   if (s.nameserver.length) {
     lines.push(`  nameserver:`)
     s.nameserver.forEach((a) => lines.push(`    - ${a}`))
+  }
+  if (s.proxyServerNameserver.length) {
+    lines.push('  proxy-server-nameserver:')
+    s.proxyServerNameserver.forEach((a) => lines.push(`    - ${a}`))
+  }
+  if (s.respectRules) {
+    lines.push(`  respect-rules: true`)
   }
   if (s.fallback.length) {
     lines.push('  fallback:')

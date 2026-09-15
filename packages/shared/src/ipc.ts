@@ -56,8 +56,22 @@ export interface ArkhonAPI {
   validateRuleLines(rules: { type: string; payload: string; proxy: string }[]): Promise<RuleLineValidation[]>
   /** 预览规则集（远程 HTTP 规则集或本地规则集）返回前 N 行，用于编辑校验 */
   previewRuleProvider(provider: { type: 'http' | 'file'; url?: string; file?: string }): Promise<RuleProviderPreview>
-  /** 对目标域名/IP 做规则命中调试（模拟匹配顺序逐步检测） */
-  debugRuleHit(target: string, rules: { type: string; payload: string; proxy: string }[]): Promise<RuleDebugResult>
+  /**
+   * 安装远程规则集：下载 → 落盘到配置目录 providers/ → 合并写入 rule-providers 并热重载。
+   * 返回安装后的完整编辑状态（rules 不变）。
+   */
+  installRuleProvider(provider: {
+    name: string
+    behavior: 'domain' | 'ipcidr' | 'classical' | 'mrs'
+    url: string
+    interval?: number
+  }): Promise<RuleEditorState>
+  /** 对目标域名/IP 做规则命中调试（geosite/geoip/规则集本地真实判定；providers 用于 RULE-SET 展开） */
+  debugRuleHit(
+    target: string,
+    rules: { type: string; payload: string; proxy: string }[],
+    providers?: { name: string; type: 'http' | 'file'; behavior: string; url?: string; file?: string; interval?: number }[]
+  ): Promise<RuleDebugResult>
   /** 返回所有内置分流预设的元信息 */
   listRulePresets(): Promise<RulePresetMeta[]>
 

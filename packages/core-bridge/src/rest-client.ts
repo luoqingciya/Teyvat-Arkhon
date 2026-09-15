@@ -7,18 +7,22 @@ export interface RestClientOptions {
   controller: string
   secret?: string
   fetchImpl?: typeof fetch
+  /** 单请求超时 ms（默认 5000，防内核假死时调用方无限挂起） */
+  timeoutMs?: number
 }
 
 export class RestClient {
   private readonly baseUrl: string
   private readonly secret?: string
   private readonly fetchImpl: typeof fetch
+  private readonly timeoutMs: number
 
   constructor(opts: RestClientOptions) {
     const c = opts.controller.trim()
     this.baseUrl = /^https?:\/\//i.test(c) ? c : `http://${c}`
     this.secret = opts.secret?.trim() || undefined
     this.fetchImpl = opts.fetchImpl ?? fetch
+    this.timeoutMs = opts.timeoutMs ?? 5_000
   }
 
   private headers(json?: unknown): Record<string, string> {
@@ -32,7 +36,8 @@ export class RestClient {
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method,
       headers: this.headers(body),
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(this.timeoutMs)
     })
     if (!res.ok) {
       let detail = ''

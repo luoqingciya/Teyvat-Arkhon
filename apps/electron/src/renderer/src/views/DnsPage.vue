@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import * as DNS_CONST from '@teyvat-arkhon/shared'
 import type { DnsPreset, DnsSettings } from '@teyvat-arkhon/shared'
@@ -21,10 +21,24 @@ const s = ref<DnsSettings>({
   enhancedMode: 'redir-host',
   ipv6: false,
   fakeIpRange: '198.18.0.1/16',
+  fakeIpFilter: [],
   defaultNameserver: [],
   nameserver: [],
+  proxyServerNameserver: [],
+  respectRules: false,
   fallback: [],
   nameserverPolicy: []
+})
+
+/** fake-ip-filter 以多行文本编辑（列表 <-> 换行分隔文本互转） */
+const fakeIpFilterText = computed<string>({
+  get: () => s.value.fakeIpFilter.join('\n'),
+  set: (v: string) => {
+    s.value.fakeIpFilter = v
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean)
+  }
 })
 
 const tabs: Array<{ key: TabKey; label: string }> = [
@@ -116,6 +130,11 @@ onMounted(load)
             <span class="knob"></span>
             {{ t('dns.basic.ipv6') }}
           </label>
+          <label class="switch">
+            <input v-model="s.respectRules" type="checkbox" />
+            <span class="knob"></span>
+            {{ t('dns.basic.respectRules') }}
+          </label>
         </div>
 
         <div class="field">
@@ -129,6 +148,17 @@ onMounted(load)
         <div class="field">
           <label class="flabel">{{ t('dns.basic.fakeIpRange') }}</label>
           <input v-model="s.fakeIpRange" class="inp" placeholder="198.18.0.1/16" />
+        </div>
+
+        <div v-if="s.enhancedMode === 'fake-ip'" class="field">
+          <label class="flabel">{{ t('dns.basic.fakeIpFilter') }}</label>
+          <textarea
+            v-model="fakeIpFilterText"
+            class="inp ta"
+            rows="6"
+            :placeholder="t('dns.basic.fakeIpFilterPh')"
+          ></textarea>
+          <p class="hint">{{ t('dns.basic.fakeIpFilterHint') }}</p>
         </div>
 
         <div class="field">
@@ -147,6 +177,16 @@ onMounted(load)
             <button class="mini danger" @click="s.nameserver.splice(i, 1)">✕</button>
           </div>
           <button class="btn" @click="s.nameserver.push('')">{{ t('dns.basic.addNs') }}</button>
+        </div>
+
+        <div class="field">
+          <label class="flabel">{{ t('dns.basic.proxyNs') }}</label>
+          <div v-for="(_, i) in s.proxyServerNameserver" :key="'pn' + i" class="row">
+            <input v-model="s.proxyServerNameserver[i]" class="inp" :placeholder="t('dns.basic.placeholders.server')" />
+            <button class="mini danger" @click="s.proxyServerNameserver.splice(i, 1)">✕</button>
+          </div>
+          <button class="btn" @click="s.proxyServerNameserver.push('')">{{ t('dns.basic.addNs') }}</button>
+          <p class="hint">{{ t('dns.basic.proxyNsHint') }}</p>
         </div>
 
         <div class="field">
@@ -314,6 +354,10 @@ onMounted(load)
 }
 .inp:focus { outline: none; border-color: rgba(79, 124, 255, 0.6); }
 .inp.sel { width: auto; }
+.inp.ta {
+  resize: vertical; min-height: 96px; line-height: 1.6;
+  font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+}
 .inp:disabled { opacity: 0.5; }
 
 .mini {

@@ -50,8 +50,10 @@ const api: ArkhonAPI = {
   validateRuleLines: (rules) => ipcRenderer.invoke('rules:validate', rules) as Promise<RuleLineValidation[]>,
   previewRuleProvider: (provider) =>
     ipcRenderer.invoke('rules:provider-preview', provider) as Promise<RuleProviderPreview>,
-  debugRuleHit: (target, rules) =>
-    ipcRenderer.invoke('rules:debug-hit', target, rules) as Promise<RuleDebugResult>,
+  installRuleProvider: (provider) =>
+    ipcRenderer.invoke('rules:provider-install', provider) as Promise<RuleEditorState>,
+  debugRuleHit: (target, rules, providers) =>
+    ipcRenderer.invoke('rules:debug-hit', target, rules, providers) as Promise<RuleDebugResult>,
   listRulePresets: () => ipcRenderer.invoke('rules:presets') as Promise<RulePresetMeta[]>,
 
   getDnsState: () => ipcRenderer.invoke('dns:get') as Promise<DnsSettings>,

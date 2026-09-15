@@ -13,8 +13,11 @@ const SAMPLE: DnsSettings = {
   enhancedMode: 'fake-ip',
   ipv6: false,
   fakeIpRange: '198.18.0.1/16',
+  fakeIpFilter: ['+.lan', 'time.windows.com'],
   defaultNameserver: ['223.5.5.5'],
   nameserver: ['https://doh.pub/dns-query'],
+  proxyServerNameserver: ['https://doh.pub/dns-query'],
+  respectRules: true,
   fallback: ['tls://8.8.8.8'],
   nameserverPolicy: [
     { domain: 'geosite:cn', server: '223.5.5.5' },

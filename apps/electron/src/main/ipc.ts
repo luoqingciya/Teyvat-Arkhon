@@ -58,7 +58,10 @@ export function createIpc(
   ipcMain.handle('rules:editor-save', (_e, state) => service.saveRuleEditorState(state))
   ipcMain.handle('rules:validate', (_e, rules) => service.validateRuleLines(rules))
   ipcMain.handle('rules:provider-preview', (_e, provider) => service.previewRuleProvider(provider))
-  ipcMain.handle('rules:debug-hit', (_e, target: string, rules) => service.debugRuleMatch(target, rules))
+  ipcMain.handle('rules:provider-install', (_e, provider) => service.installRuleProvider(provider))
+  ipcMain.handle('rules:debug-hit', (_e, target: string, rules, providers) =>
+    service.debugRuleMatch(target, rules, providers)
+  )
   ipcMain.handle('rules:presets', () => service.listRulePresets())
 
   // DNS 分流联动
