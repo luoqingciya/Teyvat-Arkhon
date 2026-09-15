@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import * as DNS_CONST from '@teyvat-arkhon/shared'
 import type { DnsPreset, DnsSettings } from '@teyvat-arkhon/shared'
+import { plain } from '../utils/plain'
 
 const { DNS_PRESETS } = DNS_CONST
 
@@ -63,7 +64,7 @@ async function load(): Promise<void> {
 async function save(): Promise<void> {
   busy.value = true
   try {
-    await window.arkhon.saveDnsState(s.value)
+    await window.arkhon.saveDnsState(plain(s.value))
     savedAt.value = new Date().toLocaleTimeString()
   } catch (e) {
     error.value = (e as Error).message
