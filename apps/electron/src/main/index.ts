@@ -12,7 +12,7 @@ import { createLoopbackController } from './system-loopback'
 import { createSubscriptionSync } from './subscription-sync'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
 import { setupAutoUpdater } from './updater'
-import { bootstrapDataDir } from './paths'
+import { bootstrapDataDir, migratePortableData } from './paths'
 
 // 数据目录策略（须在 ready 前确定）：默认便携时数据跟随运行目录
 const dataLayout = bootstrapDataDir(app)
@@ -25,6 +25,10 @@ console.log(
 let service: CoreService | null = null
 let mainWindow: BrowserWindow | null = null
 let trafficMonitor: TrafficMonitor | null = null
+/** 系统代理控制器（退出清理用，whenReady 后可用） */
+let systemProxy: SystemProxyController | null = null
+/** 本会话内由本应用成功应用的系统代理期望态（null=未操作过；退出清理仅处理 true） */
+let proxyExpected: boolean | null = null
 
 /** arkhon 内核可执行文件名（示例: arkhon-windows-x64.exe / arkhon-darwin-arm64 / arkhon-linux-x64） */
 export function coreFileName(): string {
@@ -378,22 +382,23 @@ if (!gotLock) {
     service = await bootstrapService()
     // 系统代理守护：记录本会话内由本应用成功应用的期望态；
     // 被第三方程序（VPN/安全软件）改掉时自动恢复并通知（仅守护"开启"态）
-    let proxyExpected: boolean | null = null
-    const systemProxy = createSystemProxyController({
+    systemProxy = createSystemProxyController({
       isCoreRunning: () => (service?.status().state ?? 'stopped') === 'running',
       getHttpPort: async () => (await service?.activeHttpPort()) ?? 7890,
       onApplied: (enabled) => {
         proxyExpected = enabled
       }
     })
+    // 模块级 controller 已就位，局部非空绑定供后续引用
+    const sysProxy = systemProxy
     setInterval(() => {
       void (async () => {
         if (proxyExpected !== true) return
         if ((service?.status().state ?? 'stopped') !== 'running') return
         try {
-          const actual = await systemProxy.read()
+          const actual = await sysProxy.read()
           if (actual.enabled === true) return
-          await systemProxy.set(true)
+          await sysProxy.set(true)
           for (const w of BrowserWindow.getAllWindows()) {
             w.webContents.send('arkhon:error', '系统代理设置被外部程序修改，已自动恢复')
           }
@@ -426,7 +431,7 @@ if (!gotLock) {
     }
     createIpc(
       service,
-      systemProxy,
+      sysProxy,
       serviceManager,
       // TUN 前置依赖探测：resources/arkhon-core 或内核工作目录存在 wintun.dll 即为可用
       () =>
@@ -449,10 +454,10 @@ if (!gotLock) {
 
     setupAutoUpdater()
 
-    await createWindow(systemProxy)
+    await createWindow(sysProxy)
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) void createWindow(systemProxy)
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow(sysProxy)
     })
   })
 }
@@ -464,11 +469,31 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async (e) => {
   // 托盘"退出"或系统退出时放行窗口 close（不再最小化到托盘）
   isQuitting = true
+  e.preventDefault()
+  trafficMonitor?.stop()
   if (service) {
-    e.preventDefault()
-    trafficMonitor?.stop()
     await service.stop()
     service = null
-    app.exit(0)
   }
+  // 退出清理：仅当本会话开启过系统代理时才关闭，
+  // 避免误关用户系统自带的代理设置（内核停止后代理端口悬空会导致断网；
+  // 自动更新 quitAndInstall 同样经过此路径，防止更新后网络不可用）
+  if (proxyExpected === true) {
+    try {
+      await systemProxy?.set(false)
+    } catch {
+      /* 关闭失败不阻塞退出 */
+    }
+    proxyExpected = null
+  }
+  // 便携数据迁移：安装版曾被误判便携时，退到系统 userData，防更新卸载丢配置
+  try {
+    if (app.isPackaged) {
+      const r = migratePortableData(app)
+      if (r.migrated) console.log('[teyvat-arkhon] %s', r.note)
+    }
+  } catch (migErr) {
+    console.warn('[teyvat-arkhon] 便携数据迁移异常:', (migErr as Error).message)
+  }
+  app.exit(0)
 })
