@@ -13,6 +13,7 @@ import type {
   RuleProviderPreview
 } from '@teyvat-arkhon/shared'
 import { useAppStore } from '../stores/app'
+import { plain } from '../utils/plain'
 
 // 具名常量经命名空间再解构，规避 rollup 对 shared CJS `__exportStar` 桶的静态分析限制
 const { RULE_PRESETS, RULE_TYPES, RULE_TYPE_HINTS, RECOMMENDED_RULE_SETS } = RULES_CONST
@@ -89,7 +90,7 @@ async function load(): Promise<void> {
 async function validate(): Promise<void> {
   validated.value = true
   try {
-    validations.value = await window.arkhon.validateRuleLines(rules.value)
+    validations.value = await window.arkhon.validateRuleLines(plain(rules.value))
   } catch (e) {
     error.value = (e as Error).message
   }
@@ -98,7 +99,7 @@ async function validate(): Promise<void> {
 async function save(): Promise<void> {
   busy.value = true
   try {
-    await window.arkhon.saveRuleEditorState({ rules: rules.value, providers: providers.value })
+    await window.arkhon.saveRuleEditorState(plain({ rules: rules.value, providers: providers.value }))
     savedAt.value = new Date().toLocaleTimeString()
     await validate()
     await store.refreshRules?.()
@@ -148,7 +149,7 @@ function removeProvider(i: number): void {
 async function preview(p: RuleProvider): Promise<void> {
   previewBox.value = null
   try {
-    previewBox.value = await window.arkhon.previewRuleProvider(p)
+    previewBox.value = await window.arkhon.previewRuleProvider(plain(p))
   } catch (e) {
     previewBox.value = { name: p.name || '?', remote: p.type === 'http', count: 0, lines: [], error: (e as Error).message }
   }
@@ -236,7 +237,7 @@ async function runDebug(): Promise<void> {
   debugging.value = true
   debugResult.value = null
   try {
-    debugResult.value = await window.arkhon.debugRuleHit(target, rules.value, providers.value)
+    debugResult.value = await window.arkhon.debugRuleHit(target, plain(rules.value), plain(providers.value))
   } catch (e) {
     error.value = (e as Error).message
   } finally {
