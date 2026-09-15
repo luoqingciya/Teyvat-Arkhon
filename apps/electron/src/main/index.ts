@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron'
+import { app, BrowserWindow, Menu, powerMonitor, Tray, nativeImage } from 'electron'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import * as os from 'node:os'
 import { join } from 'node:path'
@@ -347,6 +347,7 @@ async function bootstrapService(): Promise<CoreService> {
     profilesDir: join(app.getPath('userData'), 'profiles'),
     activeConfigFile: join(configDir, 'config.yaml'),
     excludeKeywords: readExcludeKeywords,
+    geodataDirs: [mihomoDataDir(), coreResourcesDir()],
     driver: {
       mode: 'process',
       options: {
@@ -375,9 +376,35 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     seedGeoData()
     service = await bootstrapService()
+    // 系统代理守护：记录本会话内由本应用成功应用的期望态；
+    // 被第三方程序（VPN/安全软件）改掉时自动恢复并通知（仅守护"开启"态）
+    let proxyExpected: boolean | null = null
     const systemProxy = createSystemProxyController({
       isCoreRunning: () => (service?.status().state ?? 'stopped') === 'running',
-      getHttpPort: async () => (await service?.activeHttpPort()) ?? 7890
+      getHttpPort: async () => (await service?.activeHttpPort()) ?? 7890,
+      onApplied: (enabled) => {
+        proxyExpected = enabled
+      }
+    })
+    setInterval(() => {
+      void (async () => {
+        if (proxyExpected !== true) return
+        if ((service?.status().state ?? 'stopped') !== 'running') return
+        try {
+          const actual = await systemProxy.read()
+          if (actual.enabled === true) return
+          await systemProxy.set(true)
+          for (const w of BrowserWindow.getAllWindows()) {
+            w.webContents.send('arkhon:error', '系统代理设置被外部程序修改，已自动恢复')
+          }
+        } catch {
+          /* 本轮读取/恢复失败，下轮重试 */
+        }
+      })()
+    }, 10_000).unref()
+    // 休眠唤醒后立即探测内核健康（唤醒瞬间 REST 可能短暂不可用，连续失败会触发自动重启）
+    powerMonitor.on('resume', () => {
+      void service?.probeHealth()
     })
     const serviceManager = createServiceManager({
       binaryPath: join(coreResourcesDir(), coreFileName()),

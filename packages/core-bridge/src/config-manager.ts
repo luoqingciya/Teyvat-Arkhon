@@ -30,11 +30,15 @@ import { clashProxiesToUriList } from './uri-export'
 import {
   applyRulesToConfig,
   debugRulesMatch,
+  matchTargetAgainstRule,
   parseProvidersMap,
+  parseRuleText,
   parseRulesArray,
   strategyNamesOfSummary,
-  validateRules as validateRuleLines
+  validateRules as validateRuleLines,
+  type RuleMatchContext
 } from './rules-editor'
+import { GeodataMatcher, ipInCidrBytes, ipToBuffer } from './geodata'
 import { applyDnsToConfig, listDnsPresetMetas, parseDnsSettings, validateDnsSettings } from './dns-editor'
 
 export interface ConfigManagerOptions {
@@ -42,6 +46,8 @@ export interface ConfigManagerOptions {
   activeConfigFile: string
   /** 订阅导入/刷新时的节点排除关键词（对 URI 转换产物生效，运行时读取以支持动态配置） */
   excludeKeywords?: () => string[]
+  /** geosite.dat / geoip.dat 的候选目录（规则命中调试本地判定用；缺省时退化为「需内核判定」） */
+  geodataDirs?: string[]
 }
 
 const DEFAULT_MIXED_PORT = 7890
@@ -52,11 +58,24 @@ export class ConfigManager {
   private readonly profilesDir: string
   private readonly activeConfigFile: string
   private readonly excludeKeywords: () => string[]
+  private readonly geodataDirs: string[]
+  /** geodata 懒加载缓存（加载失败缓存 null 避免反复读盘） */
+  private geodataPromise: Promise<GeodataMatcher | null> | null = null
 
   constructor(opts: ConfigManagerOptions) {
     this.profilesDir = opts.profilesDir
     this.activeConfigFile = opts.activeConfigFile
     this.excludeKeywords = opts.excludeKeywords ?? (() => [])
+    this.geodataDirs = opts.geodataDirs ?? []
+  }
+
+  /** 懒加载并缓存 geodata 匹配器（geosite/geoip .dat，内核工作目录优先） */
+  private loadGeodata(): Promise<GeodataMatcher | null> {
+    this.geodataPromise ??= GeodataMatcher.load([
+      path.dirname(this.activeConfigFile),
+      ...this.geodataDirs
+    ])
+    return this.geodataPromise
   }
 
   /** 对 URI 转换产物应用排除关键词（节点名包含任一关键词即剔除；同步清理组引用） */
@@ -427,10 +446,186 @@ export class ConfigManager {
     return { name, remote: provider.type === 'http', count: lines.length, lines: lines.slice(0, 30) }
   }
 
-  /** 对目标做规则命中调试（尽力匹配） */
-  debugRuleMatch(target: string, rules: RuleEntry[]): RuleDebugResult {
-    return debugRulesMatch(target, rules ?? [])
+  /**
+   * 安装远程规则集：下载 → 落盘到配置目录 providers/ 下 → 合并写入 rule-providers。
+   * 保留 url（内核按 interval 自动更新），返回安装后的完整编辑状态（rules 不变）。
+   */
+  async installRuleProvider(provider: {
+    name: string
+    behavior: RuleProvider['behavior']
+    url: string
+    interval?: number
+  }): Promise<RuleEditorState> {
+    const name = provider.name?.trim() ?? ''
+    const url = provider.url?.trim() ?? ''
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) {
+      throw new Error('规则集名称仅允许字母/数字/下划线/连字符')
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error('规则集 URL 需以 http(s):// 开头')
+    }
+    if (!(await exists(this.activeConfigFile))) {
+      throw new Error('没有可用的工作配置，请先选择订阅')
+    }
+
+    // 下载远程内容（mrs 为二进制格式）
+    const isMrs = provider.behavior === 'mrs'
+    let body: Buffer
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      body = Buffer.from(await res.arrayBuffer())
+    } catch (e) {
+      throw new Error(`下载规则集失败: ${(e as Error).message}`)
+    }
+    if (body.length === 0) throw new Error('规则集内容为空')
+
+    // 落盘：配置目录/providers/<name>.<txt|mrs>（相对内核工作目录，供 rule-provider path 引用）
+    const providersDir = path.join(path.dirname(this.activeConfigFile), 'providers')
+    await fs.mkdir(providersDir, { recursive: true })
+    const ext = isMrs ? 'mrs' : 'txt'
+    const relPath = `providers/${name}.${ext}`
+    await fs.writeFile(path.join(path.dirname(this.activeConfigFile), relPath), body)
+
+    // 合并进 rule-providers（同名替换，保持其余条目与顺序）
+    const state = await this.readActiveRules()
+    const next: RuleProvider = {
+      name,
+      type: 'http',
+      behavior: provider.behavior,
+      url,
+      file: relPath,
+      interval: provider.interval && provider.interval > 0 ? provider.interval : 86400
+    }
+    const idx = state.providers.findIndex((p) => p.name === name)
+    if (idx >= 0) state.providers[idx] = next
+    else state.providers.push(next)
+    await this.writeActiveRules(state)
+    return state
   }
+
+  /**
+   * 对目标做规则命中调试：
+   * 加载 geosite/geoip 与已落盘规则集，构建本地真实判定上下文（RULE-SET 按 providers 落盘文件展开）。
+   */
+  async debugRuleMatch(target: string, rules: RuleEntry[], providers?: RuleProvider[]): Promise<RuleDebugResult> {
+    const geodata = await this.loadGeodata()
+    const ctx: RuleMatchContext = geodata ? geodata.toMatchContext() : {}
+    if (providers?.length) {
+      // 规则集上下文不含 rulesetMatch（防止 RULE-SET 互相引用时递归展开）
+      const baseCtx: RuleMatchContext = {
+        geositeMatch: ctx.geositeMatch,
+        geoipMatch: ctx.geoipMatch
+      }
+      const snapshots = await this.loadRulesetSnapshots(providers)
+      ctx.rulesetMatch = (providerName, t) => {
+        const snap = snapshots.get(providerName)
+        if (!snap) return null
+        return matchRulesetSnapshot(snap, t, baseCtx)
+      }
+    }
+    return debugRulesMatch(target, rules ?? [], ctx)
+  }
+
+  /**
+   * 预读规则集落盘文件，构建同步匹配快照（domain/ipcidr 为 payload 列表，classical 为规则行）。
+   * mrs 二进制格式与读取失败的条目跳过（对应 RULE-SET 调试时退化为「无法本地展开」）。
+   */
+  private async loadRulesetSnapshots(
+    providers: RuleProvider[]
+  ): Promise<Map<string, RulesetSnapshot>> {
+    const map = new Map<string, RulesetSnapshot>()
+    for (const p of providers) {
+      if (!p.name || p.behavior === 'mrs' || !p.file) continue
+      const filePath = path.isAbsolute(p.file) ? p.file : path.join(path.dirname(this.activeConfigFile), p.file)
+      let content: string
+      try {
+        content = await fs.readFile(filePath, 'utf-8')
+      } catch {
+        continue
+      }
+      if (p.behavior === 'classical') {
+        const lines: RuleEntry[] = []
+        for (const line of content.split('\n')) {
+          const entry = parseRuleText(line)
+          if (entry) lines.push(entry)
+        }
+        map.set(p.name, { behavior: 'classical', lines })
+      } else {
+        let items: string[] = []
+        try {
+          const parsed = yaml.load(content) as Record<string, unknown> | null
+          if (Array.isArray(parsed?.payload)) {
+            items = (parsed?.payload as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+          }
+        } catch {
+          continue
+        }
+        map.set(p.name, { behavior: p.behavior, items })
+      }
+    }
+    return map
+  }
+}
+
+/** 规则集匹配快照（预读到内存，供同步闭包判定） */
+interface RulesetSnapshot {
+  behavior: 'domain' | 'ipcidr' | 'classical'
+  /** domain/ipcidr 的 payload 条目 */
+  items?: string[]
+  /** classical 的规则行 */
+  lines?: RuleEntry[]
+}
+
+/** 对规则集快照做同步匹配；快照缺失/无法判定语义时由调用方处理 */
+function matchRulesetSnapshot(snap: RulesetSnapshot, target: string, baseCtx: RuleMatchContext): boolean | null {
+  const t = target.trim().toLowerCase()
+  if (snap.behavior === 'classical') {
+    for (const entry of snap.lines ?? []) {
+      if (matchTargetAgainstRule(entry, t, baseCtx).matched) return true
+    }
+    return false
+  }
+  if (snap.behavior === 'domain') return matchDomainPayload(snap.items ?? [], t)
+  return matchIpcidrPayload(snap.items ?? [], t)
+}
+
+/** domain behavior 规则集匹配：支持 `+.x` 后缀、`.x` 后缀、精确、`*` 通配条目 */
+function matchDomainPayload(items: string[], host: string): boolean {
+  for (const raw of items) {
+    const item = raw.trim().toLowerCase()
+    if (!item) continue
+    if (item.startsWith('+.')) {
+      const suffix = item.slice(2)
+      if (host === suffix || host.endsWith('.' + suffix)) return true
+    } else if (item.startsWith('.')) {
+      const suffix = item.slice(1)
+      if (host === suffix || host.endsWith('.' + suffix)) return true
+    } else if (item.includes('*')) {
+      const re = new RegExp('^' + item.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$')
+      if (re.test(host)) return true
+    } else if (host === item) {
+      return true
+    }
+  }
+  return false
+}
+
+/** ipcidr behavior 规则集匹配：条目形如 `1.2.3.0/24` 或 `2001:db8::/32`（可带 no-resolve 尾注） */
+function matchIpcidrPayload(items: string[], ip: string): boolean {
+  const ipBuf = ipToBuffer(ip)
+  if (!ipBuf) return false
+  for (const raw of items) {
+    const cidr = raw.split(',')[0].trim() // 忽略 no-resolve 等尾注
+    const [netStr, prefixStr] = cidr.split('/')
+    if (!netStr) continue
+    const netBuf = ipToBuffer(netStr)
+    if (!netBuf) continue
+    const prefix = prefixStr === undefined ? netBuf.length * 8 : Number(prefixStr)
+    if (!Number.isInteger(prefix)) continue
+    if (ipInCidrBytes(ipBuf, netBuf, prefix)) return true
+  }
+  return false
 }
 
 function numberVal(v: unknown): number | undefined {
@@ -459,12 +654,21 @@ function urlTextToName(url: string): string {
   return url.split('/').pop() ?? url
 }
 
-/** 缺失监听端口/外控时补充默认值（仅追加不覆盖），保证内核可直接运行 */
+/**
+ * 缺失时补全内核默认值（仅追加不覆盖，订阅自带配置优先）：
+ *  - 监听端口/外控：保证内核可直接运行
+ *  - 稳定性防线：keep-alive 防中间设备老化杀空闲长连接（断流最常见根因）；
+ *    tcp-concurrent 多 IP 并发握手加快建连；unified-delay 统一延迟口径使自动切换判断更准
+ */
 export function mergeKernelDefaults(content: string): string {
   const has = (key: string) => new RegExp(`^\\s*${key}:`, 'm').test(content)
   const block: string[] = []
   if (!has('mixed-port')) block.push(`mixed-port: ${DEFAULT_MIXED_PORT}`)
   if (!has('external-controller')) block.push(`external-controller: ${DEFAULT_CONTROLLER}`)
+  if (!has('keep-alive-interval')) block.push('keep-alive-interval: 30')
+  if (!has('keep-alive-idle')) block.push('keep-alive-idle: 120')
+  if (!has('tcp-concurrent')) block.push('tcp-concurrent: true')
+  if (!has('unified-delay')) block.push('unified-delay: true')
   if (block.length === 0) return content
   const sep = content.endsWith('\n') ? '' : '\n'
   return content + sep + block.join('\n') + '\n'
@@ -558,8 +762,11 @@ function emptyDns(): DnsSettings {
     enhancedMode: 'redir-host',
     ipv6: false,
     fakeIpRange: '198.18.0.1/16',
+    fakeIpFilter: [],
     defaultNameserver: [],
     nameserver: [],
+    proxyServerNameserver: [],
+    respectRules: false,
     fallback: [],
     nameserverPolicy: []
   }

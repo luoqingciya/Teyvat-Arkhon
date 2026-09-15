@@ -650,13 +650,33 @@ function uniqueNames(proxies: ProxyDef[]): ProxyDef[] {
 }
 
 export function buildClashYaml(proxies: ProxyDef[]): string {
+  const names = proxies.map((p) => String(p.name))
+  // 节点数 >= 2 时生成 AUTO 自动选优组并置于 PROXY 首位：
+  // 节点半死不活（TCP 通但丢包）时自动切换，无需手动测速换节点；仍可在 PROXY 组手动指定。
+  const groups: ProxyDef[] = []
+  if (names.length >= 2) {
+    groups.push({
+      name: 'AUTO',
+      type: 'url-test',
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 300,
+      tolerance: 50,
+      lazy: true,
+      proxies: names
+    })
+  }
+  groups.push({
+    name: 'PROXY',
+    type: 'select',
+    proxies: [...(names.length >= 2 ? ['AUTO'] : []), ...names, 'DIRECT']
+  })
   const cfg = {
     'mixed-port': 7890,
     'external-controller': '127.0.0.1:9090',
     mode: 'rule',
     'log-level': 'info',
     proxies,
-    'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: [...proxies.map((p) => p.name), 'DIRECT'] }],
+    'proxy-groups': groups,
     rules: ['MATCH,PROXY']
   }
   return yaml.dump(cfg)

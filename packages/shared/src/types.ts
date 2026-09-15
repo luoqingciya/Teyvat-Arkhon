@@ -243,17 +243,20 @@ export interface RuleEntry {
   proxy: string
 }
 
+/** 规则集（rule-provider）的行为语义 */
+export type RuleProviderBehavior = 'domain' | 'ipcidr' | 'classical' | 'mrs'
+
 /** rule-provider（规则集）元信息 */
 export interface RuleProvider {
   name: string
   /** http=远程 URL；file=本地文件路径 */
   type: 'http' | 'file'
-  /** 规则行为语义：domain / ipcidr */
-  behavior: 'domain' | 'ipcidr'
+  /** 规则行为语义：domain / ipcidr / classical / mrs */
+  behavior: RuleProviderBehavior
   /** http 型 provider 的远程 URL */
   url?: string
   file?: string
-  /** http 型 provider 的自动刷新间隔（分钟） */
+  /** http 型 provider 的自动刷新间隔（秒，mihomo 语义） */
   interval?: number
 }
 
@@ -402,12 +405,18 @@ export interface DnsSettings {
   ipv6: boolean
   /** fake-ip 地址池（仅 fake-ip 模式有意义） */
   fakeIpRange: string
+  /** fake-ip 排除列表：命中的域名不返回虚拟 IP（NTP/STUN/游戏平台等，支持通配） */
+  fakeIpFilter: string[]
   /** 解析失败内核回退的系统 DNS（纯地址，多行） */
   defaultNameserver: string[]
   /** 主用 DNS */
   nameserver: string[]
   /** 兜底 DNS（仅在主用判定为高危区时触发） */
   fallback: string[]
+  /** 代理节点服务器域名的专用解析通道（避免节点域名被污染/劣化） */
+  proxyServerNameserver: string[]
+  /** DNS 查询遵循分流规则（respect-rules，防 DNS 泄露；需代理组可用） */
+  respectRules: boolean
   /** 域名级 DNS 策略：域名 → 解析组名 */
   nameserverPolicy: DnsPolicyEntry[]
 }
@@ -436,6 +445,150 @@ export interface DnsPreset {
 }
 
 /**
+ * 推荐规则集条目（规则集市场）。
+ * 来源为社区维护的公开规则集（Loyalsoldier/clash-rules，每日自动构建），
+ * 「安装」= 下载落盘到配置目录 + 写入 rule-providers，可同时生成 RULE-SET 规则行。
+ */
+export interface RecommendedRuleSet {
+  id: string
+  /** 展示名 */
+  name: string
+  desc: string
+  /** 写入 rule-providers 的键名（也是 RULE-SET 规则行的 payload） */
+  providerName: string
+  behavior: RuleProviderBehavior
+  url: string
+  /** 自动刷新间隔（秒） */
+  interval: number
+  /** 建议策略：REJECT / DIRECT / __PROXY__（安装时由用户替换为代理组名） */
+  suggestedProxy: string
+}
+
+/** 内置推荐规则集列表（规则集市场） */
+export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
+  {
+    id: 'reject',
+    name: '广告与追踪拦截',
+    desc: '常见广告/追踪/恶意域名（数万条），拦截后可显著减少请求',
+    providerName: 'loyalsoldier-reject',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt',
+    interval: 86400,
+    suggestedProxy: 'REJECT'
+  },
+  {
+    id: 'direct',
+    name: '大陆可直连域名',
+    desc: ' Apple / Microsoft / 国内站点等在大陆可直连的域名集合',
+    providerName: 'loyalsoldier-direct',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'proxy',
+    name: '常见代理域名',
+    desc: '需要走代理的境外域名集合（Google/Twitter/YouTube 等）',
+    providerName: 'loyalsoldier-proxy',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt',
+    interval: 86400,
+    suggestedProxy: '__PROXY__'
+  },
+  {
+    id: 'gfw',
+    name: 'GFWList 域名',
+    desc: '被防火长城拦截的域名列表',
+    providerName: 'loyalsoldier-gfw',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt',
+    interval: 86400,
+    suggestedProxy: '__PROXY__'
+  },
+  {
+    id: 'tld-not-cn',
+    name: '非大陆顶级域名',
+    desc: '非中国大陆使用的顶级域名（.jp / .kr / .hk 等）',
+    providerName: 'loyalsoldier-tld-not-cn',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/tld-not-cn.txt',
+    interval: 86400,
+    suggestedProxy: '__PROXY__'
+  },
+  {
+    id: 'apple',
+    name: 'Apple 直连域名',
+    desc: 'Apple 在中国大陆可直连的域名',
+    providerName: 'loyalsoldier-apple',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'icloud',
+    name: 'iCloud 域名',
+    desc: 'iCloud 服务域名集合',
+    providerName: 'loyalsoldier-icloud',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/icloud.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'private',
+    name: '私有网络域名',
+    desc: '局域网 / 保留地址专用域名（配合 lancidr 使用）',
+    providerName: 'loyalsoldier-private',
+    behavior: 'domain',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'applications',
+    name: '常见软件直连',
+    desc: '需要直连的常见软件（按进程名匹配，behavior=classical）',
+    providerName: 'loyalsoldier-applications',
+    behavior: 'classical',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'telegramcidr',
+    name: 'Telegram IP 段',
+    desc: 'Telegram 使用的 IP 地址段',
+    providerName: 'loyalsoldier-telegramcidr',
+    behavior: 'ipcidr',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt',
+    interval: 86400,
+    suggestedProxy: '__PROXY__'
+  },
+  {
+    id: 'cncidr',
+    name: '大陆 IP 段',
+    desc: '中国大陆 IPv4 地址段（规则末尾 MATCH 之前的兜底直连）',
+    providerName: 'loyalsoldier-cncidr',
+    behavior: 'ipcidr',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  },
+  {
+    id: 'lancidr',
+    name: '局域网 IP 段',
+    desc: '局域网及保留 IP 地址段',
+    providerName: 'loyalsoldier-lancidr',
+    behavior: 'ipcidr',
+    url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/lancidr.txt',
+    interval: 86400,
+    suggestedProxy: 'DIRECT'
+  }
+]
+
+/**
  * 内置 DNS 分流预设模板库。
  * `{name}` 占位符表示解析组名，应用时由用户替换；`--default--` 为默认统一解析组。
  */
@@ -449,8 +602,34 @@ export const DNS_PRESETS: DnsPreset[] = [
       enhancedMode: 'fake-ip',
       ipv6: false,
       fakeIpRange: '198.18.0.1/16',
+      fakeIpFilter: [
+        'dns.msftncsi.com',
+        'www.msftncsi.com',
+        'www.msftconnecttest.com',
+        '+.market.xbox.com',
+        '+.srv.nintendo.net',
+        '+.stun.playstation.net',
+        'xbox.*.microsoft.com',
+        '*.*.xboxlive.com',
+        '+.battlenet.com.cn',
+        '+.wotgame.cn',
+        '+.wggames.cn',
+        'time.windows.com',
+        'time.nist.gov',
+        'time.apple.com',
+        'time1.cloud.tencent.com',
+        '+.ntp.org',
+        '+.pool.ntp.org',
+        'localhost.ptlogin2.qq.com',
+        'stun.*.*',
+        'stun.*.*.*',
+        '+.stun.*.*',
+        '+.stun.*.*.*'
+      ],
       defaultNameserver: ['223.5.5.5', '119.29.29.29'],
       nameserver: ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
+      proxyServerNameserver: ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
+      respectRules: false,
       fallback: ['tls://8.8.8.8', 'tls://1.1.1.1'],
       nameserverPolicy: [
         { domain: 'geosite:cn', server: 'cn' },
@@ -468,8 +647,11 @@ export const DNS_PRESETS: DnsPreset[] = [
       enhancedMode: 'redir-host',
       ipv6: false,
       fakeIpRange: '198.18.0.1/16',
+      fakeIpFilter: [],
       defaultNameserver: ['223.5.5.5', '119.29.29.29'],
       nameserver: ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
+      proxyServerNameserver: ['https://doh.pub/dns-query'],
+      respectRules: false,
       fallback: ['tls://8.8.8.8', 'tls://1.1.1.1'],
       nameserverPolicy: [
         { domain: 'geosite:cn', server: 'cn' },
@@ -486,8 +668,11 @@ export const DNS_PRESETS: DnsPreset[] = [
       enhancedMode: 'redir-host',
       ipv6: false,
       fakeIpRange: '198.18.0.1/16',
+      fakeIpFilter: [],
       defaultNameserver: [],
       nameserver: ['https://doh.pub/dns-query'],
+      proxyServerNameserver: [],
+      respectRules: false,
       fallback: [],
       nameserverPolicy: []
     }

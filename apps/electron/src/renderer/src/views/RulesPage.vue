@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import * as RULES_CONST from '@teyvat-arkhon/shared'
 import type {
+  RecommendedRuleSet,
   RuleDebugResult,
   RuleEditorState,
   RuleEntry,
@@ -14,7 +15,7 @@ import type {
 import { useAppStore } from '../stores/app'
 
 // 具名常量经命名空间再解构，规避 rollup 对 shared CJS `__exportStar` 桶的静态分析限制
-const { RULE_PRESETS, RULE_TYPES, RULE_TYPE_HINTS } = RULES_CONST
+const { RULE_PRESETS, RULE_TYPES, RULE_TYPE_HINTS, RECOMMENDED_RULE_SETS } = RULES_CONST
 
 const store = useAppStore()
 const { t } = useTranslation()
@@ -35,6 +36,8 @@ const validated = ref(false)
 // ---- Tab2 规则集 ----
 const providers = ref<RuleProvider[]>([])
 const previewBox = ref<RuleProviderPreview | null>(null)
+const installingId = ref('')
+const installNote = ref('')
 
 // ---- Tab4 命中调试 ----
 const debugTarget = ref('')
@@ -47,6 +50,9 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'presets', label: t('rules.tabs.presets') },
   { key: 'debug', label: t('rules.tabs.debug') }
 ]
+
+/** 已安装的规则集名集合（推荐列表标记「已安装」） */
+const installedNames = computed(() => new Set(providers.value.map((p) => p.name)))
 
 /** 运行时命中统计（来自内核 /rules），用于在编辑行展示当前命中数 */
 const hitsMap = computed(() => {
@@ -132,7 +138,7 @@ function hitsOf(r: RuleEntry): number | null {
 
 // ---- Tab2 规则集 ----
 function addProvider(): void {
-  providers.value.push({ name: '', type: 'http', behavior: 'domain', url: '', interval: 60 })
+  providers.value.push({ name: '', type: 'http', behavior: 'domain', url: '', interval: 86400 })
 }
 
 function removeProvider(i: number): void {
@@ -145,6 +151,56 @@ async function preview(p: RuleProvider): Promise<void> {
     previewBox.value = await window.arkhon.previewRuleProvider(p)
   } catch (e) {
     previewBox.value = { name: p.name || '?', remote: p.type === 'http', count: 0, lines: [], error: (e as Error).message }
+  }
+}
+
+/**
+ * 安装推荐规则集：下载落盘 + 写入 rule-providers，随后自动添加对应 RULE-SET 规则行。
+ * - REJECT 建议类 → 规则插到顶部；DIRECT 建议类 → 插到 MATCH 之前；__PROXY__ → 询问策略
+ */
+async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
+  installNote.value = ''
+  let policy = rs.suggestedProxy
+  if (policy === '__PROXY__') {
+    const target = window.prompt(
+      t('rules.providers.installPrompt', { name: rs.name }),
+      store.selectedGroup || 'PROXY'
+    )
+    if (target === null) return
+    policy = target.trim()
+    if (!policy) return
+  }
+
+  installingId.value = rs.id
+  error.value = ''
+  try {
+    // 1. 下载落盘 + 合并 rule-providers（服务端返回落盘后的完整状态）
+    const state = await window.arkhon.installRuleProvider({
+      name: rs.providerName,
+      behavior: rs.behavior,
+      url: rs.url,
+      interval: rs.interval
+    })
+    // 2. 用服务端状态同步本地（rules 为当前盘上内容）
+    rules.value = state.rules ?? []
+    providers.value = state.providers ?? []
+    // 3. 添加 RULE-SET 规则行（DIRECT 类插 MATCH 前，其余插顶部）
+    const entry: RuleEntry = { type: 'RULE-SET', payload: rs.providerName, proxy: policy }
+    if (policy === 'DIRECT') {
+      const matchIdx = rules.value.findIndex((r) => (r.type ?? '').toUpperCase() === 'MATCH')
+      if (matchIdx >= 0) rules.value.splice(matchIdx, 0, entry)
+      else rules.value.push(entry)
+    } else {
+      rules.value.unshift(entry)
+    }
+    // 4. 保存完整编辑状态（含新规则行）
+    await save()
+    installNote.value = t('rules.providers.installed', { name: rs.name })
+    await store.refreshRules?.()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    installingId.value = ''
   }
 }
 
@@ -180,7 +236,7 @@ async function runDebug(): Promise<void> {
   debugging.value = true
   debugResult.value = null
   try {
-    debugResult.value = await window.arkhon.debugRuleHit(target, rules.value)
+    debugResult.value = await window.arkhon.debugRuleHit(target, rules.value, providers.value)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -302,6 +358,35 @@ onMounted(load)
           </div>
         </div>
 
+        <!-- 推荐规则集市场 -->
+        <div class="market">
+          <div class="market-head">
+            <h5>{{ t('rules.providers.marketTitle') }}</h5>
+            <span v-if="installNote" class="ok-note">✓ {{ installNote }}</span>
+          </div>
+          <p class="hint">{{ t('rules.providers.marketHint') }}</p>
+          <div class="market-grid">
+            <div v-for="rs in RECOMMENDED_RULE_SETS" :key="rs.id" class="market-item" :class="{ installed: installedNames.has(rs.providerName) }">
+              <div class="mi-top">
+                <span class="mi-name">{{ rs.name }}</span>
+                <span class="chip">{{ rs.behavior }}</span>
+                <span v-if="installedNames.has(rs.providerName)" class="flag">✓ {{ t('rules.providers.installedTag') }}</span>
+              </div>
+              <p class="mi-desc">{{ rs.desc }}</p>
+              <div class="mi-foot">
+                <span class="mi-policy dim">{{ rs.suggestedProxy === '__PROXY__' ? t('rules.providers.viaProxy') : rs.suggestedProxy }}</span>
+                <button
+                  class="btn mini-install"
+                  :disabled="busy || installingId !== ''"
+                  @click="installRecommended(rs)"
+                >
+                  {{ installingId === rs.id ? t('rules.providers.installing') : (installedNames.has(rs.providerName) ? t('rules.providers.reinstall') : t('rules.providers.install')) }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="providers.length === 0" class="rules-empty">{{ t('rules.providers.empty') }}</div>
 
         <table v-else class="rules-table">
@@ -328,6 +413,8 @@ onMounted(load)
                 <select v-model="p.behavior" class="inp sel">
                   <option value="domain">{{ t('rules.providers.behaviorDomain') }}</option>
                   <option value="ipcidr">{{ t('rules.providers.behaviorIp') }}</option>
+                  <option value="classical">{{ t('rules.providers.behaviorClassical') }}</option>
+                  <option value="mrs">{{ t('rules.providers.behaviorMrs') }}</option>
                 </select>
               </td>
               <td>
@@ -525,6 +612,22 @@ onMounted(load)
 .pv-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-hover); font-size: 13px; }
 .pv-head .bad { color: #fda4af; }
 .pv-body { margin: 0; padding: 12px 14px; max-height: 240px; overflow: auto; font-size: 12px; line-height: 1.65; font-family: ui-monospace, Consolas, monospace; color: var(--text-dim); }
+
+.market { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 14px; padding: 14px; background: rgba(79, 124, 255, 0.04); }
+.market-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.market-head h5 { margin: 0; font-size: 14.5px; }
+.ok-note { font-size: 12.5px; color: #34d399; }
+.market .hint { margin: 6px 0 12px; }
+.market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.market-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: rgba(10, 12, 20, 0.35); }
+.market-item.installed { border-color: rgba(52, 211, 153, 0.45); }
+.mi-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mi-name { font-weight: 600; font-size: 14px; }
+.mi-desc { margin: 0; color: var(--text-dim); font-size: 12px; line-height: 1.5; flex: 1; }
+.mi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mi-policy { font-size: 12px; }
+.dim { color: var(--text-faint); font-size: 12px; }
+.btn.mini-install { padding: 5px 12px; font-size: 12.5px; border-radius: 9px; }
 
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
 .preset { border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
