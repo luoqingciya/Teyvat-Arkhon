@@ -5,6 +5,7 @@ import type { SystemProxyController } from './system-proxy'
 import type { WindowsServiceManager } from './system-service'
 import type { NetChecker } from './net-check'
 import type { LoopbackController } from './system-loopback'
+import type { UpdateManager } from './updater'
 import { setPortableEnabled, isPortableMode } from './paths'
 
 /** 订阅主进程错误事件的内容推送到渲染进程 */
@@ -20,7 +21,9 @@ export function createIpc(
   getExcludeKeywords: () => string[],
   setExcludeKeywords: (keywords: string[]) => void,
   getAutoStart: () => boolean,
-  setAutoStart: (enabled: boolean) => boolean
+  setAutoStart: (enabled: boolean) => boolean,
+  updateManager: UpdateManager,
+  setAutoUpdate: (enabled: boolean) => boolean
 ): void {
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -122,4 +125,11 @@ export function createIpc(
     wintun: tunPrereq(),
     windows: process.platform === 'win32'
   }))
+
+  // ---------- 应用更新（设置页） ----------
+  ipcMain.handle('update:get-state', () => updateManager.getState())
+  ipcMain.handle('update:check', () => updateManager.checkNow())
+  ipcMain.handle('update:install', () => updateManager.installNow())
+  ipcMain.handle('app:update-auto-get', () => updateManager.getState().autoUpdate)
+  ipcMain.handle('app:update-auto-set', (_e, enabled: boolean) => setAutoUpdate(enabled === true))
 }

@@ -20,7 +20,8 @@ import type {
   RuleProviderPreview,
   SystemProxyState,
   SystemServiceState,
-  TrafficSnapshot
+  TrafficSnapshot,
+  UpdateState
 } from '@teyvat-arkhon/shared'
 
 /**
@@ -139,6 +140,16 @@ const api: ArkhonAPI = {
 
   getTunPrereq: () =>
     invoke('app:get-tun-prereq') as Promise<{ wintun: boolean; windows: boolean }>,
+
+  getUpdateState: () => invoke('update:get-state') as Promise<UpdateState>,
+  checkUpdate: () => invoke('update:check') as Promise<UpdateState>,
+  installUpdate: () => invoke('update:install') as Promise<void>,
+  setAutoUpdate: (enabled) => invoke('app:update-auto-set', enabled) as Promise<boolean>,
+  onUpdateState: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, state: UpdateState): void => cb(state)
+    ipcRenderer.on('arkhon:update', listener)
+    return () => ipcRenderer.removeListener('arkhon:update', listener)
+  },
 
   onStateChange: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, status: CoreStatus): void => cb(status)

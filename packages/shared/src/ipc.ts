@@ -18,7 +18,8 @@ import type {
   DnsSettings,
   SystemProxyState,
   SystemServiceState,
-  TrafficSnapshot
+  TrafficSnapshot,
+  UpdateState
 } from './types'
 
 /**
@@ -148,6 +149,18 @@ export interface ArkhonAPI {
   getDataInfo(): Promise<{ dataDir: string; portable: boolean }>
   setPortable(enabled: boolean): Promise<{ portable: boolean; note: string }>
   getTunPrereq(): Promise<{ wintun: boolean; windows: boolean }>
+
+  // ---------- 应用更新（设置页） ----------
+  /** 获取当前更新状态（含自动检查开关） */
+  getUpdateState(): Promise<UpdateState>
+  /** 手动检查更新 */
+  checkUpdate(): Promise<UpdateState>
+  /** 立即重启并安装已下载的更新 */
+  installUpdate(): Promise<void>
+  /** 设置自动检查更新（主进程持久化） */
+  setAutoUpdate(enabled: boolean): Promise<boolean>
+  /** 更新状态变化时通知（手动/自动检查、下载完成、错误） */
+  onUpdateState(cb: (state: UpdateState) => void): () => void
 
   // ---------- 事件订阅（返回取消函数） ----------
   onStateChange(cb: (status: CoreStatus) => void): () => void
