@@ -12,7 +12,7 @@
  */
 
 import { type App } from 'electron'
-import { cpSync, existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 export const PORTABLE_MARKER = 'portable.txt'
@@ -43,46 +43,8 @@ export function isPortableMode(appHandle: App, env = process.env): boolean {
 }
 
 /**
- * 一次性回迁：v1.3.4 曾把安装版数据迁到系统 userData。现数据固定回安装目录 data/，
- * 若安装目录无真实订阅而系统 userData 有，则把订阅与配置复制回安装目录。
- * 幂等：安装目录已有真实订阅（profiles/index.json 非空）时不动。
- */
-function recoverUserDataToDataDir(appHandle: App): void {
-  if (!appHandle.isPackaged) return
-  const dataDir = join(appRootDir(appHandle), PORTABLE_DATA_DIR)
-  try {
-    const dataIdx = join(dataDir, 'profiles', 'index.json')
-    if (existsSync(dataIdx) && statSync(dataIdx).size > 2) return
-  } catch {
-    return
-  }
-  // 系统默认 userData（setPath 之前的原始位置，v1.3.4 迁移目标）
-  const legacy = join(appHandle.getPath('appData'), appHandle.getName())
-  try {
-    const legacyIdx = join(legacy, 'profiles', 'index.json')
-    if (!existsSync(legacyIdx) || statSync(legacyIdx).size <= 2) return
-  } catch {
-    return
-  }
-  try {
-    mkdirSync(join(dataDir, 'profiles'), { recursive: true })
-    if (existsSync(join(legacy, 'profiles'))) {
-      cpSync(join(legacy, 'profiles'), join(dataDir, 'profiles'), { recursive: true, force: true })
-    }
-    mkdirSync(join(dataDir, 'config'), { recursive: true })
-    if (existsSync(join(legacy, 'config'))) {
-      cpSync(join(legacy, 'config'), join(dataDir, 'config'), { recursive: true, force: true })
-    }
-    console.log('[teyvat-arkhon] 已从系统目录恢复订阅配置到安装目录 %s', dataDir)
-  } catch (e) {
-    console.warn('[teyvat-arkhon] 从系统目录恢复订阅配置失败:', (e as Error).message)
-  }
-}
-
-/**
  * 计算并设置运行数据目录（须在 app ready 之前调用一次）。
- * 便携模式下：数据目录 = 运行目录/data，并把 XDG_CONFIG_HOME 指过去
- * （内嵌 mihomo 与主进程同进程，可读到该 env，geo/wintun 跟随本地）。
+ * 数据固定跟随应用：打包版 userData = 安装目录 data/，开发期用系统 userData。
  */
 export function bootstrapDataDir(appHandle: App): { dataDir: string; portable: boolean } {
   const portable = isPortableMode(appHandle)
@@ -92,8 +54,6 @@ export function bootstrapDataDir(appHandle: App): { dataDir: string; portable: b
     process.env['XDG_CONFIG_HOME'] = dataDir
   }
   appHandle.setPath('userData', dataDir)
-  // 打包版启动：把 v1.3.4 误迁到系统 userData 的真实订阅带回安装目录 data/
-  if (portable) recoverUserDataToDataDir(appHandle)
   return { dataDir, portable }
 }
 
