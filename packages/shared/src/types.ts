@@ -588,6 +588,22 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   }
 ]
 
+/** 应用更新状态（设置页展示 / 主进程广播） */
+export type UpdateCheckState = 'idle' | 'checking' | 'not-available' | 'available' | 'downloaded' | 'error' | 'disabled'
+
+export interface UpdateState {
+  /** 当前状态 */
+  state: UpdateCheckState
+  /** 当前应用版本 */
+  currentVersion: string
+  /** 自动检查开关（主进程持久化） */
+  autoUpdate: boolean
+  /** 可用新版本号（available / downloaded 时） */
+  version?: string
+  /** error / disabled 时的说明 */
+  message?: string
+}
+
 /**
  * 内置 DNS 分流预设模板库。
  * `{name}` 占位符表示解析组名，应用时由用户替换；`--default--` 为默认统一解析组。

@@ -205,7 +205,17 @@ const resources = {
         about: '关于',
         version: '版本',
         license: '协议',
-        licenseText: '许可证文本'
+        licenseText: '许可证文本',
+        update: '更新',
+        updateHint: '启动时自动检查一次新版本；也可随时手动检查。下载完成后可在本页立即重启安装，或稍后由系统在退出时自动安装。',
+        updateAuto: '自动检查更新',
+        updateCheck: '检查更新',
+        updateChecking: '正在检查更新…',
+        updateUpToDate: '当前已是最新版本',
+        updateAvailable: '发现新版本 {{version}}，正在下载/待下载…',
+        updateReady: '新版本 {{version}} 已就绪',
+        updateInstall: '立即重启安装',
+        updateFailed: '检查更新失败'
       },
       common: { apply: '应用', cancel: '取消', save: '保存' },
       rules: {
@@ -531,7 +541,17 @@ const resources = {
         about: 'About',
         version: 'Version',
         license: 'License',
-        licenseText: 'License text'
+        licenseText: 'License text',
+        update: 'Update',
+        updateHint: 'Checks for a new version once at startup; you can also check manually anytime. After the download finishes you can restart to install here, or the installer will apply it on exit.',
+        updateAuto: 'Auto-check updates',
+        updateCheck: 'Check for updates',
+        updateChecking: 'Checking for updates…',
+        updateUpToDate: 'You are on the latest version',
+        updateAvailable: 'New version {{version}} found, downloading/pending…',
+        updateReady: 'New version {{version}} is ready',
+        updateInstall: 'Restart & install',
+        updateFailed: 'Update check failed'
       },
       common: { apply: 'Apply', cancel: 'Cancel', save: 'Save' },
       rules: {

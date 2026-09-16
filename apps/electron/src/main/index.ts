@@ -11,7 +11,7 @@ import { createServiceManager } from './system-service'
 import { createLoopbackController } from './system-loopback'
 import { createSubscriptionSync } from './subscription-sync'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
-import { setupAutoUpdater } from './updater'
+import { createUpdateManager } from './updater'
 import { bootstrapDataDir } from './paths'
 
 // 数据目录策略（须在 ready 前确定）：默认便携时数据跟随运行目录
@@ -137,6 +137,33 @@ function writeExcludeKeywords(keywords: string[]): void {
     writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
   } catch (e) {
     console.warn('[teyvat-arkhon] 保存订阅排除关键词失败:', (e as Error).message)
+  }
+}
+
+// ---------- 自动检查更新（默认开启，持久化到 settings.json） ----------
+
+function readAutoUpdate(): boolean {
+  try {
+    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { autoUpdate?: boolean }
+    return j.autoUpdate !== false
+  } catch {
+    return true
+  }
+}
+
+function writeAutoUpdate(enabled: boolean): void {
+  try {
+    const file = settingsFilePath()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
+    } catch {
+      /* 首次写入 */
+    }
+    j.autoUpdate = enabled
+    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
+  } catch (e) {
+    console.warn('[teyvat-arkhon] 保存自动更新设置失败:', (e as Error).message)
   }
 }
 
@@ -429,6 +456,13 @@ if (!gotLock) {
       if (enabled) subscriptionSync.start()
       else subscriptionSync.stop()
     }
+    // 应用更新管理：状态广播到渲染进程（设置页展示/手动检查/安装）
+    const updateManager = createUpdateManager({ autoEnabled: readAutoUpdate() })
+    const setAutoUpdate = (enabled: boolean): boolean => {
+      const ok = updateManager.setAutoEnabled(enabled)
+      writeAutoUpdate(enabled)
+      return ok
+    }
     createIpc(
       service,
       sysProxy,
@@ -444,7 +478,9 @@ if (!gotLock) {
       readExcludeKeywords,
       writeExcludeKeywords,
       readAutoStart,
-      applyAutoStart
+      applyAutoStart,
+      updateManager,
+      setAutoUpdate
     )
     // 已开启自动更新的用户：启动即进入定时刷新节奏
     if (readAutoRefresh()) subscriptionSync.start()
@@ -452,7 +488,10 @@ if (!gotLock) {
     trafficMonitor = createTrafficMonitor(() => service)
     trafficMonitor.start()
 
-    setupAutoUpdater()
+    // 启动稍后自动检查一次更新（未勾选自动检查时仍可到设置页手动检查）
+    if (readAutoUpdate()) {
+      setTimeout(() => void updateManager.checkNow(), 10_000)
+    }
 
     await createWindow(sysProxy)
 

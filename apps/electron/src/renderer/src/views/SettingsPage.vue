@@ -272,6 +272,57 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
     </div>
 
     <div class="card glass">
+      <h3>{{ t('settings.update') }}</h3>
+      <p class="hint">{{ t('settings.updateHint') }}</p>
+      <div class="switch-row">
+        <span class="row-label">{{ t('settings.updateAuto') }}</span>
+        <button
+          class="switch"
+          :class="{ on: store.update.autoUpdate }"
+          role="switch"
+          :aria-checked="store.update.autoUpdate"
+          @click="store.setAutoUpdate(!store.update.autoUpdate)"
+        >
+          <span class="knob"></span>
+        </button>
+      </div>
+
+      <div class="update-status">
+        <template v-if="store.update.state === 'checking'">
+          <span class="upd-checking">{{ t('settings.updateChecking') }}</span>
+        </template>
+        <template v-else-if="store.update.state === 'available'">
+          <span class="upd-news">{{ t('settings.updateAvailable', { version: store.update.version }) }}</span>
+        </template>
+        <template v-else-if="store.update.state === 'downloaded'">
+          <span class="upd-news">{{ t('settings.updateReady', { version: store.update.version }) }}</span>
+        </template>
+        <template v-else-if="store.update.state === 'not-available'">
+          <span class="upd-ok">{{ t('settings.updateUpToDate') }}</span>
+        </template>
+        <template v-else-if="store.update.state === 'error'">
+          <span class="upd-err">{{ t('settings.updateFailed') }}：{{ store.update.message }}</span>
+        </template>
+        <template v-else-if="store.update.state === 'disabled'">
+          <span class="upd-dim">{{ store.update.message }}</span>
+        </template>
+      </div>
+
+      <div class="row upd-actions">
+        <button class="btn" :disabled="store.update.state === 'checking'" @click="store.checkUpdate()">
+          {{ t('settings.updateCheck') }}
+        </button>
+        <button
+          v-if="store.update.state === 'downloaded'"
+          class="btn primary"
+          @click="store.installUpdate()"
+        >
+          {{ t('settings.updateInstall') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="card glass">
       <h3>{{ t('settings.about') }}</h3>
       <dl class="kv">
         <dt>{{ t('settings.version') }}</dt>
@@ -514,5 +565,21 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
 .switch:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.update-status {
+  margin: 14px 0 4px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+}
+.upd-checking { color: #fcd34d; }
+.upd-news { color: #7dd3fc; }
+.upd-ok { color: #34d399; }
+.upd-err { color: #fda4af; }
+.upd-dim { color: var(--text-faint); }
+.upd-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
 }
 </style>

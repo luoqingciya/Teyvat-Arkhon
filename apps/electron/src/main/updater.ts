@@ -1,55 +1,143 @@
 /**
- * 自动更新：基于 electron-updater + GitHub Releases。
- * 仅在打包（非 dev）且未设置 TEVVAT_ARKHON_DISABLE_UPDATE 时启用。
+ * 应用更新管理：基于 electron-updater + GitHub Releases。
+ * - 设置页可手动检查、查看状态、立即重启安装；
+ * - 每次状态变化广播到渲染进程（arkhon:update）。
+ * 仅打包（非 dev）且未设置 TEVVAT_ARKHON_DISABLE_UPDATE 时启用。
  */
 
-import { app, dialog } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
+import type { UpdateState } from '@teyvat-arkhon/shared'
 
-let checkedOnce = false
+export interface UpdateManager {
+  /** 当前更新状态快照 */
+  getState(): UpdateState
+  /** 手动检查更新 */
+  checkNow(): Promise<UpdateState>
+  /** 立即重启并安装（需已有下载完成的更新） */
+  installNow(): void
+  /** 自动检查开关 */
+  setAutoEnabled(enabled: boolean): boolean
+}
 
-export function setupAutoUpdater(): void {
-  if (!app.isPackaged) {
-    console.log('[teyvat-arkhon] 开发环境跳过自动更新')
-    return
-  }
-  if (process.env['TEVVAT_ARKHON_DISABLE_UPDATE'] === '1') {
-    console.log('[teyvat-arkhon] 已通过环境变量禁用自动更新')
-    return
-  }
+export interface UpdateManagerOptions {
+  /** 自动检查开关（初始值，主进程持久化配合） */
+  autoEnabled: boolean
+  /** 状态变化广播（主进程向渲染窗口推送） */
+  onBroadcast?: (state: UpdateState) => void
+}
 
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+const UPDATE_CHANNEL = 'arkhon:update'
 
-  autoUpdater.on('update-downloaded', (info) => {
-    try {
-      dialog
-        .showMessageBox({
-          type: 'info',
-          title: 'Teyvat Arkhon',
-          message: `新版本 ${info.version} 已就绪`,
-          detail: '将在退出时自动安装。是否立即重启应用完成更新？',
-          buttons: ['稍后', '立即重启'],
-          defaultId: 1,
-          cancelId: 0
-        })
-        .then(({ response }) => {
-          if (response === 1) {
-            void autoUpdater.quitAndInstall(false, true)
-          }
-        })
-    } catch {
-      /* 对话框失败时静默，下次启动再检查 */
+export function createUpdateManager(opts: UpdateManagerOptions): UpdateManager {
+  let autoEnabled = opts.autoEnabled
+  let state: UpdateState['state'] = 'idle'
+  let updateVersion: string | undefined
+  let lastError = ''
+
+  const send = (): void => {
+    const snapshot = snapshotState()
+    opts.onBroadcast?.(snapshot)
+    for (const w of BrowserWindow.getAllWindows()) {
+      w.webContents.send(UPDATE_CHANNEL, snapshot)
     }
-  })
-  autoUpdater.on('error', (err) => {
-    console.warn('[teyvat-arkhon] 自动更新检查失败:', err?.message ?? err)
+  }
+
+  const snapshotState = (): UpdateState => ({
+    state: state === 'idle' ? 'idle' : state,
+    currentVersion: app.getVersion(),
+    autoUpdate: autoEnabled,
+    version: updateVersion,
+    message: lastError || undefined
   })
 
-  // 延迟到窗口准备好后检查一次
-  setTimeout(() => {
-    if (checkedOnce) return
-    checkedOnce = true
-    void autoUpdater.checkForUpdates().catch(() => {})
-  }, 10_000)
+  // ---- electron-updater 事件 ----
+  if (app.isPackaged && process.env['TEVVAT_ARKHON_DISABLE_UPDATE'] !== '1') {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => {
+      state = 'checking'
+      lastError = ''
+      send()
+    })
+    autoUpdater.on('update-available', (info) => {
+      state = 'available'
+      updateVersion = info.version
+      send()
+      // 自动下载由 autoDownload=true 接管；下载完成走 update-downloaded
+    })
+    autoUpdater.on('update-not-available', () => {
+      state = 'not-available'
+      send()
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      state = 'downloaded'
+      updateVersion = info.version
+      send()
+      try {
+        dialog
+          .showMessageBox({
+            type: 'info',
+            title: 'Teyvat Arkhon',
+            message: `新版本 ${info.version} 已就绪`,
+            detail: '可在「设置 → 更新」中安装。是否立即重启应用完成更新？',
+            buttons: ['稍后', '立即重启'],
+            defaultId: 1,
+            cancelId: 0
+          })
+          .then(({ response }) => {
+            if (response === 1) autoUpdater.quitAndInstall(false, true)
+          })
+      } catch {
+        /* 对话框失败时静默，设置页仍可手动安装 */
+      }
+    })
+    autoUpdater.on('error', (err) => {
+      state = 'error'
+      lastError = err instanceof Error ? err.message : String(err)
+      console.warn('[teyvat-arkhon] 更新检查失败:', lastError)
+      send()
+    })
+  }
+
+  const enabled = (): boolean => app.isPackaged && process.env['TEVVAT_ARKHON_DISABLE_UPDATE'] !== '1'
+
+  const manager: UpdateManager = {
+    getState(): UpdateState {
+      if (!enabled()) {
+        return {
+          state: process.env['TEVVAT_ARKHON_DISABLE_UPDATE'] === '1' ? 'disabled' : 'disabled',
+          currentVersion: app.getVersion(),
+          autoUpdate: autoEnabled,
+          message: !app.isPackaged ? '开发环境不检查更新' : '自动更新已被环境变量禁用'
+        }
+      }
+      return snapshotState()
+    },
+
+    async checkNow(): Promise<UpdateState> {
+      if (!enabled()) return manager.getState()
+      try {
+        await autoUpdater.checkForUpdates()
+      } catch {
+        /* 错误由 error 事件广播 */
+      }
+      return manager.getState()
+    },
+
+    installNow(): void {
+      if (enabled() && state === 'downloaded') {
+        autoUpdater.quitAndInstall(false, true)
+      }
+    },
+
+    setAutoEnabled(enabled): boolean {
+      autoEnabled = enabled
+      send()
+      return autoEnabled
+    }
+  }
+
+  return manager
 }

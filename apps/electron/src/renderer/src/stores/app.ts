@@ -14,7 +14,8 @@ import type {
   RuleInfo,
   SystemProxyState,
   SystemServiceState,
-  TrafficSnapshot
+  TrafficSnapshot,
+  UpdateState
 } from '@teyvat-arkhon/shared'
 import { applyTheme, readTheme, type Theme } from '../theme'
 
@@ -66,6 +67,8 @@ interface AppState {
   loopback: LoopbackState | null
   /** 当前路由规则（内核运行期有效） */
   rules: RuleInfo[]
+  /** 应用更新状态（设置页） */
+  update: UpdateState
 }
 
 /** 测速配置本地持久化键 */
@@ -133,7 +136,8 @@ export const useAppStore = defineStore('app', {
     netProbe: null,
     netChecking: false,
     loopback: null,
-    rules: []
+    rules: [],
+    update: { state: 'idle', currentVersion: '', autoUpdate: true }
   }),
 
   getters: {
@@ -171,6 +175,9 @@ export const useAppStore = defineStore('app', {
       window.arkhon.onProfilesChanged(() => {
         void this.refreshProfiles()
       })
+      window.arkhon.onUpdateState((state) => {
+        this.update = state
+      })
       await this.refreshStatus()
       await this.refreshProfiles()
       await this.refreshSystemProxy()
@@ -183,7 +190,41 @@ export const useAppStore = defineStore('app', {
       await this.refreshAutoStart()
       await this.refreshExcludeKeywords()
       await this.refreshLoopback()
+      await this.initUpdateState()
       this.appVersion = await window.arkhon.getAppVersion()
+    },
+
+    /** 启动时拉取一次更新状态（含自动检查开关） */
+    async initUpdateState(): Promise<void> {
+      try {
+        this.update = await window.arkhon.getUpdateState()
+      } catch {
+        /* 更新功能不可用时保持默认 */
+      }
+    },
+
+    // ---------- 应用更新 ----------
+    async checkUpdate(): Promise<void> {
+      try {
+        this.update = await window.arkhon.checkUpdate()
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+    async installUpdate(): Promise<void> {
+      try {
+        await window.arkhon.installUpdate()
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+    async setAutoUpdate(enabled: boolean): Promise<void> {
+      try {
+        const ok = await window.arkhon.setAutoUpdate(enabled)
+        this.update = { ...this.update, autoUpdate: ok }
+      } catch (e) {
+        this.error = (e as Error).message
+      }
     },
 
     /** 启动时同步当前运行模式 */
