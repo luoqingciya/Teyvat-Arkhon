@@ -37,6 +37,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   perMachine: false
   shortcutName: Teyvat Arkhon
+  # 自定义 NSIS 脚本：更新/卸载时保留安装目录 data/（订阅配置等用户数据）
+  include: build/installer.nsh
 
 linux:
   target:
