@@ -263,14 +263,13 @@ const resources = {
           reinstall: '重新安装',
           installedTag: '已安装',
           installed: '已安装「{{name}}」并添加规则行',
-          installPrompt: '规则集「{{name}}」的分流策略（代理组/节点名）：',
+          installedDefault: '已安装「{{name}}」并添加规则行（策略默认 {{policy}}，可在规则编辑器修改）',
           viaProxy: '走代理'
         },
         presets: {
           title: '内置分流预设',
           hint: '一键将常见分流场景模板插入到规则列表顶部，之后可继续手工调整。',
           apply: '应用',
-          policyPrompt: '该模板需要指定目标策略（代理组/节点名）用于替换 {name} 占位：',
           applied: '已应用模板 "{{name}}"'
         },
         debug: {
@@ -590,14 +589,13 @@ const resources = {
           reinstall: 'Reinstall',
           installedTag: 'Installed',
           installed: 'Installed "{{name}}" and added the rule line',
-          installPrompt: 'Routing policy (proxy group / node) for "{{name}}":',
+          installedDefault: 'Installed "{{name}}" and added the rule line (policy defaults to {{policy}}, editable in the editor)',
           viaProxy: 'via proxy'
         },
         presets: {
           title: 'Built-in Templates',
           hint: 'Insert a common routing scenario template to the top of the rule list, then fine-tune manually.',
           apply: 'Apply',
-          policyPrompt: 'This template needs a target policy (proxy group / node) to replace {name}:',
           applied: 'Template "{{name}}" applied'
         },
         debug: {
