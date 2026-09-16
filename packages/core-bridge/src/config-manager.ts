@@ -430,7 +430,7 @@ export class ConfigManager {
       const url = provider.url ?? ''
       if (!url) return { name, remote: true, count: 0, lines: [], error: '缺少远程规则集 URL' }
       try {
-        const res = await fetch(url)
+        const res = await fetchRuleSet(url)
         if (!res.ok) {
           return { name, remote: true, count: 0, lines: [], error: `下载失败: HTTP ${res.status}` }
         }
@@ -472,7 +472,7 @@ export class ConfigManager {
     const isMrs = provider.behavior === 'mrs'
     let body: Buffer
     try {
-      const res = await fetch(url)
+      const res = await fetchRuleSet(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       body = Buffer.from(await res.arrayBuffer())
     } catch (e) {
@@ -652,6 +652,28 @@ function urlTextToName(url: string): string {
     /* 非标准 URL 忽略 */
   }
   return url.split('/').pop() ?? url
+}
+
+/** jsdelivr 官方 CDN 不可达时的国内可达镜像（按顺序回退） */
+const JSDELIVR_MIRRORS = ['fastly.jsdelivr.net', 'gcore.jsdelivr.net', 'testingcf.jsdelivr.net']
+/** 规则集下载超时 ms（防止 jsdelivr 挂起导致安装"无响应"） */
+const RULESET_FETCH_TIMEOUT_MS = 20_000
+
+/**
+ * 下载规则集：超时控制 + jsdelivr 多镜像回退。
+ * 返回首个可用镜像的响应（非 2xx 也返回，由调用方按 HTTP 状态处理）。
+ */
+async function fetchRuleSet(url: string): Promise<Response> {
+  const candidates = [url, ...JSDELIVR_MIRRORS.map((h) => url.replace('cdn.jsdelivr.net', h))]
+  let lastErr: unknown = new Error('download-failed')
+  for (const u of candidates) {
+    try {
+      return await fetch(u, { signal: AbortSignal.timeout(RULESET_FETCH_TIMEOUT_MS) })
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
 /**

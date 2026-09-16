@@ -157,20 +157,13 @@ async function preview(p: RuleProvider): Promise<void> {
 
 /**
  * 安装推荐规则集：下载落盘 + 写入 rule-providers，随后自动添加对应 RULE-SET 规则行。
- * - REJECT 建议类 → 规则插到顶部；DIRECT 建议类 → 插到 MATCH 之前；__PROXY__ → 询问策略
+ * - REJECT 建议类 → 规则插到顶部；DIRECT 建议类 → 插到 MATCH 之前；
+ *   __PROXY__ → 默认用当前选中组（无则 PROXY），安装后可在编辑器修改策略
+ *   （Electron 不支持 window.prompt，不能在安装时弹窗询问）
  */
 async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
   installNote.value = ''
-  let policy = rs.suggestedProxy
-  if (policy === '__PROXY__') {
-    const target = window.prompt(
-      t('rules.providers.installPrompt', { name: rs.name }),
-      store.selectedGroup || 'PROXY'
-    )
-    if (target === null) return
-    policy = target.trim()
-    if (!policy) return
-  }
+  const policy = rs.suggestedProxy === '__PROXY__' ? store.selectedGroup || 'PROXY' : rs.suggestedProxy
 
   installingId.value = rs.id
   error.value = ''
@@ -196,7 +189,10 @@ async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
     }
     // 4. 保存完整编辑状态（含新规则行）
     await save()
-    installNote.value = t('rules.providers.installed', { name: rs.name })
+    installNote.value =
+      rs.suggestedProxy === '__PROXY__'
+        ? t('rules.providers.installedDefault', { name: rs.name, policy })
+        : t('rules.providers.installed', { name: rs.name })
     await store.refreshRules?.()
   } catch (e) {
     error.value = (e as Error).message
@@ -207,17 +203,14 @@ async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
 
 // ---- Tab3 预设 ----
 async function applyPreset(preset: RulePreset): Promise<void> {
-  let entries = preset.rules.map((r) => ({ type: r.type, payload: r.payload ?? '', proxy: r.proxy ?? '' }))
-  if (entries.some((r) => r.proxy === '__PROXY__')) {
-    const target = window.prompt(
-      t('rules.presets.policyPrompt', { name: preset.name }),
-      store.selectedGroup || 'PROXY'
-    )
-    if (target === null) return
-    const policy = target.trim()
-    if (!policy) return
-    entries = entries.map((r) => ({ ...r, proxy: r.proxy === '__PROXY__' ? policy : r.proxy }))
-  }
+  // __PROXY__ 占位：默认用当前选中组（无则 PROXY），可后续在编辑器修改
+  // （Electron 不支持 window.prompt，不能弹窗询问）
+  const policy = store.selectedGroup || 'PROXY'
+  const entries = preset.rules.map((r) => ({
+    type: r.type,
+    payload: r.payload ?? '',
+    proxy: r.proxy === '__PROXY__' ? policy : (r.proxy ?? '')
+  }))
   if (preset.id === 'cn-direct') {
     // 中国大陆直连：插到 MATCH 之前（末尾）
     const matchIdx = rules.value.findIndex((r) => (r.type ?? '').toUpperCase() === 'MATCH')
