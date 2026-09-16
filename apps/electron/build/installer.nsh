@@ -9,9 +9,22 @@
 
 !macro customCheckAppRunning
   DetailPrint "正在关闭已运行的 ${PRODUCT_NAME} 旧实例..."
-  ; 忽略执行结果（没有实例在运行时 taskkill 会失败，属正常）
+  ; 杀主进程及 Electron 同影像名子进程（/f 强杀）
   nsExec::Exec `%SYSTEMROOT%\System32\cmd.exe /c taskkill /im "Teyvat Arkhon.exe" /f`
-  Sleep 500
+  ; 杀内核（sidecar mihomo）子进程：其工作目录在安装目录 data/ 内，
+  ; 若不退出会占用 data 文件，导致后续 customRemoveFiles 暂存 data 时 Abort。
+  nsExec::Exec `%SYSTEMROOT%\System32\cmd.exe /c taskkill /im "arkhon-windows-x64.exe" /f`
+  ; 等待主进程真正退出（最多 5s），确保文件释放后才进入文件复制/卸载段
+  StrCpy $R0 0
+  killWait:
+    IntOp $R0 $R0 + 1
+    Sleep 1000
+    nsExec::Exec `%SYSTEMROOT%\System32\cmd.exe /c tasklist /FI "IMAGENAME eq Teyvat Arkhon.exe" /FO csv | find "Teyvat Arkhon.exe"`
+    Pop $R1
+    ${if} $R1 == 0
+    ${andIf} $R0 < 5
+      Goto killWait
+    ${endIf}
 !macroend
 
 !macro customRemoveFiles
