@@ -12,7 +12,7 @@ import { createLoopbackController } from './system-loopback'
 import { createSubscriptionSync } from './subscription-sync'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
 import { setupAutoUpdater } from './updater'
-import { bootstrapDataDir, migratePortableData } from './paths'
+import { bootstrapDataDir } from './paths'
 
 // 数据目录策略（须在 ready 前确定）：默认便携时数据跟随运行目录
 const dataLayout = bootstrapDataDir(app)
@@ -485,15 +485,6 @@ app.on('before-quit', async (e) => {
       /* 关闭失败不阻塞退出 */
     }
     proxyExpected = null
-  }
-  // 便携数据迁移：安装版曾被误判便携时，退到系统 userData，防更新卸载丢配置
-  try {
-    if (app.isPackaged) {
-      const r = migratePortableData(app)
-      if (r.migrated) console.log('[teyvat-arkhon] %s', r.note)
-    }
-  } catch (migErr) {
-    console.warn('[teyvat-arkhon] 便携数据迁移异常:', (migErr as Error).message)
   }
   app.exit(0)
 })
