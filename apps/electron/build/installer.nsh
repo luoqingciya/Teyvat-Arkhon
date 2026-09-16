@@ -1,7 +1,18 @@
 ; Teyvat Arkhon - NSIS 自定义脚本
-; 作用：更新/卸载时保留安装目录下的 data 目录（订阅档案、工作配置等用户数据）。
-; electron-builder 定义 customRemoveFiles 宏后，将不再执行默认的
-; "RMDir /r $INSTDIR 删除整个安装目录"，改由本宏接管文件删除。
+; 作用：
+;  1. customCheckAppRunning：安装/更新前自动关闭正在运行的旧实例。
+;     应用关闭主窗口是隐藏到系统托盘、进程常驻（设计如此），若让 electron-builder 默认
+;     检测弹"软件正在运行请关闭"会卡住用户；这里直接 taskkill 后继续。
+;     必须先杀进程，否则后续卸载段暂存 data 目录时文件被占用会触发 Abort 保护。
+;  2. customRemoveFiles：更新/卸载时保留安装目录下的 data 目录（订阅档案、工作配置等
+;     用户数据）。electron-builder 定义该宏后不再执行默认整目录删除，改由本宏接管。
+
+!macro customCheckAppRunning
+  DetailPrint "正在关闭已运行的 ${PRODUCT_NAME} 旧实例..."
+  ; 忽略执行结果（没有实例在运行时 taskkill 会失败，属正常）
+  nsExec::Exec `%SYSTEMROOT%\System32\cmd.exe /c taskkill /im "Teyvat Arkhon.exe" /f`
+  Sleep 500
+!macroend
 
 !macro customRemoveFiles
   ; data 目录先移出安装目录
