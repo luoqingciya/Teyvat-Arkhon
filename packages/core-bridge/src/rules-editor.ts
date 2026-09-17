@@ -132,16 +132,29 @@ export function parseProvidersMap(providers: unknown): RuleProvider[] {
   for (const [name, v] of Object.entries(providers as Record<string, unknown>)) {
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue
     const p = v as Record<string, unknown>
+    const behavior = normalizeBehavior(p.behavior)
     out.push({
       name,
       type: p.type === 'file' ? 'file' : 'http',
-      behavior: normalizeBehavior(p.behavior),
+      behavior,
       url: typeof p.url === 'string' ? p.url : undefined,
-      file: typeof p.path === 'string' ? p.path : typeof p.file === 'string' ? p.file : undefined,
+      // path 缺失时按应用落盘约定推断 providers/<name>.<txt|mrs>（兼容旧版未写 path 的配置）
+      file:
+        typeof p.path === 'string'
+          ? p.path
+          : typeof p.file === 'string'
+            ? p.file
+            : inferProviderFile(name, behavior),
       interval: typeof p.interval === 'number' ? p.interval : undefined
     })
   }
   return out
+}
+
+/** 按落盘约定推断规则集本地文件名（installRuleProvider 固定写入 providers/<name>.<ext>） */
+function inferProviderFile(name: string, behavior: string): string {
+  const ext = behavior === 'mrs' ? 'mrs' : 'txt'
+  return `providers/${name}.${ext}`
 }
 
 /** 序列化 provider 为 Clash rule-providers 映射对象（便于 yaml.dump） */
