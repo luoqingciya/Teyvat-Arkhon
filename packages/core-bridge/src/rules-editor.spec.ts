@@ -69,7 +69,9 @@ describe('parseProvidersMap / providersToMap', () => {
       type: 'http',
       behavior: 'domain',
       url: 'https://x/a.yaml',
-      interval: 60
+      interval: 60,
+      // http 型无 path 时按落盘约定推断本地文件
+      file: 'providers/adblock.txt'
     })
     expect(list).toContainEqual({
       name: 'cn',
@@ -77,6 +79,13 @@ describe('parseProvidersMap / providersToMap', () => {
       behavior: 'ipcidr',
       file: './cn.yaml'
     })
+  })
+
+  it('parseProvidersMap 有 path 时优先用 path，不推断', () => {
+    const list = parseProvidersMap({
+      p: { type: 'http', behavior: 'domain', url: 'https://x/y.txt', path: 'providers/other.txt' }
+    })
+    expect(list[0].file).toBe('providers/other.txt')
   })
 
   it('providersToMap 往返保持字段', () => {
