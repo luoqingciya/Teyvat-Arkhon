@@ -153,6 +153,9 @@ export function providersToMap(providers: RuleProvider[]): Record<string, unknow
     if (p.type === 'http') {
       if (p.url) entry.url = p.url
       if (p.interval && p.interval > 0) entry.interval = p.interval
+      // http 型也写本地 path（安装时已落盘 providers/<name>.txt）：
+      // 使内核优先读本地文件（离线可用/启动更快），并让规则命中调试能展开真实内容
+      if (p.file) entry.path = p.file
     } else {
       if (p.file) entry.path = p.file
     }

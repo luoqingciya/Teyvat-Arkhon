@@ -84,6 +84,14 @@ describe('parseProvidersMap / providersToMap', () => {
     const map = providersToMap(list)
     expect(map.p).toEqual({ type: 'http', behavior: 'domain', url: 'https://x/b', interval: 30 })
   })
+
+  it('providersToMap http 型带本地落盘文件时写入 path（调试/内核本地加载）', () => {
+    const list: RuleProvider[] = [
+      { name: 'p', type: 'http', behavior: 'domain', url: 'https://x/b', file: 'providers/p.txt', interval: 60 }
+    ]
+    const map = providersToMap(list)
+    expect(map.p).toMatchObject({ type: 'http', url: 'https://x/b', path: 'providers/p.txt', interval: 60 })
+  })
 })
 
 describe('validateRule / validateRules', () => {
