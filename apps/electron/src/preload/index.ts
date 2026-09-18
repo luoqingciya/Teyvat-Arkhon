@@ -47,6 +47,7 @@ const api: ArkhonAPI = {
   setCoreMode: (mode) => invoke('core:set-mode', mode) as Promise<void>,
   getCoreMode: () => invoke('core:get-mode') as Promise<ProxyMode | undefined>,
   getCoreLogs: () => invoke('core:get-logs') as Promise<string[]>,
+  exportLogs: () => invoke('logs:export') as Promise<string | null>,
 
   getConnections: () =>
     invoke('core:get-connections') as Promise<{

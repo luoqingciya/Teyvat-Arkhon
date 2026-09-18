@@ -463,6 +463,27 @@ describe('buildClashYaml 自动切换组', () => {
   })
 })
 
+describe('工作配置自动备份', () => {
+  it('每次写工作配置前轮转备份，最多保留 3 份，readActiveBackup 返回最近备份', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'arkhon-bak-'))
+    const activeFile = path.join(dir, 'config.yaml')
+    const mgr = new ConfigManager({ profilesDir: path.join(dir, 'profiles'), activeConfigFile: activeFile })
+    await mgr.init()
+    for (let i = 1; i <= 5; i++) {
+      const src = SAMPLE_YAML.replace('mixed-port: 7890', `mixed-port: ${7800 + i}`)
+      const { profile } = await mgr.importFromText(`sub-${i}`, src)
+      await mgr.selectProfile(profile.id)
+    }
+    const bak = `${activeFile}.bak`
+    expect((await fs.stat(bak)).size).toBeGreaterThan(0)
+    expect((await fs.stat(`${bak}.1`)).size).toBeGreaterThan(0)
+    expect((await fs.stat(`${bak}.2`)).size).toBeGreaterThan(0)
+    await expect(fs.stat(`${bak}.3`)).rejects.toThrow()
+    // 最近备份 = 第 4 版内容（第 5 次写之前的工作配置）
+    expect(await mgr.readActiveBackup()).toContain('mixed-port: 7804')
+  })
+})
+
 function updatedResponse(): Response {
   return new Response(SAMPLE_YAML, { status: 200 })
 }

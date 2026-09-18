@@ -75,6 +75,14 @@ function copy(): void {
   })
 }
 
+const exportedTip = ref(false)
+async function exportToFile(): Promise<void> {
+  const path = await window.arkhon.exportLogs()
+  if (!path) return
+  exportedTip.value = true
+  setTimeout(() => (exportedTip.value = false), 3000)
+}
+
 /** 新日志到达且开启"跟随最新"时自动滚到底部 */
 watch(
   () => store.logs.length,
@@ -95,6 +103,9 @@ watch(
         <span class="hint">{{ t('logs.hint') }}</span>
         <button class="btn mini" :disabled="!store.logs.length" @click="copy">
           {{ copied ? t('logs.copied') : t('logs.copy') }}
+        </button>
+        <button class="btn mini" :disabled="!store.logs.length" @click="exportToFile">
+          {{ exportedTip ? t('logs.exported') : t('logs.export') }}
         </button>
         <button class="btn mini" :disabled="!store.logs.length" @click="store.clearLogs()">
           {{ t('logs.clear') }}

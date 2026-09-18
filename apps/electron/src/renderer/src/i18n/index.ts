@@ -101,7 +101,10 @@ const resources = {
         shareFailed: '复制失败',
         usedOfTotal: '已用 {{used}} / {{total}}',
         expiresIn: '{{days}} 天后到期',
-        expired: '已到期'
+        expired: '已到期',
+        expiringSoon: '⚠ {{days}} 天后到期',
+        expiringTitle: '订阅即将到期',
+        expiringBody: '订阅「{{names}}」将在 7 天内到期，请及时续期'
       },
       connections: {
         title: '活跃连接',
@@ -134,6 +137,8 @@ const resources = {
         hint: '实时展示 mihomo 内核运行输出，便于排障（启动失败 / 规则 miss / TUN 异常等）。',
         copy: '复制全量',
         copied: '已复制',
+        export: '导出',
+        exported: '已导出',
         clear: '清空',
         search: '搜索日志…',
         noMatch: '没有匹配的日志',
@@ -432,7 +437,10 @@ const resources = {
         shareFailed: 'Copy failed',
         usedOfTotal: 'Used {{used}} / {{total}}',
         expiresIn: 'Expires in {{days}}d',
-        expired: 'Expired'
+        expired: 'Expired',
+        expiringSoon: '⚠ expires in {{days}}d',
+        expiringTitle: 'Subscription expiring soon',
+        expiringBody: 'Subscriptions "{{names}}" expire within 7 days, please renew in time'
       },
       connections: {
         title: 'Active Connections',
@@ -465,6 +473,8 @@ const resources = {
         hint: 'Live mihomo core output for troubleshooting (startup failure / rule miss / TUN errors).',
         copy: 'Copy all',
         copied: 'Copied',
+        export: 'Export',
+        exported: 'Exported',
         clear: 'Clear',
         search: 'Search logs…',
         noMatch: 'No matching logs',

@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
+import { BrowserWindow, app, dialog, ipcMain } from 'electron'
 import type { CoreStatus, ProxyMode, SystemProxyState } from '@teyvat-arkhon/shared'
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 import type { SystemProxyController } from './system-proxy'
@@ -78,6 +78,20 @@ export function createIpc(
   ipcMain.handle('service:status', () => serviceManager.status())
   ipcMain.handle('service:install', () => serviceManager.install())
   ipcMain.handle('service:uninstall', () => serviceManager.uninstall())
+
+  // ---------- 日志导出 ----------
+  ipcMain.handle('logs:export', async (): Promise<string | null> => {
+    const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19)
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: '导出日志',
+      defaultPath: `arkhon-logs-${ts}.log`,
+      filters: [{ name: 'Log', extensions: ['log', 'txt'] }]
+    })
+    if (canceled || !filePath) return null
+    const content = service.getLogs().join('\n') + '\n'
+    await (await import('node:fs')).promises.writeFile(filePath, content, 'utf-8')
+    return filePath
+  })
 
   ipcMain.handle('proxies:list', () => service.listProxies())
   ipcMain.handle('rules:list', () => service.listRules())
