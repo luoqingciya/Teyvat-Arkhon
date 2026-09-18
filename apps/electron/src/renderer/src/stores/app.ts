@@ -3,6 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
+import i18next from 'i18next'
 import type {
   CoreStatus,
   DelayResult,
@@ -191,7 +192,29 @@ export const useAppStore = defineStore('app', {
       await this.refreshExcludeKeywords()
       await this.refreshLoopback()
       await this.initUpdateState()
+      await this.checkExpiringProfiles()
       this.appVersion = await window.arkhon.getAppVersion()
+    },
+
+    /** 启动时检查即将到期的订阅（≤7 天）并弹系统通知 */
+    async checkExpiringProfiles(): Promise<void> {
+      const soon = this.profiles.filter((p) => {
+        const e = p.subInfo?.expire
+        if (!e || e <= 0) return false
+        const days = (e * 1000 - Date.now()) / 86400000
+        return days >= 0 && days <= 7
+      })
+      if (soon.length === 0) return
+      try {
+        const names = soon.map((p) => p.name).join('、')
+        // 主进程已设置 AppUserModelID，系统通知归属正确
+        const n = new Notification(i18next.t('profiles.expiringTitle'), {
+          body: i18next.t('profiles.expiringBody', { names })
+        })
+        setTimeout(() => n.close(), 8000)
+      } catch {
+        /* 环境不支持通知时忽略 */
+      }
     },
 
     /** 启动时拉取一次更新状态（含自动检查开关） */

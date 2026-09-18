@@ -46,6 +46,8 @@ function expireText(s: ProfileSubInfo | undefined): string | null {
   if (!s || s.expire === undefined || s.expire <= 0) return null
   const days = (s.expire * 1000 - Date.now()) / 86400000
   if (days < 0) return t('profiles.expired')
+  // 临期（≤7 天）明显提示
+  if (days <= 7) return t('profiles.expiringSoon', { days: Math.ceil(days) })
   return t('profiles.expiresIn', { days: Math.ceil(days) })
 }
 
@@ -129,7 +131,14 @@ async function submitText(): Promise<void> {
                 <div class="quota-fill" :class="{ warn: quotaPct(p.subInfo) > 80 }" :style="{ width: quotaPct(p.subInfo) + '%' }"></div>
               </div>
             </div>
-            <span v-if="expireText(p.subInfo)" class="quota-expire" :class="{ overdue: expireText(p.subInfo) === t('profiles.expired') }">
+            <span
+              v-if="expireText(p.subInfo)"
+              class="quota-expire"
+              :class="{
+                overdue: expireText(p.subInfo) === t('profiles.expired'),
+                near: (p.subInfo?.expire ?? 0) > 0 && (p.subInfo!.expire! * 1000 - Date.now()) / 86400000 <= 7
+              }"
+            >
               {{ expireText(p.subInfo) }}
             </span>
           </div>
@@ -290,8 +299,13 @@ async function submitText(): Promise<void> {
   color: var(--text-faint);
   flex: none;
 }
+.quota-expire.near {
+  color: #fbbf24;
+  font-weight: 600;
+}
 .quota-expire.overdue {
   color: #f87171;
+  font-weight: 700;
 }
 .p-actions {
   display: flex;

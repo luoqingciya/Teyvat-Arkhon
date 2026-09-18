@@ -104,14 +104,27 @@
 
 ### 运行时数据布局
 
-| 数据 | 免安装版（zip，数据跟随运行目录） | 安装版 / 开发期（系统用户目录） |
-| --- | --- | --- |
-| 订阅档案 / 工作配置 `config.yaml` | `运行目录/data` | `%APPDATA%\<app>` |
-| geo 数据（geoip/geosite） | `运行目录/data/mihomo` | `~/.config/mihomo` |
-| wintun 驱动 | `运行目录/data/config/` | 数据目录 `config/` |
-| 系统代理 / 服务注册 | 系统级（注册表 / sc） | 系统级，不随便携 |
+**所有运行数据统一放在应用运行目录的 `data/`（安装版与免安装版一致）**：订阅档案、工作配置、geo 数据、内核缓存均在其中。更新/卸载安装器（NSIS）会**保留 `data/` 只删除其余文件**，因此升级永远不会丢配置。
 
-> 数据归置策略：**exe 所在目录可写（解压免安装版）时自动启用便携模式**，数据落在 exe 同级的 `data/`，无需任何配置；安装版（如 Program Files 不可写）自动回退系统用户目录。也可用 `portable.txt` 或环境变量 `TEVVAT_ARKHON_PORTABLE=1` 强制开启，设置页「数据与便携」可查询当前目录。
+| 数据 | 位置 |
+| --- | --- |
+| 订阅档案 `profiles/` | `安装目录/data/profiles` |
+| 工作配置 `config.yaml`（自动备份 `config.yaml.bak` ×3） | `安装目录/data/config` |
+| 规则集落盘 `providers/` | `安装目录/data/config/providers` |
+| geo 数据（geoip/geosite） | `安装目录/data/mihomo`（随包播种） |
+| wintun 驱动 | `安装目录/data/config/` |
+| Chromium 缓存等 | `安装目录/data/`（userData 重定向） |
+
+> 便携开关：环境变量 `TEVVAT_ARKHON_PORTABLE=1` 或运行目录放置 `portable.txt` 强制便携；设置页「数据与便携」可查询当前目录。zip 免安装包解压即用，数据天然跟随目录。
+
+### 稳定性与自愈
+
+- **内核守护**：进程意外退出自动重启（指数退避 2s→30s，最多 5 次，稳定 60s 重置计数）；连续无响应（假死，30s 探测 ×3）强制重启
+- **连接保活**：工作配置自动补 `keep-alive-interval/idle`、`tcp-concurrent`、`unified-delay`、`proxy-test-url`（仅缺失时，不覆盖订阅自带值）
+- **节点自动切换**：URI 导入 ≥2 节点自动生成 `AUTO`（url-test, 5min/容差50ms）置于 PROXY 首位
+- **系统代理守护**：被外部程序（VPN/安全软件）改动后 10s 内自动恢复；退出/更新前自动关闭，避免代理悬空断网
+- **数据保护**：工作配置写前轮转备份 `.bak`×3；规则集更新失败/内容异常时保留旧文件；唤醒（休眠 resume）后立即探测内核健康，加速恢复
+- **安装/更新**：NSIS 自定义脚本自动关闭旧实例（含内核子进程）并保留 `data/`，托盘常驻不会再弹「程序正在运行」
 
 ---
 

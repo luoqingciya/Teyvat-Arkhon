@@ -278,7 +278,7 @@ export class ConfigManager {
 
     const content = await fs.readFile(this.profileFile(id), 'utf-8')
     const enhanced = mergeKernelDefaults(content)
-    await fs.writeFile(this.activeConfigFile, enhanced, 'utf-8')
+    await this.writeActive(enhanced)
 
     for (const p of list) p.selected = p.id === id
     await this.writeIndex(list)
@@ -298,10 +298,40 @@ export class ConfigManager {
     return fs.readFile(this.activeConfigFile, 'utf-8')
   }
 
+  /**
+   * 写工作配置（统一入口）：写前先轮转备份上一份到 config.yaml.bak（最多保留 3 份）。
+   * 任何写入（档案切换/编辑器保存/DNS/规则/TUN/模式）都会留下可回滚副本。
+   */
+  private async writeActive(content: string): Promise<void> {
+    await this.rotateActiveBackup()
+    await fs.writeFile(this.activeConfigFile, content, 'utf-8')
+  }
+
+  private async rotateActiveBackup(): Promise<void> {
+    if (!(await exists(this.activeConfigFile))) return
+    const base = `${this.activeConfigFile}.bak`
+    try {
+      await fs.rm(`${base}.2`, { force: true })
+      if (await exists(`${base}.1`)) await fs.rename(`${base}.1`, `${base}.2`)
+      if (await exists(base)) await fs.rename(base, `${base}.1`)
+      await fs.copyFile(this.activeConfigFile, base)
+    } catch (e) {
+      /* 备份失败不阻塞写入（仅记录） */
+      console.warn('[teyvat-arkhon] 工作配置备份失败:', (e as Error).message)
+    }
+  }
+
+  /** 读取最近一份备份原文（回滚用）；无备份返回空串 */
+  async readActiveBackup(): Promise<string> {
+    const base = `${this.activeConfigFile}.bak`
+    if (await exists(base)) return fs.readFile(base, 'utf-8')
+    return ''
+  }
+
   /** 校验并覆写工作配置（编辑器保存），不合法时抛 Error 且不落盘 */
   async writeActiveValidated(content: string): Promise<ClashConfigSummary> {
     const summary = this.parseAndValidate(content)
-    await fs.writeFile(this.activeConfigFile, content, 'utf-8')
+    await this.writeActive(content)
     return summary
   }
 
@@ -321,7 +351,7 @@ export class ConfigManager {
         ? content + line + '\n'
         : content + '\n' + line + '\n'
     if (next !== content) {
-      await fs.writeFile(this.activeConfigFile, next, 'utf-8')
+      await this.writeActive(next)
     }
   }
 
@@ -343,7 +373,7 @@ export class ConfigManager {
     }
 
     if (next !== content) {
-      await fs.writeFile(this.activeConfigFile, next, 'utf-8')
+      await this.writeActive(next)
     }
     return this.parseAndValidate(next)
   }
@@ -368,7 +398,7 @@ export class ConfigManager {
     if (issues.length) throw new Error(`DNS 配置不合法：${issues[0]}`)
     const raw = await fs.readFile(this.activeConfigFile, 'utf-8')
     const { text } = applyDnsToConfig(raw, settings)
-    await fs.writeFile(this.activeConfigFile, text, 'utf-8')
+    await this.writeActive(text)
     return this.parseAndValidate(text)
   }
 
@@ -400,7 +430,7 @@ export class ConfigManager {
     if (!(await exists(this.activeConfigFile))) throw new Error('没有可用的工作配置，请先选择订阅')
     const raw = await fs.readFile(this.activeConfigFile, 'utf-8')
     const { text } = applyRulesToConfig(raw, state.rules ?? [], state.providers ?? [])
-    await fs.writeFile(this.activeConfigFile, text, 'utf-8')
+    await this.writeActive(text)
     return this.parseAndValidate(text)
   }
 
@@ -479,6 +509,13 @@ export class ConfigManager {
       throw new Error(`下载规则集失败: ${(e as Error).message}`)
     }
     if (body.length === 0) throw new Error('规则集内容为空')
+    // 内容防伪：CDN 返回 200 的错误页/HTML 会静默覆盖本地规则集，检测后中止
+    if (!isMrs) {
+      const head = body.toString('utf-8', 0, Math.min(1024, body.length)).trimStart().toLowerCase()
+      if (head.startsWith('<!doctype') || head.startsWith('<html') || head.includes('<title>')) {
+        throw new Error('下载内容疑似网页错误页（非规则集），已中止安装并保留原有文件')
+      }
+    }
 
     // 落盘：配置目录/providers/<name>.<txt|mrs>（相对内核工作目录，供 rule-provider path 引用）
     const providersDir = path.join(path.dirname(this.activeConfigFile), 'providers')
@@ -521,7 +558,14 @@ export class ConfigManager {
       ctx.rulesetMatch = (providerName, t) => {
         const snap = snapshots.get(providerName)
         if (!snap) return null
-        return matchRulesetSnapshot(snap, t, baseCtx)
+        return matchRulesetSnapshot(snap, t, baseCtx).hit
+      }
+      // 行级定位：命中时由调试器展示具体条目行号（大规则集逐行排查用）
+      ctx.rulesetHitLine = (providerName, t) => {
+        const snap = snapshots.get(providerName)
+        if (!snap) return null
+        const r = matchRulesetSnapshot(snap, t, baseCtx)
+        return r.hit ? r.index + 1 : null
       }
     }
     return debugRulesMatch(target, rules ?? [], ctx)
@@ -538,12 +582,8 @@ export class ConfigManager {
     for (const p of providers) {
       if (!p.name || p.behavior === 'mrs' || !p.file) continue
       const filePath = path.isAbsolute(p.file) ? p.file : path.join(path.dirname(this.activeConfigFile), p.file)
-      let content: string
-      try {
-        content = await fs.readFile(filePath, 'utf-8')
-      } catch {
-        continue
-      }
+      const content = await readRulesetCached(filePath)
+      if (content === undefined) continue
       if (p.behavior === 'classical') {
         const lines: RuleEntry[] = []
         for (const line of content.split('\n')) {
@@ -568,6 +608,25 @@ export class ConfigManager {
   }
 }
 
+/**
+ * 规则集文件内容缓存（按 mtime+size 失效）：
+ * 大规则集（如 reject.txt 5.4MB）频繁调试时避免反复读盘解析。
+ */
+const RULESET_FILE_CACHE = new Map<string, { mtimeMs: number; size: number; content: string }>()
+
+async function readRulesetCached(filePath: string): Promise<string | undefined> {
+  try {
+    const st = await fs.stat(filePath)
+    const hit = RULESET_FILE_CACHE.get(filePath)
+    if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.content
+    const content = await fs.readFile(filePath, 'utf-8')
+    RULESET_FILE_CACHE.set(filePath, { mtimeMs: st.mtimeMs, size: st.size, content })
+    return content
+  } catch {
+    return undefined
+  }
+}
+
 /** 规则集匹配快照（预读到内存，供同步闭包判定） */
 interface RulesetSnapshot {
   behavior: 'domain' | 'ipcidr' | 'classical'
@@ -577,55 +636,60 @@ interface RulesetSnapshot {
   lines?: RuleEntry[]
 }
 
-/** 对规则集快照做同步匹配；快照缺失/无法判定语义时由调用方处理 */
-function matchRulesetSnapshot(snap: RulesetSnapshot, target: string, baseCtx: RuleMatchContext): boolean | null {
+/** 对规则集快照做同步匹配；返回是否命中与命中条目下标（未命中 index=-1） */
+function matchRulesetSnapshot(snap: RulesetSnapshot, target: string, baseCtx: RuleMatchContext): { hit: boolean; index: number } {
   const t = target.trim().toLowerCase()
   if (snap.behavior === 'classical') {
-    for (const entry of snap.lines ?? []) {
-      if (matchTargetAgainstRule(entry, t, baseCtx).matched) return true
+    const lines = snap.lines ?? []
+    for (let i = 0; i < lines.length; i++) {
+      if (matchTargetAgainstRule(lines[i], t, baseCtx).matched) return { hit: true, index: i }
     }
-    return false
+    return { hit: false, index: -1 }
   }
-  if (snap.behavior === 'domain') return matchDomainPayload(snap.items ?? [], t)
-  return matchIpcidrPayload(snap.items ?? [], t)
+  if (snap.behavior === 'domain') {
+    const idx = findDomainPayloadIndex(snap.items ?? [], t)
+    return { hit: idx >= 0, index: idx }
+  }
+  const idx = findIpcidrPayloadIndex(snap.items ?? [], t)
+  return { hit: idx >= 0, index: idx }
 }
 
-/** domain behavior 规则集匹配：支持 `+.x` 后缀、`.x` 后缀、精确、`*` 通配条目 */
-function matchDomainPayload(items: string[], host: string): boolean {
-  for (const raw of items) {
-    const item = raw.trim().toLowerCase()
+/** domain behavior 规则集匹配：支持 `+.x` 后缀、`.x` 后缀、精确、`*` 通配条目；返回条目下标 */
+function findDomainPayloadIndex(items: string[], host: string): number {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i].trim().toLowerCase()
     if (!item) continue
     if (item.startsWith('+.')) {
       const suffix = item.slice(2)
-      if (host === suffix || host.endsWith('.' + suffix)) return true
+      if (host === suffix || host.endsWith('.' + suffix)) return i
     } else if (item.startsWith('.')) {
       const suffix = item.slice(1)
-      if (host === suffix || host.endsWith('.' + suffix)) return true
+      if (host === suffix || host.endsWith('.' + suffix)) return i
     } else if (item.includes('*')) {
       const re = new RegExp('^' + item.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$')
-      if (re.test(host)) return true
+      if (re.test(host)) return i
     } else if (host === item) {
-      return true
+      return i
     }
   }
-  return false
+  return -1
 }
 
-/** ipcidr behavior 规则集匹配：条目形如 `1.2.3.0/24` 或 `2001:db8::/32`（可带 no-resolve 尾注） */
-function matchIpcidrPayload(items: string[], ip: string): boolean {
+/** ipcidr behavior 规则集匹配：条目形如 `1.2.3.0/24` 或 `2001:db8::/32`（可带 no-resolve 尾注）；返回条目下标 */
+function findIpcidrPayloadIndex(items: string[], ip: string): number {
   const ipBuf = ipToBuffer(ip)
-  if (!ipBuf) return false
-  for (const raw of items) {
-    const cidr = raw.split(',')[0].trim() // 忽略 no-resolve 等尾注
+  if (!ipBuf) return -1
+  for (let i = 0; i < items.length; i++) {
+    const cidr = items[i].split(',')[0].trim() // 忽略 no-resolve 等尾注
     const [netStr, prefixStr] = cidr.split('/')
     if (!netStr) continue
     const netBuf = ipToBuffer(netStr)
     if (!netBuf) continue
     const prefix = prefixStr === undefined ? netBuf.length * 8 : Number(prefixStr)
     if (!Number.isInteger(prefix)) continue
-    if (ipInCidrBytes(ipBuf, netBuf, prefix)) return true
+    if (ipInCidrBytes(ipBuf, netBuf, prefix)) return i
   }
-  return false
+  return -1
 }
 
 function numberVal(v: unknown): number | undefined {
@@ -681,6 +745,8 @@ async function fetchRuleSet(url: string): Promise<Response> {
  *  - 监听端口/外控：保证内核可直接运行
  *  - 稳定性防线：keep-alive 防中间设备老化杀空闲长连接（断流最常见根因）；
  *    tcp-concurrent 多 IP 并发握手加快建连；unified-delay 统一延迟口径使自动切换判断更准
+ *  - proxy-test-url：内核所有 URLTest/Fallback/AUTO 组统一测速地址（与 UI 默认一致），
+ *    保证自动选优组（AUTO）在墙内直连 204 地址上测速更准
  */
 export function mergeKernelDefaults(content: string): string {
   const has = (key: string) => new RegExp(`^\\s*${key}:`, 'm').test(content)
@@ -691,6 +757,7 @@ export function mergeKernelDefaults(content: string): string {
   if (!has('keep-alive-idle')) block.push('keep-alive-idle: 120')
   if (!has('tcp-concurrent')) block.push('tcp-concurrent: true')
   if (!has('unified-delay')) block.push('unified-delay: true')
+  if (!has('proxy-test-url')) block.push('proxy-test-url: https://www.gstatic.com/generate_204')
   if (block.length === 0) return content
   const sep = content.endsWith('\n') ? '' : '\n'
   return content + sep + block.join('\n') + '\n'

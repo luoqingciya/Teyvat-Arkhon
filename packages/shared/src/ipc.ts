@@ -34,6 +34,8 @@ export interface ArkhonAPI {
   setCoreMode(mode: ProxyMode): Promise<void>
   getCoreMode(): Promise<ProxyMode | undefined>
   getCoreLogs(): Promise<string[]>
+  /** 导出内核日志到文件（保存对话框），返回保存路径；取消返回 null */
+  exportLogs(): Promise<string | null>
 
   // ---------- 实时连接与流量 ----------
   getConnections(): Promise<{

@@ -52,6 +52,8 @@ export interface RuleMatchContext {
   geoipMatch?: (code: string, ip: string) => boolean | null
   /** 规则集匹配（provider 名 + 目标 → 是否命中）；未安装/未加载返回 null */
   rulesetMatch?: (providerName: string, target: string) => boolean | null
+  /** 规则集命中行号（1-based，仅命中时有效）；未命中/未安装返回 null（行级定位展示用） */
+  rulesetHitLine?: (providerName: string, target: string) => number | null
 }
 
 /**
@@ -434,6 +436,12 @@ export function matchTargetAgainstRule(
         const r = ctx.rulesetMatch(payload, t)
         if (r === null) {
           return { matched: false, reason: `规则集 ${payload || '(未命名)'} 未安装或未落盘，无法本地展开` }
+        }
+        if (r === true && ctx.rulesetHitLine) {
+          const line = ctx.rulesetHitLine(payload, t)
+          if (line !== null && line > 0) {
+            return { matched: true, reason: `规则集 ${payload || '(未命名)'} 第 ${line} 行命中` }
+          }
         }
         return { matched: r }
       }
