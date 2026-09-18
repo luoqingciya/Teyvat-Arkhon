@@ -2,7 +2,7 @@
 
 # Teyvat Arkhon（提瓦特方舟）
 
-基于 **Electron + C/C++** 的跨平台网络代理客户端，内嵌 **[Mihomo](https://github.com/MetaCubeX/mihomo)（Clash Meta）** 内核（sidecar 进程驱动，稳定优先），提供高性能、低延迟、支持 TUN 与系统服务托管的专业级代理方案。
+基于 **Electron** 的跨平台网络代理客户端，内嵌定制内核 **[arkhon-core](https://github.com/luoqingciya/arkhon-core)（MetaCubeX/mihomo fork）**，以 sidecar 进程驱动（稳定优先），提供高性能、低延迟、支持 TUN 与系统服务托管的专业级代理方案。
 
 [![CI](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/ci.yml/badge.svg)](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/badge/release-GitHub%20Actions-blue)](https://github.com/luoqingciya/Teyvat-Arkhon/actions/workflows/release.yml)
@@ -11,7 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-40-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
 
-> 当前版本：**v1.2.0**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
+> 当前版本：**v1.3.13**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
@@ -92,7 +92,7 @@
 │    ▲ ipcMain.handle                                                  │
 │  Main Process ────────────────┬───────────────┴─ TrafficMonitor        │
 │    CoreService                │                SystemProxy / Service   │
-│      └─ ProcessCoreDriver ──► spawn mihomo 二进制 + external-controller│
+│      └─ ProcessCoreDriver ──► spawn arkhon 内核 + external-controller│
 │           ├─ 控制面: start/stop/reload/version（REST /configs 等）       │
 │           └─ 数据面: proxies/connections/delay（内核 RESTful API）        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -236,7 +236,7 @@ A：「代理」页顶部的策略组 chips 切换分组，表格中每行可"�
 
 - **CI 测试**：每次 push / PR 自动运行单测、类型检查、应用构建（ubuntu）与 Playwright UI 冒烟（windows）。
 - **一键发布**：推送 `v*` 标签（例：`git tag v0.2.0 && git push origin v0.2.0`）触发 [release.yml](.github/workflows/release.yml)：
-  win/linux 矩阵自动完成 安装依赖 → `core:download`（内核/geo/wintun，固定 v1.19.30）→ electron-builder 打包（**Windows NSIS 安装版 + 免安装 zip / Linux AppImage+deb**）→ 上传 GitHub Releases。
+  win/linux 矩阵自动完成 安装依赖 → `core:download`（内核/geo/wintun，从定制内核 [arkhon-core](https://github.com/luoqingciya/arkhon-core) 取最新 release，可用 `CORE_TAG` 覆盖）→ electron-builder 打包（**Windows NSIS 安装版 + 免安装 zip / Linux AppImage+deb**）→ 上传 GitHub Releases。
 - **自动更新**：应用内置 electron-updater 读取 Releases 最新版本；zip 免安装版直接替换解压目录文件升级。
 
 ---
