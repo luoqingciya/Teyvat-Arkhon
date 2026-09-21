@@ -100,14 +100,22 @@ export class WindowsServiceManager {
    * 退出码，必须靠日志文件判断真实成败）。日志为系统 ANSI(GBK)，读取时转 utf-8 避免乱码。
    */
   private async runElevated(logFile: string, commands: string[]): Promise<void> {
-    const lines = ['@echo off', 'setlocal EnableExtensions', `> "${logFile}" echo BEGIN`]
+    const lines = [
+      '@echo off',
+      'setlocal EnableExtensions',
+      `> "${logFile}" echo BEGIN`,
+      'echo [teyvat-arkhon] running service operation as admin; this window closes automatically...'
+    ]
     for (const c of commands) {
       lines.push(
-        `${c} 1>> "${logFile}" 2>&1 1>&2`,
-        `if errorlevel 1 echo EXIT=%errorlevel% 1>> "${logFile}" 2>&1`
+        `${c} >> "${logFile}" 2>&1`,
+        `if errorlevel 1 echo EXIT=%errorlevel% >> "${logFile}" 2>&1`
       )
-      lines.push(`echo --- 1>> "${logFile}" 2>&1`)
+      lines.push(`echo --- >> "${logFile}" 2>&1`)
     }
+    // 强制退出 cmd：否则 Start-Process -Wait 会等到窗口被手动关闭，
+    // install() 的状态刷新被阻塞 → 服务已创建但界面仍停留「未安装」。
+    lines.push('exit /b 0')
     const batPath = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.bat`)
     // .bat 由 cmd 按系统 ANSI 代码页解析；内容全英文保证兼容（中文 OEM 936）
     await fs.writeFile(batPath, lines.join('\r\n'), 'ascii')

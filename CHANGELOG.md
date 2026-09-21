@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...HEAD
+[1.3.18]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...v1.3.18
 [1.3.17]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.16...v1.3.17
 [1.3.16]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.15...v1.3.16
 [1.3.15]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.14...v1.3.15
@@ -17,6 +18,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.18] - 2026-09-21
+
+### Fixed
+- **服务安装后 cmd 窗口不自动关闭、界面停留「未安装」**：bat 执行 sc create/start 后未强制退出 cmd，`Start-Process -Wait` 一直等到窗口被手动关闭，install() 的状态刷新被阻塞——服务其实已创建成功但界面不更新。现 bat 末尾强制 `exit /b 0` 自动关窗，并统一重定向写法；窗口内显示一行英文提示（完成后自动关闭）。
 
 ## [1.3.17] - 2026-09-21
 
