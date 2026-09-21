@@ -10,6 +10,7 @@ import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { TextDecoder } from 'node:util'
 import { promisify } from 'node:util'
 import type { SystemServiceState } from '@teyvat-arkhon/shared'
 
@@ -61,9 +62,13 @@ export class WindowsServiceManager {
     const bin = this.opts.binaryPath
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
     try {
+      // binPath 值内嵌引号必须写成 \"（sc.exe 的转义形式），且整体再包一层引号。
+      // 经 .bat/cmd 执行（而非 PowerShell）才能把这些引号原样传给 sc，
+      // 否则 PowerShell 会把内嵌引号二次转义 → sc 报 1639 参数错误。
+      const binPath = `\\"${bin}\\" -d \\"${this.opts.workingDir}\\" -f \\"${this.opts.configFile}\\"`
       await this.runElevated(logFile, [
-        `& 'sc.exe' create '${SERVICE_NAME}' 'binPath=' '"${bin}" -d "${this.opts.workingDir}" -f "${this.opts.configFile}"' 'start=' 'auto' 'DisplayName=' 'Teyvat Arkhon Core (mihomo)'`,
-        `& 'sc.exe' start '${SERVICE_NAME}'`
+        `sc create ${SERVICE_NAME} binPath= "${binPath}" start= auto DisplayName= "Teyvat Arkhon Core (mihomo)"`,
+        `sc start ${SERVICE_NAME}`
       ])
       await new Promise((r) => setTimeout(r, 600))
       return this.status()
@@ -78,7 +83,7 @@ export class WindowsServiceManager {
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
     try {
       await this.runElevated(logFile, [
-        `& 'sc.exe' stop '${SERVICE_NAME}' 2>&1 | Out-Null; sc.exe delete '${SERVICE_NAME}'`
+        `sc stop ${SERVICE_NAME} >nul 2>&1 & sc delete ${SERVICE_NAME}`
       ])
       await new Promise((r) => setTimeout(r, 400))
       return this.status()
@@ -89,43 +94,51 @@ export class WindowsServiceManager {
 
   /**
    * 以管理员权限执行一组命令（单次 UAC）。
-   * 把每条的输出 + 退出码写入 logFile 回传，供调用方拿到 sc 的真实错误——
-   * Start-Process -Verb RunAs 返回后无法直接取到被提权进程的退出码，
-   * 必须借助日志文件判断 command 是否真正成功，否则失败会被静默吞掉。
+   * 生成临时 .bat 由 cmd 执行：cmd 不对参数内的引号做二次转义，sc 才能正确解析
+   * binPath= "\"..\" -d .." 这样的转义引号形式（PowerShell 版本会把它破坏导致 sc 1639）。
+   * 每条命令的输出与退出码写入 logFile 回传（Start-Process -Verb RunAs 拿不到被提权进程的
+   * 退出码，必须靠日志文件判断真实成败）。日志为系统 ANSI(GBK)，读取时转 utf-8 避免乱码。
    */
   private async runElevated(logFile: string, commands: string[]): Promise<void> {
-    const body = commands
-      .map(
-        (c) =>
-          `${c} 2>&1 | Out-File -Append -Encoding utf8 -FilePath '${logFile}'\n` +
-          `if ($LASTEXITCODE -ne 0) { "EXIT=$LASTEXITCODE" | Out-File -Append -Encoding utf8 -FilePath '${logFile}' }`
+    const lines = ['@echo off', 'setlocal EnableExtensions', `> "${logFile}" echo BEGIN`]
+    for (const c of commands) {
+      lines.push(
+        `${c} 1>> "${logFile}" 2>&1 1>&2`,
+        `if errorlevel 1 echo EXIT=%errorlevel% 1>> "${logFile}" 2>&1`
       )
-      .join('\n')
-    const script =
-      `$ErrorActionPreference = 'Continue'\n` +
-      `Set-Content -Encoding utf8 -Path '${logFile}' -Value 'BEGIN'\n${body}\n`
-
-    const scriptPath = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.ps1`)
-    await fs.writeFile(scriptPath, script, 'utf-8')
+      lines.push(`echo --- 1>> "${logFile}" 2>&1`)
+    }
+    const batPath = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.bat`)
+    // .bat 由 cmd 按系统 ANSI 代码页解析；内容全英文保证兼容（中文 OEM 936）
+    await fs.writeFile(batPath, lines.join('\r\n'), 'ascii')
 
     try {
       await execFileAsync(
         'powershell.exe',
-        ['-NoProfile', '-Command', `Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','${scriptPath}'`],
+        ['-NoProfile', '-Command', `Start-Process cmd -Verb RunAs -Wait -ArgumentList '/d','/c','"${batPath}"'`],
         { timeout: 120_000 }
       )
     } finally {
-      await fs.rm(scriptPath, { force: true }).catch(() => {})
+      await fs.rm(batPath, { force: true }).catch(() => {})
     }
 
-    const log = await fs.readFile(logFile, 'utf-8').catch(() => '')
-    const m = log.match(/EXIT=([0-9]+)/)
+    const buf = await fs.readFile(logFile).catch(() => Buffer.from(''))
+    const text = decodeAnsi(buf)
+    const m = text.match(/EXIT=([0-9]+)/)
     if (m) {
-      throw new Error(`服务命令执行失败（退出码 ${m[1]}）：\n${log.split('\n').filter(Boolean).join(' | ')}`)
+      throw new Error(
+        `服务命令执行失败（退出码 ${m[1]}）：\n${text.split('\n').filter(Boolean).join(' | ')}`
+      )
     }
-    if (log.includes('EXIT_ERR')) {
-      throw new Error(`服务命令执行异常：\n${log}`)
-    }
+  }
+}
+
+/** sc/cmd 输出为系统 ANSI；按 GBK 解码，读不出来时退回 utf-8 */
+function decodeAnsi(buf: Buffer): string {
+  try {
+    return new TextDecoder('gbk').decode(buf)
+  } catch {
+    return buf.toString('utf8')
   }
 }
 
