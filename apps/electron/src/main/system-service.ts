@@ -53,46 +53,58 @@ export class WindowsServiceManager {
     }
   }
 
-  /** 安装服务并在成功后启动（提权） */
+  /** 安装服务并在成功后启动（单次提权） */
   async install(): Promise<SystemServiceState> {
     if (process.platform !== 'win32') {
       throw new Error('系统服务托管目前仅支持 Windows')
     }
     const bin = this.opts.binaryPath
-    const display = 'Teyvat Arkhon Core (mihomo)'
-    const args = [
-      'create',
-      SERVICE_NAME,
-      'binPath=',
-      `"${bin}" -d "${this.opts.workingDir}" -f "${this.opts.configFile}"`,
-      'start=',
-      'auto',
-      'DisplayName=',
-      display
-    ]
-    await this.runElevated('sc.exe', args)
-    await this.runElevated('sc.exe', ['start', SERVICE_NAME])
-    await new Promise((r) => setTimeout(r, 500))
-    return this.status()
+    const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
+    try {
+      await this.runElevated(logFile, [
+        `& 'sc.exe' create '${SERVICE_NAME}' 'binPath=' '"${bin}" -d "${this.opts.workingDir}" -f "${this.opts.configFile}"' 'start=' 'auto' 'DisplayName=' 'Teyvat Arkhon Core (mihomo)'`,
+        `& 'sc.exe' start '${SERVICE_NAME}'`
+      ])
+      await new Promise((r) => setTimeout(r, 600))
+      return this.status()
+    } finally {
+      await fs.rm(logFile, { force: true }).catch(() => {})
+    }
   }
 
-  /** 停止并删除服务（提权） */
+  /** 停止并删除服务（单次提权） */
   async uninstall(): Promise<SystemServiceState> {
     if (process.platform !== 'win32') throw new Error('系统服务托管目前仅支持 Windows')
-    await this.runElevated('sc.exe', ['stop', SERVICE_NAME]).catch(() => {})
-    await new Promise((r) => setTimeout(r, 300))
-    await this.runElevated('sc.exe', ['delete', SERVICE_NAME]).catch(() => {})
-    return this.status()
+    const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
+    try {
+      await this.runElevated(logFile, [
+        `& 'sc.exe' stop '${SERVICE_NAME}' 2>&1 | Out-Null; sc.exe delete '${SERVICE_NAME}'`
+      ])
+      await new Promise((r) => setTimeout(r, 400))
+      return this.status()
+    } finally {
+      await fs.rm(logFile, { force: true }).catch(() => {})
+    }
   }
 
   /**
-   * 以管理员权限执行命令：写入临时 ps1 脚本后 RunAs 调用，避免命令行引号地狱。
-   * 会弹出 UAC 确认框，由用户确认。
+   * 以管理员权限执行一组命令（单次 UAC）。
+   * 把每条的输出 + 退出码写入 logFile 回传，供调用方拿到 sc 的真实错误——
+   * Start-Process -Verb RunAs 返回后无法直接取到被提权进程的退出码，
+   * 必须借助日志文件判断 command 是否真正成功，否则失败会被静默吞掉。
    */
-  private async runElevated(exe: string, args: string[]): Promise<void> {
-    const script = `& '${exe}' ${args
-      .map((a) => (a.includes(' ') ? `'${a.replace(/'/g, "''")}'` : `'${a}'`))
-      .join(' ')}\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`
+  private async runElevated(logFile: string, commands: string[]): Promise<void> {
+    const body = commands
+      .map(
+        (c) =>
+          `${c} 2>&1 | Out-File -Append -Encoding utf8 -FilePath '${logFile}'\n` +
+          `if ($LASTEXITCODE -ne 0) { "EXIT=$LASTEXITCODE" | Out-File -Append -Encoding utf8 -FilePath '${logFile}' }`
+      )
+      .join('\n')
+    const script =
+      `$ErrorActionPreference = 'Continue'\n` +
+      `Set-Content -Encoding utf8 -Path '${logFile}' -Value 'BEGIN'\n${body}\n`
+
     const scriptPath = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.ps1`)
     await fs.writeFile(scriptPath, script, 'utf-8')
 
@@ -100,10 +112,19 @@ export class WindowsServiceManager {
       await execFileAsync(
         'powershell.exe',
         ['-NoProfile', '-Command', `Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','${scriptPath}'`],
-        { timeout: 60_000 }
+        { timeout: 120_000 }
       )
     } finally {
       await fs.rm(scriptPath, { force: true }).catch(() => {})
+    }
+
+    const log = await fs.readFile(logFile, 'utf-8').catch(() => '')
+    const m = log.match(/EXIT=([0-9]+)/)
+    if (m) {
+      throw new Error(`服务命令执行失败（退出码 ${m[1]}）：\n${log.split('\n').filter(Boolean).join(' | ')}`)
+    }
+    if (log.includes('EXIT_ERR')) {
+      throw new Error(`服务命令执行异常：\n${log}`)
     }
   }
 }
