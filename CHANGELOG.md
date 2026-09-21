@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.16...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...HEAD
+[1.3.17]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.16...v1.3.17
 [1.3.16]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.15...v1.3.16
 [1.3.15]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.14...v1.3.15
 [1.3.14]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.13...v1.3.14
@@ -16,6 +17,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.17] - 2026-09-21
+
+### Fixed
+- **服务安装报 `sc create` 1639 参数错误**：v1.3.16 用 PowerShell 调用 `sc.exe` 时内嵌引号被二次转义，`binPath= "\"路径\" -d ..." 被拆散导致 `sc create` 解析失败（1639）。现改为生成**临时 .bat 由 cmd 执行**——cmd 不对参数引号二次转义，`\"` 原样透传给 sc，服务正确创建并启动；错误回传日志同步改为按系统 ANSI(GBK) 解码，卡片上不再显示乱码。
 
 ## [1.3.16] - 2026-09-21
 
