@@ -705,7 +705,11 @@ export const useAppStore = defineStore('app', {
       try {
         this.serviceState = await window.arkhon.installService()
       } catch (e) {
-        this.error = (e as Error).message
+        const msg = (e as Error).message
+        // 同时落到 serviceState.error：服务卡片直接显示失败原因（如 UAC 取消/权限不足），
+        // 而不是只写 store.error 顶栏闪现，避免"点了没反应"。
+        this.serviceState = { ...this.serviceState, state: 'unknown', error: msg }
+        this.error = msg
       } finally {
         this.busy = false
       }
@@ -716,7 +720,9 @@ export const useAppStore = defineStore('app', {
       try {
         this.serviceState = await window.arkhon.uninstallService()
       } catch (e) {
-        this.error = (e as Error).message
+        const msg = (e as Error).message
+        this.serviceState = { ...this.serviceState, state: 'unknown', error: msg }
+        this.error = msg
       } finally {
         this.busy = false
       }
