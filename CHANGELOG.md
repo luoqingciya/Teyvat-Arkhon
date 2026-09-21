@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.14...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.15...HEAD
+[1.3.15]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.14...v1.3.15
 [1.3.14]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.13...v1.3.14
 [1.3.13]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.12...v1.3.13
 [1.3.12]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.11...v1.3.12
@@ -14,6 +15,12 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.15] - 2026-09-21
+
+### Fixed
+- **系统服务托管状态误报**：修复未安装服务时「服务状态」误显示为「未知 + Command failed: sc query」红错。根因是 Windows `sc query` 对不存在的服务以退出码 1060 失败、错误信息打在 stdout，原 catch 只检查 stderr 漏掉 stdout，现已补查 stdout，未安装正确显示灰色「未安装」。
+- **服务安装/卸载"点了没反应"**：失败原因此前只写入顶栏 6 秒闪现的 `store.error`，服务卡片上无反馈。现已把错误同步落到服务卡片直接可见（如 UAC 取消/权限不足），点击后能立即看到失败原因。
 
 ## [1.3.14] - 2026-09-21
 
