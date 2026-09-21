@@ -40,10 +40,13 @@ export class WindowsServiceManager {
       if (code === 1) return { name: SERVICE_NAME, state: 'stopped' }
       return { name: SERVICE_NAME, state: 'installed' }
     } catch (e) {
+      const stdout = (e as { stdout?: string }).stdout ?? ''
       const stderr = (e as { stderr?: string }).stderr ?? ''
       const msg = (e as Error).message
-      // 1060 = 服务不存在
-      if (/1060|not exist|does not exist/.test(msg + stderr)) {
+      // 1060 = 服务不存在。注意：sc 把「服务并未安装」错误输出到 stdout，
+      // 且以非零退出码退出（Error.message 不含错误细节），必须把 stdout 纳入判断，
+      // 否则「未安装」会被误报为「未知」+ 红错。
+      if (/1060|not exist|does not exist/.test(msg + stdout + stderr)) {
         return { name: SERVICE_NAME, state: 'not-installed' }
       }
       return { name: SERVICE_NAME, state: 'unknown', error: msg }
