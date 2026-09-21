@@ -5,9 +5,22 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.14...HEAD
+[1.3.14]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.13...v1.3.14
+[1.3.13]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.12...v1.3.13
+[1.3.12]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.11...v1.3.12
+[1.3.11]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.10...v1.3.11
+[1.3.10]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.9...v1.3.10
+[1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.14] - 2026-09-21
+
+### Changed
+- **升级内核实升至 v0.9.13-arkhon**（含 OHOS gvisor 栈适配、TUN 可观测/自愈、pprof 调试开关、geodata 懒加载等定制特性）；`deps.sha256.json` 补齐该版本全平台校验哈希
+- 根包版本号与 electron 包对齐（此前根 `package.json` 停在 1.2.0 与 tag 不一致）
+- README 修正陈旧表述：版本号、内核统一为 arkhon-core、core:download 不再固定版本
 
 ## [1.2.0] - 2026-09-09
 
