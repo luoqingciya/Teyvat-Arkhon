@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.25...HEAD
+[1.3.25]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...v1.3.25
 [1.3.24]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...v1.3.24
 [1.3.23]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...v1.3.23
 [1.3.22]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...v1.3.22
@@ -24,6 +25,14 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.25] - 2026-09-22
+
+### Fixed
+- **设置页 TUN 标题文字重复**：「TUN TUN 模式」→「TUN 模式」。
+
+### Changed
+- **Windows 版默认以管理员权限运行**（`win.requestedExecutionLevel: requireAdministrator`）：启动即提权（每次启动弹一次 UAC），TUN/wintun 建卡不再需要手动"以管理员身份运行"。
 
 ## [1.3.24] - 2026-09-22
 
