@@ -301,10 +301,23 @@ export class ConfigManager {
   /**
    * 写工作配置（统一入口）：写前先轮转备份上一份到 config.yaml.bak（最多保留 3 份）。
    * 任何写入（档案切换/编辑器保存/DNS/规则/TUN/模式）都会留下可回滚副本。
+   * 默认保留 tun 段：订阅刷新等重写流程生成的内容不含 tun，直接覆盖会把已开启的
+   * TUN 弄丢（历史 bug：config.yaml.bak 含 tun、config.yaml 无 tun）。
    */
-  private async writeActive(content: string): Promise<void> {
+  private async writeActive(content: string, opts?: { keepTun?: boolean }): Promise<void> {
+    const merged = opts?.keepTun === false ? content : await this.preserveTun(content)
     await this.rotateActiveBackup()
-    await fs.writeFile(this.activeConfigFile, content, 'utf-8')
+    await fs.writeFile(this.activeConfigFile, merged, 'utf-8')
+  }
+
+  /** 新内容缺 tun 段但当前文件有 tun 时，把该段（整行）粘回新内容，避免重写丢失 TUN */
+  private async preserveTun(content: string): Promise<string> {
+    if (/^\s*tun:\s*/m.test(content)) return content
+    const prev = await fs.readFile(this.activeConfigFile, 'utf-8').catch(() => '')
+    const m = prev.match(/^\s*tun:[^\n]*$/m)
+    if (!m) return content
+    const line = m[0].trim()
+    return (content.endsWith('\n') ? content + line : content + '\n' + line) + '\n'
   }
 
   private async rotateActiveBackup(): Promise<void> {
@@ -373,7 +386,8 @@ export class ConfigManager {
     }
 
     if (next !== content) {
-      await this.writeActive(next)
+      // 显式关闭 TUN：跳过保留逻辑（否则 preserveTun 会把刚移除的 tun 行粘回）
+      await this.writeActive(next, { keepTun: false })
     }
     return this.parseAndValidate(next)
   }
