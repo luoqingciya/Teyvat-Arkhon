@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...HEAD
+[1.3.19]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...v1.3.19
 [1.3.18]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...v1.3.18
 [1.3.17]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.16...v1.3.17
 [1.3.16]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.15...v1.3.16
@@ -18,6 +19,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.19] - 2026-09-22
+
+### Fixed
+- **服务安装启动超时（1053）——改用 NSSM 托管内核**：mihomo 内核不是标准 Windows 服务程序（不与 SCM 握手），直接 `sc create` 注册后启动必然 1053 超时。现引入 **NSSM**（服务宿主，随包分发）托管内核进程：NSSM 与 SCM 握手并作为普通子进程运行内核，服务可真正启动；附带崩溃自动重启（AppExitAction Restart）。安装前自动清理残留旧服务（覆盖 1073「服务已存在」），卸载改由 NSSM stop/remove。
 
 ## [1.3.18] - 2026-09-21
 

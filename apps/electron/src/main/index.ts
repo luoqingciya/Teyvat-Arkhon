@@ -42,6 +42,12 @@ export function coreResourcesDir(): string {
   return join(app.getAppPath(), 'resources', 'arkhon-core')
 }
 
+/** NSSM 服务宿主路径：打包后随 extraResources 分发，开发期用仓库 build/nssm */
+export function nssmPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'nssm', 'nssm.exe')
+  return join(app.getAppPath(), 'build', 'nssm', 'nssm.exe')
+}
+
 /** mihomo 默认数据目录（与 mihomo constant.Path 取值一致） */
 function mihomoDataDir(): string {
   const home = os.homedir()
@@ -441,7 +447,8 @@ if (!gotLock) {
     const serviceManager = createServiceManager({
       binaryPath: join(coreResourcesDir(), coreFileName()),
       workingDir: userDataConfigDir(),
-      configFile: join(userDataConfigDir(), 'config.yaml')
+      configFile: join(userDataConfigDir(), 'config.yaml'),
+      nssmPath: nssmPath()
     })
     const netChecker = createNetChecker({
       getProxyPort: async () => (await service?.activeHttpPort()) ?? 7890

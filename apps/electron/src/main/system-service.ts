@@ -25,6 +25,8 @@ export interface ServiceManagerOptions {
   workingDir: string
   /** 当前工作配置绝对路径 */
   configFile: string
+  /** NSSM 宿主绝对路径（随包分发；负责与 SCM 握手并托管普通内核进程） */
+  nssmPath: string
 }
 
 export class WindowsServiceManager {
@@ -54,23 +56,26 @@ export class WindowsServiceManager {
     }
   }
 
-  /** 安装服务并在成功后启动（单次提权） */
+  /** 安装服务并在成功后启动（单次提权）。用 NSSM 托管内核——内核非服务程序，
+   * 直接 sc create 注册后 SCM 等不到握手必然 1053 启动超时，NSSM 解决该问题。 */
   async install(): Promise<SystemServiceState> {
     if (process.platform !== 'win32') {
       throw new Error('系统服务托管目前仅支持 Windows')
     }
-    const bin = this.opts.binaryPath
+    const { nssmPath, binaryPath: bin, workingDir, configFile } = this.opts
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
     try {
-      // binPath 值内嵌引号必须写成 \"（sc.exe 的转义形式），且整体再包一层引号。
-      // 经 .bat/cmd 执行（而非 PowerShell）才能把这些引号原样传给 sc，
-      // 否则 PowerShell 会把内嵌引号二次转义 → sc 报 1639 参数错误。
-      const binPath = `\\"${bin}\\" -d \\"${this.opts.workingDir}\\" -f \\"${this.opts.configFile}\\"`
       await this.runElevated(logFile, [
-        `sc create ${SERVICE_NAME} binPath= "${binPath}" start= auto DisplayName= "Teyvat Arkhon Core (mihomo)"`,
-        `sc start ${SERVICE_NAME}`
+        // 清理可能残留的旧服务（覆盖 1073：服务已存在；容错：不存在时不报错）。
+        // 行尾 & ver 把 errorlevel 归零，避免「服务不存在」被下方 if errorlevel 误报。
+        `"${nssmPath}" stop ${SERVICE_NAME} >nul 2>&1 & "${nssmPath}" remove ${SERVICE_NAME} confirm >nul 2>&1 & ver >nul`,
+        // 注册：NSSM 作为宿主，把内核当普通子进程托管（参数经 nssm 原样存进 ImagePath）
+        `"${nssmPath}" install ${SERVICE_NAME} "${bin}" -d "${workingDir}" -f "${configFile}"`,
+        // 崩溃自动重启（契合内核稳定性需求），随后启动
+        `"${nssmPath}" set ${SERVICE_NAME} AppExitAction Restart`,
+        `"${nssmPath}" start ${SERVICE_NAME}`
       ])
-      await new Promise((r) => setTimeout(r, 600))
+      await new Promise((r) => setTimeout(r, 800))
       return this.status()
     } finally {
       await fs.rm(logFile, { force: true }).catch(() => {})
@@ -80,10 +85,11 @@ export class WindowsServiceManager {
   /** 停止并删除服务（单次提权） */
   async uninstall(): Promise<SystemServiceState> {
     if (process.platform !== 'win32') throw new Error('系统服务托管目前仅支持 Windows')
+    const { nssmPath } = this.opts
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
     try {
       await this.runElevated(logFile, [
-        `sc stop ${SERVICE_NAME} >nul 2>&1 & sc delete ${SERVICE_NAME}`
+        `"${nssmPath}" stop ${SERVICE_NAME} >nul 2>&1 & "${nssmPath}" remove ${SERVICE_NAME} confirm`
       ])
       await new Promise((r) => setTimeout(r, 400))
       return this.status()
