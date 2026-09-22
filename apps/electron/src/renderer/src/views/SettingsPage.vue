@@ -335,7 +335,7 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
         <dt>{{ t('home.version') }}</dt>
         <dd>{{ store.status.version?.version ?? '—' }}</dd>
         <dt>{{ t('home.driver') }}</dt>
-        <dd>{{ t('status.driverProcess') }}</dd>
+        <dd>{{ store.status.driver === 'service' ? t('status.driverService') : t('status.driverProcess') }}</dd>
       </dl>
     </div>
   </div>

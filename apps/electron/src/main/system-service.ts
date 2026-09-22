@@ -12,6 +12,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { TextDecoder } from 'node:util'
 import { promisify } from 'node:util'
+import type { CoreDriverConfig } from '@teyvat-arkhon/core-bridge'
 import type { SystemServiceState } from '@teyvat-arkhon/shared'
 
 const execFileAsync = promisify(execFile)
@@ -31,6 +32,27 @@ export interface ServiceManagerOptions {
 
 export class WindowsServiceManager {
   constructor(private readonly opts: ServiceManagerOptions) {}
+
+  /** 卸载/未安装时切回「应用进程驱动」所需的配置（含内核二进制与数据目录） */
+  getProcessDriverConfig(): CoreDriverConfig {
+    return {
+      mode: 'process',
+      options: {
+        binaryPath: this.opts.binaryPath,
+        workingDir: this.opts.workingDir,
+        externalController: '127.0.0.1:9090',
+        secret: ''
+      }
+    }
+  }
+
+  /** 服务托管运行中「接管服务内核」所需的配置（仅 REST，不 spawn） */
+  getServiceDriverConfig(): CoreDriverConfig {
+    return {
+      mode: 'service',
+      options: { externalController: '127.0.0.1:9090', secret: '' }
+    }
+  }
 
   /** 查询服务状态（无需管理员权限） */
   async status(): Promise<SystemServiceState> {

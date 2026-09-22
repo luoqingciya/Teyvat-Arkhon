@@ -2,12 +2,12 @@ import { app, BrowserWindow, Menu, powerMonitor, Tray, nativeImage } from 'elect
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import * as os from 'node:os'
 import { join } from 'node:path'
-import { CoreService } from '@teyvat-arkhon/core-bridge'
+import { CoreService, type CoreDriverConfig } from '@teyvat-arkhon/core-bridge'
 import type { ProxyMode } from '@teyvat-arkhon/shared'
 import { createIpc } from './ipc'
 import { createNetChecker } from './net-check'
 import { createSystemProxyController, type SystemProxyController } from './system-proxy'
-import { createServiceManager } from './system-service'
+import { createServiceManager, type WindowsServiceManager } from './system-service'
 import { createLoopbackController } from './system-loopback'
 import { createSubscriptionSync } from './subscription-sync'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
@@ -23,6 +23,7 @@ console.log(
 )
 
 let service: CoreService | null = null
+let serviceManager: WindowsServiceManager | null = null
 let mainWindow: BrowserWindow | null = null
 let trafficMonitor: TrafficMonitor | null = null
 /** 系统代理控制器（退出清理用，whenReady 后可用） */
@@ -378,22 +379,20 @@ async function createWindow(systemProxy: SystemProxyController): Promise<void> {
 
 async function bootstrapService(): Promise<CoreService> {
   const configDir = userDataConfigDir()
-  console.log('[teyvat-arkhon] 内核驱动：进程驱动（稳定优先）')
+  // 驱动配置按系统服务状态决定：服务托管运行中则接管服务内核（不再二次 spawn），
+  // 否则常规进程驱动（应用内启动内核实例）。
+  const svcRunning = serviceManager ? (await serviceManager.status()).state === 'running' : false
+  const driver: CoreDriverConfig = svcRunning
+    ? serviceManager!.getServiceDriverConfig()
+    : serviceManager!.getProcessDriverConfig()
+  console.log(`[teyvat-arkhon] 内核驱动：${svcRunning ? '系统服务接管（service）' : '进程驱动（process）'}`)
 
   const svc = new CoreService({
     profilesDir: join(app.getPath('userData'), 'profiles'),
     activeConfigFile: join(configDir, 'config.yaml'),
     excludeKeywords: readExcludeKeywords,
     geodataDirs: [mihomoDataDir(), coreResourcesDir()],
-    driver: {
-      mode: 'process',
-      options: {
-        binaryPath: join(coreResourcesDir(), coreFileName()),
-        workingDir: configDir,
-        externalController: '127.0.0.1:9090',
-        secret: ''
-      }
-    }
+    driver
   })
   await svc.init()
   return svc
@@ -412,6 +411,13 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     seedGeoData()
+    // 系统服务托管管理器（须在 bootstrapService 之前就位：后者按服务状态选择驱动）
+    serviceManager = createServiceManager({
+      binaryPath: join(coreResourcesDir(), coreFileName()),
+      workingDir: userDataConfigDir(),
+      configFile: join(userDataConfigDir(), 'config.yaml'),
+      nssmPath: nssmPath()
+    })
     service = await bootstrapService()
     // 系统代理守护：记录本会话内由本应用成功应用的期望态；
     // 被第三方程序（VPN/安全软件）改掉时自动恢复并通知（仅守护"开启"态）
@@ -443,12 +449,6 @@ if (!gotLock) {
     // 休眠唤醒后立即探测内核健康（唤醒瞬间 REST 可能短暂不可用，连续失败会触发自动重启）
     powerMonitor.on('resume', () => {
       void service?.probeHealth()
-    })
-    const serviceManager = createServiceManager({
-      binaryPath: join(coreResourcesDir(), coreFileName()),
-      workingDir: userDataConfigDir(),
-      configFile: join(userDataConfigDir(), 'config.yaml'),
-      nssmPath: nssmPath()
     })
     const netChecker = createNetChecker({
       getProxyPort: async () => (await service?.activeHttpPort()) ?? 7890

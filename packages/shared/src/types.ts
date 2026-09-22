@@ -70,7 +70,8 @@ export type ProxyMode = 'rule' | 'global' | 'direct'
 export interface CoreStatus {
   state: CoreState
   version?: MihomoVersion
-  driver: 'process'
+  /** 'process'=应用内启动内核进程；'service'=接管系统服务托管的常驻内核（NSSM） */
+  driver: 'process' | 'service'
   /** 当前运行模式（运行态有效） */
   mode?: ProxyMode
 }

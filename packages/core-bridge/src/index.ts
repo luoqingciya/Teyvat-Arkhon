@@ -1,6 +1,7 @@
 export * from './driver'
 export * from './rest-client'
 export * from './process-driver'
+export * from './service-driver'
 export * from './config-manager'
 export * from './service'
 export * from './geodata'

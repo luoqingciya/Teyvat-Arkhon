@@ -27,14 +27,20 @@ import type {
 } from '@teyvat-arkhon/shared'
 import { RULE_PRESETS } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
-import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
 import { ConfigManager } from './config-manager'
+import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
+import { ServiceCoreDriver, type ServiceDriverOptions } from './service-driver'
+
+/** 内核驱动配置：process=应用内启动内核进程；service=接管系统服务托管的常驻内核 */
+export type CoreDriverConfig =
+  | { mode: 'process'; options: ProcessDriverOptions }
+  | { mode: 'service'; options: ServiceDriverOptions }
 
 export interface CoreServiceOptions {
   profilesDir: string
   activeConfigFile: string
-  /** 内核驱动（当前统一使用进程驱动，稳定优先；字段保留以便未来扩展） */
-  driver: { mode: 'process'; options: ProcessDriverOptions }
+  /** 内核驱动（见 CoreDriverConfig；缺省按主进程启动时检测系统服务状态而定） */
+  driver: CoreDriverConfig
   fetchImpl?: typeof fetch
   /** 订阅导入/刷新的节点排除关键词（运行时读取，支持设置页动态修改） */
   excludeKeywords?: () => string[]
@@ -54,6 +60,8 @@ const WATCHDOG_MAX_FAILS = 3
 export class CoreService extends EventEmitter {
   private readonly config: ConfigManager
   private driver: CoreDriver | null = null
+  /** 当前驱动配置（运行时可变；主进程持有 process/service 两套 options 按需切换） */
+  private driverConfig: CoreDriverConfig
   private state: CoreState = 'stopped'
   private version: MihomoVersion | undefined
 
@@ -68,6 +76,7 @@ export class CoreService extends EventEmitter {
 
   constructor(private readonly opts: CoreServiceOptions) {
     super()
+    this.driverConfig = opts.driver
     this.config = new ConfigManager({
       profilesDir: opts.profilesDir,
       activeConfigFile: opts.activeConfigFile,
@@ -86,8 +95,20 @@ export class CoreService extends EventEmitter {
   }
 
   status(): CoreStatus {
-    // 未启动时驱动尚未实例化，按配置的驱动模式展示（避免误显示为进程回退）
-    return { state: this.state, version: this.version, driver: this.driver?.kind ?? this.opts.driver.mode }
+    // 未启动时驱动尚未实例化，按当前驱动配置展示（避免误显示为进程回退）
+    return { state: this.state, version: this.version, driver: this.driver?.kind ?? this.driverConfig.mode }
+  }
+
+  /** 运行时切换驱动配置（如服务卸载后从 service 切回 process）；运行中会先停后启 */
+  async setDriverConfig(config: CoreDriverConfig): Promise<CoreStatus> {
+    if (this.driverConfig.mode === config.mode && this.driver?.kind === config.mode) {
+      return this.status()
+    }
+    const wasRunning = this.state === 'running'
+    if (wasRunning) await this.stop()
+    this.driverConfig = config
+    if (wasRunning) await this.start()
+    return this.status()
   }
 
   private setState(next: CoreState): void {
@@ -156,12 +177,16 @@ export class CoreService extends EventEmitter {
   }
 
   private buildDriver(active: ClashConfigSummary): CoreDriver {
-    const opts = this.opts.driver.options
+    const cfg = this.driverConfig
+    if (cfg.mode === 'service') {
+      return new ServiceCoreDriver({
+        externalController: cleanController(active.externalController, cfg.options.externalController),
+        secret: active.secret ?? cfg.options.secret,
+        fetchImpl: this.opts.fetchImpl
+      })
+    }
     return new ProcessCoreDriver({
-      ...opts,
-      externalController: cleanController(active.externalController, opts.externalController),
-      secret: active.secret ?? opts.secret,
-      fetchImpl: this.opts.fetchImpl,
+      ...cfg.options,
       onExit: (code) => {
         this.stopWatchdog()
         this.clearStableTimer()

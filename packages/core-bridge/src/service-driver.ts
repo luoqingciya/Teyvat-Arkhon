@@ -1,9 +1,11 @@
 /**
- * 进程驱动：以 sidecar 方式运行 mihomo 二进制，通过 external-controller RESTful API 通信。
- * 当前唯一驱动（稳定优先）：独立进程天然隔离，升级与排障简单。
+ * 服务驱动：接管已由系统服务（NSSM）托管的内核实例。
+ * 与进程驱动共享全部 REST 数据面语义，但**不 spawn 进程**：
+ * - start()：只探测 external-controller 就绪（内核由服务拉起，等待其 API 可用）
+ * - stop()/close()：不杀进程（服务生命周期归系统服务管，卸载服务才停止）
+ * - reload()：走 REST 热重载（配置变更直接作用到服务内唯一内核）
  */
 
-import { spawn, type ChildProcess } from 'node:child_process'
 import type {
   ConnectionInfo,
   DelayResult,
@@ -12,133 +14,72 @@ import type {
   ProxyMode,
   RuleInfo
 } from '@teyvat-arkhon/shared'
-import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap, type MihomoRules } from './rest-client'
+import { RestClient, type MihomoConnections, type MihomoProxyMap, type MihomoRules } from './rest-client'
+import { inferNodeType } from './process-driver'
 import type { CoreDriver } from './driver'
 
-export interface ProcessDriverOptions {
-  /** mihomo 可执行文件绝对路径 */
-  binaryPath: string
-  /** mihomo -d 工作目录（存放 config.yaml） */
-  workingDir: string
+export interface ServiceDriverOptions {
   /** REST 外控地址，如 127.0.0.1:9090 */
   externalController: string
   /** 外控密钥（可为空） */
   secret: string
-  /** 子进程意外退出回调 */
-  onExit?: (code: number | null, signal: NodeJS.Signals | null) => void
-  /** 内核 stdout/stderr 每行日志回调 */
-  onLog?: (line: string) => void
-  /** 内核日志环形缓冲上限 */
-  logLimit?: number
   /** fetch 注入（测试用） */
   fetchImpl?: typeof fetch
-  /** 就绪等待超时 ms */
+  /** 服务内核就绪等待超时 ms（服务刚启动时 API 可能尚未可用） */
   startupTimeoutMs?: number
 }
 
 const READY_POLL_INTERVAL = 250
 
-export class ProcessCoreDriver implements CoreDriver {
-  readonly kind = 'process' as const
+export class ServiceCoreDriver implements CoreDriver {
+  readonly kind = 'service' as const
 
   private readonly rest: RestClient
-  private child: ChildProcess | null = null
-  private exited = false
   private readonly startupTimeoutMs: number
-  private readonly logs: string[] = []
-  private readonly logLimit: number
+  private started = false
 
-  constructor(private readonly opts: ProcessDriverOptions) {
+  constructor(private readonly opts: ServiceDriverOptions) {
     this.rest = new RestClient({
       controller: opts.externalController,
       secret: opts.secret,
       fetchImpl: opts.fetchImpl
     })
     this.startupTimeoutMs = opts.startupTimeoutMs ?? 10_000
-    this.logLimit = opts.logLimit ?? 500
   }
 
-  get running(): boolean {
-    return this.child !== null && !this.exited
-  }
-
-  private pushLog(chunk: Buffer | string): void {
-    const text = Buffer.isBuffer(chunk) ? chunk.toString() : chunk
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed) continue
-      this.logs.push(trimmed)
-      if (this.logs.length > this.logLimit) this.logs.shift()
-      this.opts.onLog?.(trimmed)
-    }
-  }
-
-  getLogs(): string[] {
-    return [...this.logs]
+  /** 服务接管无"运行中"进程概念；以是否已连接表示 */
+  get attached(): boolean {
+    return this.started
   }
 
   async start(): Promise<void> {
-    if (this.running) return
-
-    const binary = this.opts.binaryPath
-    this.exited = false
-    try {
-      this.child = spawn(binary, ['-d', this.opts.workingDir], {
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe']
-      })
-      this.child.stdout?.on('data', (d: Buffer) => this.pushLog(d))
-      this.child.stderr?.on('data', (d: Buffer) => this.pushLog(d))
-    } catch (e) {
-      throw new Error(
-        `无法启动 mihomo（${binary}）。请先运行 pnpm core:download 下载内核，` +
-          `或检查路径是否正确。原始错误: ${(e as Error).message}`
-      )
-    }
-
-    this.child.on('exit', (code, signal) => {
-      this.child = null
-      this.exited = true
-      this.opts.onExit?.(code, signal)
-    })
-    // 启动进程立即失败（如 ENOENT）时给出明确错误
-    this.child.on('error', (err) => {
-      this.child?.kill()
-      this.child = null
-      this.exited = true
-      throw err
-    })
-
-    await this.waitForReady()
-  }
-
-  private async waitForReady(): Promise<void> {
+    if (this.started) return
     const deadline = Date.now() + this.startupTimeoutMs
+    let lastErr: unknown
     while (Date.now() < deadline) {
-      if (!this.running) throw new Error('mihomo 进程启动后立即退出')
       try {
         await this.rest.get('/version')
+        this.started = true
         return
-      } catch {
+      } catch (e) {
+        lastErr = e
         await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL))
       }
     }
-    throw new Error(`mihomo 在 ${this.startupTimeoutMs}ms 内未就绪（检查 external-controller 配置）`)
+    throw new Error(
+      `未检测到系统服务托管的内核（${this.opts.externalController} 未就绪）。` +
+        '请确认「系统服务托管」已安装并运行，或卸载服务后改用常规模式。' +
+        `原始错误: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+    )
   }
 
+  /** 服务由系统托管：停止不杀进程 */
   async stop(): Promise<void> {
-    const child = this.child
-    if (!child) return
-    const exited = new Promise<void>((resolve) => {
-      child.once('exit', () => resolve())
-    })
-    child.kill()
-    // Windows 下 SIGTERM 语义弱，兜底强制结束
-    setTimeout(() => {
-      if (this.running) child.kill('SIGKILL')
-    }, 3000).unref()
-    await exited
-    this.exited = true
+    this.started = false
+  }
+
+  async close(): Promise<void> {
+    this.started = false
   }
 
   async reload(configPath: string): Promise<void> {
@@ -174,7 +115,6 @@ export class ProcessCoreDriver implements CoreDriver {
     }))
   }
 
-  /** 当前生效的路由规则（rule 模式；global/direct 模式下内核返回空洞规则） */
   async getRules(): Promise<RuleInfo[]> {
     const res = await this.rest.get<MihomoRules>('/rules')
     return (res.rules ?? []).map((r) => ({
@@ -200,7 +140,6 @@ export class ProcessCoreDriver implements CoreDriver {
       groupError = e
     }
     try {
-      // 策略组使用 group 端点
       const groupRes = await this.rest.get<{ delay?: number }>(`/group/${encodeURIComponent(name)}/delay?${q}`)
       if (typeof groupRes.delay === 'number') return { node: name, delay: groupRes.delay }
     } catch {
@@ -209,7 +148,6 @@ export class ProcessCoreDriver implements CoreDriver {
     return { node: name, delay: -1, error: groupError instanceof Error ? groupError.message : String(groupError) }
   }
 
-  /** 全部节点最近一次延迟测试快照（读取内核 /delay/latest 缓存，不触发测速） */
   async listDelaySnapshot(): Promise<Record<string, number | null>> {
     try {
       const res = await this.rest.get<{ proxies: Record<string, { delay?: number | null }> }>('/delay/latest')
@@ -219,7 +157,6 @@ export class ProcessCoreDriver implements CoreDriver {
       }
       return out
     } catch {
-      // 定制端点缺失/内核未启用时降级为空快照，不阻塞页面
       return {}
     }
   }
@@ -253,25 +190,8 @@ export class ProcessCoreDriver implements CoreDriver {
     await this.rest.delete('/connections')
   }
 
-  async close(): Promise<void> {
-    await this.stop()
+  /** 服务内核日志不经 App 环形缓冲；后续可接 REST /logs，暂时返回空 */
+  getLogs(): string[] {
+    return []
   }
 }
-
-/**
- * mihomo REST /proxies 列表响应不返回 nodeType 字段（实测 v1.19.30），
- * 按 type 推断其语义（数值与 mihomo 内核 NodeType 定义一致）：
- *   Selector=2 / URLTest=1 / Fallback=3 / LoadBalance=4 / Relay=5，其余为单节点=0。
- */
-function inferNodeType(p: MihomoProxyEntry): number {
-  switch (p.type) {
-    case 'Selector':return 2
-    case 'URLTest': return 1
-    case 'Fallback': return 3
-    case 'LoadBalance': return 4
-    case 'Relay': return 5
-    default: return 0
-  }
-}
-
-export { inferNodeType }

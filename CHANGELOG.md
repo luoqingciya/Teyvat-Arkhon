@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...HEAD
+[1.3.22]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...v1.3.22
 [1.3.21]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...v1.3.21
 [1.3.20]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...v1.3.20
 [1.3.19]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...v1.3.19
@@ -21,6 +22,12 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.22] - 2026-09-22
+
+### Added
+- **系统服务托管与 App 内核互斥（服务接管）**：系统服务运行中时，App 不再二次启动内核（此前双内核会同时抢 7890 端口导致 Mixed 代理绑定失败、TUN 配置无法生效）。现检测到服务运行则改为「服务接管」驱动（新增 `service` 驱动：仅通过 REST 连接服务托管的常驻内核，不 spawn 进程），状态栏/总览/设置显示「驱动：服务模式」；服务卸载后自动切回进程驱动由应用接管。
+- 此项同时是 TUN 网卡可正常注册的前置：TUN 配置写入 + 热重载只作用于唯一运行的内核实例。
 
 ## [1.3.21] - 2026-09-22
 
