@@ -22,6 +22,9 @@ extraResources:
   # 托盘图标（主进程 nativeImage 直接读取）
   - from: build/icon.png
     to: icon.png
+  # NSSM：服务宿主（SCM 握手 + 托管普通内核进程，解决 sc create 直接注册 1053）
+  - from: build/nssm
+    to: nssm
 
 # 许可证合规：electron-builder 自动包含仓库根 LICENSE 文件进产物（GPL-3.0）
 win:
