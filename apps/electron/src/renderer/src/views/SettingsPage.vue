@@ -141,24 +141,27 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
     <div class="card glass">
       <h3>{{ t('settings.autoRefresh') }}</h3>
       <p class="hint">{{ t('settings.autoRefreshHint') }}</p>
-      <div class="switch-row">
-        <span class="row-label">{{ t('settings.autoRefreshOn') }}</span>
-        <button
-          class="switch"
-          :class="{ on: store.autoRefresh }"
-          role="switch"
-          :aria-checked="store.autoRefresh"
-          :disabled="store.busy"
-          @click="store.setAutoRefresh(!store.autoRefresh)"
-        >
-          <span class="knob"></span>
+      <div class="block">
+        <div class="switch-row">
+          <span class="row-label">{{ t('settings.autoRefreshOn') }}</span>
+          <button
+            class="switch"
+            :class="{ on: store.autoRefresh }"
+            role="switch"
+            :aria-checked="store.autoRefresh"
+            :disabled="store.busy"
+            @click="store.setAutoRefresh(!store.autoRefresh)"
+          >
+            <span class="knob"></span>
+          </button>
+        </div>
+        <button class="btn" :disabled="store.busy" @click="store.refreshAllProfiles()">
+          {{ t('settings.refreshNow') }}
         </button>
       </div>
-      <button class="btn" :disabled="store.busy" @click="store.refreshAllProfiles()">
-        {{ t('settings.refreshNow') }}
-      </button>
-      <div class="field">
-        <span class="row-label">{{ t('settings.excludeHint') }}</span>
+      <div class="block divider">
+        <span class="block-title">{{ t('settings.excludeTitle') }}</span>
+        <p class="hint">{{ t('settings.excludeHint') }}</p>
         <div class="field-row">
           <input
             v-model="excludeInput"
@@ -377,6 +380,27 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
 }
 .field-row {
   padding: 10px 0;
+}
+.block {
+  margin-top: 4px;
+}
+.block .btn {
+  margin-top: 10px;
+}
+.block.divider {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.block.divider .hint {
+  margin-bottom: 8px;
+}
+.block-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
 }
 .path-row {
   display: flex;
