@@ -13,9 +13,19 @@ const host = ref<HTMLDivElement | null>(null)
 const empty = ref(false)
 const saving = ref(false)
 const savedAt = ref('')
+const saveError = ref('')
 
 let view: EditorView | null = null
 let content = ''
+
+function jumpToLine(line: number): void {
+  if (!view) return
+  const doc = view.state.doc
+  const target = Math.min(Math.max(line, 1), doc.lines)
+  const pos = doc.line(target).from
+  view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
+  view.focus()
+}
 
 function initEditor(text: string): void {
   content = text
@@ -47,6 +57,7 @@ onBeforeUnmount(() => {
 
 async function save(): Promise<void> {
   saving.value = true
+  saveError.value = ''
   try {
     const summary = await window.arkhon.saveActiveConfig(content)
     empty.value = false
@@ -54,7 +65,12 @@ async function save(): Promise<void> {
     store.refreshStatus()
     void summary
   } catch (e) {
-    store.error = `${t('config.errorSaving')}: ${(e as Error).message}`
+    const msg = `${t('config.errorSaving')}: ${(e as Error).message}`
+    saveError.value = msg
+    store.error = msg
+    // 错误消息带「第 N 行」时，自动把光标滚动定位到该行
+    const m = msg.match(/第 (\d+) 行/)
+    if (m) jumpToLine(Number(m[1]))
   } finally {
     saving.value = false
   }
@@ -74,6 +90,7 @@ async function save(): Promise<void> {
       </div>
     </div>
 
+    <p v-if="saveError" class="save-error">✗ {{ saveError }}</p>
     <div v-if="empty" class="empty glass">{{ t('config.empty') }}</div>
     <div v-else ref="host" class="codemirror glass"></div>
   </div>
@@ -113,6 +130,18 @@ async function save(): Promise<void> {
 .saved {
   font-size: 13px;
   color: #34d399;
+}
+.save-error {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .codemirror {
   flex: 1;

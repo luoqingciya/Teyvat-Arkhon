@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.25...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.26...HEAD
+[1.3.26]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.25...v1.3.26
 [1.3.25]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...v1.3.25
 [1.3.24]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...v1.3.24
 [1.3.23]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...v1.3.23
@@ -25,6 +26,13 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.26] - 2026-09-22
+
+### Changed
+- **设置页「订阅自动更新」卡片分组优化**：自动更新（开关+立即刷新）与节点过滤分块展示，加分隔线与间距，消除元素堆叠拥挤感。
+- **配置页保存错误精确定位**：YAML 解析失败时错误信息带「第 N 行，第 M 列」+ 出错上下文片段，保存按钮下方就地红条展示，并**自动滚动光标到出错行**（编辑器已具备 YAML 高亮）。
+- **更新器错误友好化**：404/发布未完成、鉴权失败、网络不通等原始报错翻译成可读提示（如「发布尚未完成或版本已下线，请稍后再试」）。
 
 ## [1.3.25] - 2026-09-22
 
