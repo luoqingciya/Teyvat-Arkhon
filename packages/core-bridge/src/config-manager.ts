@@ -128,6 +128,16 @@ export class ConfigManager {
     try {
       raw = yaml.load(text)
     } catch (e) {
+      // js-yaml 的 YAMLException 携带 mark（0 起行/列 + 上下文片段），拼进错误以精确定位
+      const mark = (e as { mark?: { line?: number; column?: number; snippet?: string } }).mark
+      if (mark && typeof mark.line === 'number') {
+        const line = mark.line + 1
+        const col = (mark.column ?? 0) + 1
+        throw new Error(
+          `YAML 解析失败（第 ${line} 行，第 ${col} 列）：${(e as Error).message}` +
+            (mark.snippet ? `\n${mark.snippet}` : '')
+        )
+      }
       throw new Error(`YAML 解析失败: ${(e as Error).message}`)
     }
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {

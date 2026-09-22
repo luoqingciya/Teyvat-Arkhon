@@ -29,6 +29,24 @@ export interface UpdateManagerOptions {
 
 const UPDATE_CHANNEL = 'arkhon:update'
 
+/** 把 electron-updater 的原始报错映射成用户可读的提示（404/网络/认证等常见场景） */
+function friendlyUpdateError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/Cannot find latest\.yml|latest-linux\.yml|404/i.test(msg) && /404/.test(msg)) {
+    return '发布尚未完成或版本已下线，请稍后再试'
+  }
+  if (/release.*not found|404/i.test(msg) && !/401|403/.test(msg)) {
+    return '未找到可下载的版本（发布可能尚未完成），请稍后重试'
+  }
+  if (/401|403|token|authentication|unauthorized/i.test(msg)) {
+    return '更新服务器鉴权失败，请确认发布可用后重试'
+  }
+  if (/getaddrinfo|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|fetch failed|ERR_INTERNET|network/i.test(msg)) {
+    return '无法连接更新服务器，请检查网络后重试'
+  }
+  return msg
+}
+
 export function createUpdateManager(opts: UpdateManagerOptions): UpdateManager {
   let autoEnabled = opts.autoEnabled
   let state: UpdateState['state'] = 'idle'
@@ -95,8 +113,8 @@ export function createUpdateManager(opts: UpdateManagerOptions): UpdateManager {
     })
     autoUpdater.on('error', (err) => {
       state = 'error'
-      lastError = err instanceof Error ? err.message : String(err)
-      console.warn('[teyvat-arkhon] 更新检查失败:', lastError)
+      lastError = friendlyUpdateError(err)
+      console.warn('[teyvat-arkhon] 更新检查失败:', err instanceof Error ? err.message : err)
       send()
     })
   }
