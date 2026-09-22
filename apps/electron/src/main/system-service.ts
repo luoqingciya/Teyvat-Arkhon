@@ -71,8 +71,9 @@ export class WindowsServiceManager {
         `"${nssmPath}" stop ${SERVICE_NAME} >nul 2>&1 & "${nssmPath}" remove ${SERVICE_NAME} confirm >nul 2>&1 & ver >nul`,
         // 注册：NSSM 作为宿主，把内核当普通子进程托管（参数经 nssm 原样存进 ImagePath）
         `"${nssmPath}" install ${SERVICE_NAME} "${bin}" -d "${workingDir}" -f "${configFile}"`,
-        // 崩溃自动重启（契合内核稳定性需求；2.24 参数为 AppExit，值 Restart），随后启动
-        `"${nssmPath}" set ${SERVICE_NAME} AppExit Restart`,
+        // 崩溃自动重启（契合内核稳定性需求；2.24 语法为 AppExit <exitcode> <action>，
+        // default = 任意退出码都触发 Restart），随后启动
+        `"${nssmPath}" set ${SERVICE_NAME} AppExit default Restart`,
         `"${nssmPath}" start ${SERVICE_NAME}`
       ])
       await new Promise((r) => setTimeout(r, 800))
