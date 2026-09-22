@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...HEAD
+[1.3.21]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...v1.3.21
 [1.3.20]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...v1.3.20
 [1.3.19]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...v1.3.19
 [1.3.18]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...v1.3.18
@@ -20,6 +21,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.21] - 2026-09-22
+
+### Fixed
+- **NSSM AppExit 语法再修正**：2.24 的 `AppExit` 需带子参数（`<exitcode> <action>`），v1.3.20 缺子参数报 "requires a subparameter" 退出码 1（服务已装、已启动，仅 config 步骤误报）。改为 **`AppExit default Restart`**（任意退出码触发重启），语法已本地验证通过。
 
 ## [1.3.20] - 2026-09-22
 
