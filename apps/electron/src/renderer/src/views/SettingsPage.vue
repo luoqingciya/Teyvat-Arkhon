@@ -94,7 +94,7 @@ function probeStatus(p: NetProbeResult): { text: string; cls: string } {
 <template>
   <div class="settings">
     <div class="card glass">
-      <h3>TUN {{ t('settings.tun') }}</h3>
+      <h3>{{ t('settings.tun') }}</h3>
       <p class="hint">
         {{ t('settings.tunHint') }}
         <template v-if="tunHint">· <b class="accent">{{ tunHint }}</b></template>

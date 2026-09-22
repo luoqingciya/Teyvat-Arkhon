@@ -28,6 +28,8 @@ extraResources:
 
 # 许可证合规：electron-builder 自动包含仓库根 LICENSE 文件进产物（GPL-3.0）
 win:
+  # 默认以管理员权限运行（TUN/wintun 建卡需要提权）；每次启动会弹一次 UAC
+  requestedExecutionLevel: requireAdministrator
   target:
     - target: nsis
       arch: [x64]
