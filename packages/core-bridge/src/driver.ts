@@ -8,9 +8,9 @@ import type {
   RuleInfo
 } from '@teyvat-arkhon/shared'
 
-/** 核心驱动统一接口：当前统一使用进程驱动（稳定优先） */
+/** 核心驱动统一接口：'process'=应用内 sidecar 进程；'service'=接管系统服务（NSSM）托管的内核 */
 export interface CoreDriver {
-  readonly kind: 'process'
+  readonly kind: 'process' | 'service'
 
   /** 启动核心并等待就绪（进程驱动会轮询 external-controller） */
   start(configPath: string): Promise<void>

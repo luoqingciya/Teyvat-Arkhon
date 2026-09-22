@@ -77,7 +77,15 @@ export function createIpc(
 
   ipcMain.handle('service:status', () => serviceManager.status())
   ipcMain.handle('service:install', () => serviceManager.install())
-  ipcMain.handle('service:uninstall', () => serviceManager.uninstall())
+  ipcMain.handle('service:uninstall', async () => {
+    const st = await serviceManager.uninstall()
+    // 服务卸载后内核已停止：把驱动切回应用进程模式（重新 spawn 内核接管），
+    // 避免界面停留在「服务接管但有 REST 已断」的悬空状态。
+    if (service.status().driver === 'service') {
+      await service.setDriverConfig(serviceManager.getProcessDriverConfig())
+    }
+    return st
+  })
 
   // ---------- 日志导出 ----------
   ipcMain.handle('logs:export', async (): Promise<string | null> => {

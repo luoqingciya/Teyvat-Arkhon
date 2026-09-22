@@ -21,6 +21,7 @@ const resources = {
         error: '异常',
         driver: '驱动',
         driverProcess: '进程模式',
+        driverService: '服务模式',
         sysProxyOn: '系统代理已开启'
       },
       home: {
@@ -357,6 +358,7 @@ const resources = {
         error: 'Error',
         driver: 'Driver',
         driverProcess: 'Process mode',
+        driverService: 'Service mode',
         sysProxyOn: 'System proxy ON'
       },
       home: {

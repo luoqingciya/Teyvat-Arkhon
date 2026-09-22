@@ -6,7 +6,8 @@ import { useAppStore } from '../stores/app'
 const store = useAppStore()
 const { t } = useTranslation()
 
-const driverLabel = () => t('status.driverProcess')
+const driverLabel = () =>
+  store.status.driver === 'service' ? t('status.driverService') : t('status.driverProcess')
 
 const stateMap: Record<string, string> = {
   stopped: t('status.stopped'),
