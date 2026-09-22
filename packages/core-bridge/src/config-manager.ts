@@ -52,7 +52,7 @@ export interface ConfigManagerOptions {
 
 const DEFAULT_MIXED_PORT = 7890
 const DEFAULT_CONTROLLER = '127.0.0.1:9090'
-const TUN_DEFAULT = 'tun: {enable: true, stack: mixed, mtu: 1500, auto-route: true, auto-detect-interface: true, strict-route: false}'
+const TUN_DEFAULT = 'tun: {enable: true, stack: mixed, mtu: 1500, auto-route: true, auto-detect-interface: true, strict-route: false, device: "Teyvat TUN"}'
 
 export class ConfigManager {
   private readonly profilesDir: string
