@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...HEAD
+[1.3.23]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...v1.3.23
 [1.3.22]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...v1.3.22
 [1.3.21]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...v1.3.21
 [1.3.20]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...v1.3.20
@@ -22,6 +23,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.23] - 2026-09-22
+
+### Fixed
+- **TUN 配置开启后被其他写盘路径覆盖丢失**：启用 TUN 后，订阅刷新/档案切换等重写 config.yaml 的流程生成的内容不含 tun 段，直接覆盖导致 TUN 失效（表现为"电脑未添加虚拟网卡"）。现配置写盘统一入口自动**保留当前 tun 段**（显式关闭 TUN 除外），TUN 开启后跨任意重写稳定幸存。
 
 ## [1.3.22] - 2026-09-22
 
