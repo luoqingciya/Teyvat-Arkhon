@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...HEAD
+[1.3.24]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...v1.3.24
 [1.3.23]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.22...v1.3.23
 [1.3.22]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.21...v1.3.22
 [1.3.21]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...v1.3.21
@@ -23,6 +24,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.24] - 2026-09-22
+
+### Changed
+- **TUN 虚拟网卡默认名称**：由 mihomo 默认的 `Meta` 改为 `Teyvat TUN`（`tun.device`），开启 TUN 时创建该名称的网卡；重命名后重启内核生效。
 
 ## [1.3.23] - 2026-09-22
 
