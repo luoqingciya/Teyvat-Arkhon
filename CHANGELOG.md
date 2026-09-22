@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.20...HEAD
+[1.3.20]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.19...v1.3.20
 [1.3.19]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.18...v1.3.19
 [1.3.18]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.17...v1.3.18
 [1.3.17]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.16...v1.3.17
@@ -19,6 +20,11 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.3.20] - 2026-09-22
+
+### Fixed
+- **NSSM 参数名错误导致安装被误报失败**：v1.3.19 使用了 NSSM 新版本才有的 `AppExitAction` 参数（2.24 不支持，报 Invalid parameter 退出码 1），尽管服务已安装成功并被启动。改为 2.24 正确的 **`AppExit Restart`**，安装流程全绿。
 
 ## [1.3.19] - 2026-09-22
 
