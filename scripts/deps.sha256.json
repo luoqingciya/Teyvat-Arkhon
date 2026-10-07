@@ -2,12 +2,13 @@
   "_comment": "内核压缩包（zip/gz 原文）/geo 完整性校验哈希清单。core 表内存在的版本与平台将做强校验（校验的是下载到的压缩包原文的 SHA256，与内核 release 自带 checksums.txt 完全一致）；值为 null 的平台未登记哈希，下载时打印警告并跳过严格校验（建议首次 CI 下载后把 checksums.txt 对应哈希补登记到该平台）。geo 来自 meta-rules-dat latest，会随上游更新而变化，仅做一致性提示（不阻断下载）。",
   "core": {
     "v0.9.13-arkhon": {
-      "windows-amd64": "9afe32785be45c77fe1cd5d04ef7532bed96d429ab5272a2e84b069e063b49b0",
-      "windows-arm64": "c58011f546a8541266c55fed773e55b44bbb4a785b7a20ed32dea67db9e144b6",
-      "linux-amd64": "ec852ee512ba4ebf9b5b12300cfdc799051a3c41f7c25ab6fc0048d227531900",
-      "linux-arm64": "1a4c0df67599652ff973ee7a4d79f1163ae26db56d5133eb6da6c2744388f945",
-      "darwin-amd64": "7225043b5bd6680e42fc1d0c7a17346de023ac426428a17ed2bb6a17c3cd0f32",
-      "darwin-arm64": "f163a0fc7fefafca7cab313ce429b8f1229edb2a8fca6929c13e06504a178f6d"
+      "_note": "2026-10-07 更新：上游 v0.9.13-arkhon 的制品于 2026-09-28 被整体重建重传，6 个平台哈希全部变更。新值已逐个下载制品实算，并与该 release 自带 checksums.txt 逐行比对一致（6/6）。",
+      "windows-amd64": "4ac0c3050cd4c847be6c0965ff9c01701f46854b8c7afd874f8d3a26861088b4",
+      "windows-arm64": "a39d9e329b4d113c0244b542a0d4712f6542ef7df3753b4160785dc93ca8b248",
+      "linux-amd64": "2835b8666974d388269acc871b48db7d8c746fd750d4273bbaf7d6d8c6cdb6d4",
+      "linux-arm64": "bc3793c25d9039f379f1e3744e0119afa252558855d8b5e52944b9875fa1e368",
+      "darwin-amd64": "f1350935a13d052b30be2cebd4784a4f3accd96c3adeff445e6d6f265a3954ed",
+      "darwin-arm64": "ecde61d2699c3dc5af5e7cc0a9e5392e0b6c4b1af96c8f066b843977edc5b4b0"
     },
     "v0.9.10-arkhon": {
       "windows-amd64": "20de3da981c8bacc62ec53dc89435f549bb33765c5055cf56727e48a9b226bb3",
