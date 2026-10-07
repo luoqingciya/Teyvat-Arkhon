@@ -40,8 +40,11 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      # 防版本漂移：tag 必须与 package.json 版本一致，否则 CHANGELOG 抽取与更新器判断都会错位
+      # 防版本漂移：tag 必须与 package.json 版本一致，否则 CHANGELOG 抽取与更新器判断都会错位。
+      # 仅在 tag 推送时校验——workflow_dispatch 手动发布时 GITHUB_REF_NAME 是分支名，
+      # 无条件校验会把手动发布直接挡死。
       - name: 校验 tag 与 package.json 版本一致
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -69,12 +72,14 @@ jobs:
       - name: 打包发布
         run: pnpm --filter @teyvat-arkhon/electron exec electron-builder -- --publish always
 
-      # Release 正文：从 CHANGELOG.md 抽取当前 tag 对应版本段落，写入 release body（缺省时静默跳过）
+      # Release 正文：从 CHANGELOG.md 抽取当前版本段落，写入 release body（缺省时静默跳过）。
+      # 版本以 package.json 为准（tag 推送时已由上方闸门校验与 tag 一致），
+      # 这样 workflow_dispatch 手动发布同样可用（其 GITHUB_REF_NAME 是分支名而非 tag）。
       - name: 写入 Release 说明（CHANGELOG）
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION=$(node -p "require('./package.json').version")
           OUT="/tmp/release-notes-${VERSION}.md"
           # index() 做固定字符串匹配，避免 "[0.9.8-rc]" 被正则当作字符类误匹配其他标题
           awk -v h2="## [$VERSION]" '
@@ -83,7 +88,7 @@ jobs:
             f { print }
           ' CHANGELOG.md > "$OUT"
           if [ ! -s "$OUT" ]; then echo "未找到 [$VERSION] 段落，跳过"; exit 0; fi
-          gh release edit "${GITHUB_REF_NAME}" --notes-file "$OUT" || echo "release body 更新失败（不阻塞）"
+          gh release edit "v$VERSION" --notes-file "$OUT" || echo "release body 更新失败（不阻塞）"
           rm -f "$OUT"
 
       - name: 打包产物启动冒烟（Linux）
