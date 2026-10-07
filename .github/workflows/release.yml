@@ -90,8 +90,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -y && sudo apt-get install -y xvfb
-          BIN=$(find apps/electron/release -path '*linux-unpacked*' -type f -executable ! -name '*.so*' | head -n1)
+          # 应用主程序是 linux-unpacked 顶层的可执行文件；其余为 *.so* 与 chrome* 辅助进程。
+          # 原实现为 `find apps/electron/release -path '*linux-unpacked*' ... | head -n1`，
+          # 依赖 find 的返回顺序（目录项排列，未定义），曾误选 chrome_crashpad_handler，
+          # 再以 --no-sandbox 启动它（该辅助进程不认此参数）导致假失败。
+          BIN=$(find apps/electron/release/linux-unpacked -maxdepth 1 -type f -executable ! -name '*.so*' ! -name 'chrome*' | head -n1)
           echo "冒烟二进制: $BIN"
+          if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+            echo "✗ 未定位到应用主程序，linux-unpacked 内容如下："
+            ls -la apps/electron/release/linux-unpacked 2>&1 | head -30
+            exit 1
+          fi
           xvfb-run -a "$BIN" --no-sandbox --disable-gpu > smoke.log 2>&1 &
           PID=$!
           sleep 8
