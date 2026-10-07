@@ -11,7 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-40-47848F)](https://www.electronjs.org)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org)
 
-> 当前版本：**v1.3.13**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
+> 当前版本：**v1.3.26**（Windows 安装版 / 免安装 zip · Linux AppImage / deb）
 
 </div>
 
@@ -65,6 +65,12 @@
 - **开机自启**：设置页一键配置登录自启（系统登录项，Windows/macOS），自启后最小化到托盘常驻。
 - **系统托盘**：关闭主窗口最小化到托盘；托盘菜单支持显示/退出、**系统代理开关**、**规则/全局/直连模式切换**、档案快速切换。
 - **数据归置**：免安装版数据默认跟随运行目录（`data/`），安装版使用系统用户目录；可切换便携模式。
+
+**安全加固**
+
+- **渲染进程隔离**：渲染进程启用 OS 级沙箱（`sandbox: true`）与 `contextIsolation`，preload 仅经 `contextBridge` 暴露最小 IPC 桥，不触碰 Node 内置模块。
+- **内容安全策略**：生产构建注入 `Content-Security-Policy`（`default-src 'self'`；无内联脚本、无 eval；`connect-src 'self'`——渲染端不直连网络，全部经 IPC 交主进程）。开发期不注入，避免打断 Vite HMR。
+- **外链处理**：窗口内点击外链一律交系统浏览器打开并拒绝窗口导航，避免应用界面被外部页面替换。
 
 ---
 
@@ -229,6 +235,7 @@ A：「代理」页顶部的策略组 chips 切换分组，表格中每行可"�
 - **TUN 实机启用**需管理员权限；Windows 依赖 `wintun.dll`。
 - **系统服务托管**当前仅 Windows，服务运行于进程驱动模式（与桌面端一致）。
 - 内核 geo 数据路径遵循 mihomo `constant.Path`：便携模式下通过 `XDG_CONFIG_HOME` 指到本地（在默认 `~/.config/mihomo` 已存在时仍优先默认目录，属 mihomo 自身行为）。
+- **英文界面下，内核/配置层（core-bridge）抛出的错误详情仍为中文**：界面骨架（导航、按钮、设置项）、系统托盘、原生对话框、网络自检结果均已国际化；但订阅解析、YAML 校验、规则集安装等诊断性报错文本属于"错误详情"，按业界惯例不做本地化（便于检索与反馈）。
 
 ---
 

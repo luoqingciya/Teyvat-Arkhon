@@ -1,9 +1,14 @@
-import { app, BrowserWindow, Menu, powerMonitor, Tray, nativeImage } from 'electron'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { app, BrowserWindow, Menu, powerMonitor, shell, Tray, nativeImage } from 'electron'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import * as os from 'node:os'
 import { join } from 'node:path'
 import { CoreService, type CoreDriverConfig } from '@teyvat-arkhon/core-bridge'
-import type { ProxyMode } from '@teyvat-arkhon/shared'
+import {
+  DEFAULT_UI_LANGUAGE,
+  isUiLanguage,
+  type ProxyMode,
+  type UiLanguage
+} from '@teyvat-arkhon/shared'
 import { createIpc } from './ipc'
 import { createNetChecker } from './net-check'
 import { createSystemProxyController, type SystemProxyController } from './system-proxy'
@@ -13,6 +18,8 @@ import { createSubscriptionSync } from './subscription-sync'
 import { createTrafficMonitor, type TrafficMonitor } from './traffic-monitor'
 import { createUpdateManager } from './updater'
 import { bootstrapDataDir } from './paths'
+import { setMainLanguage, t } from './i18n'
+import { getSetting, setSetting } from './settings'
 
 // 数据目录策略（须在 ready 前确定）：默认便携时数据跟随运行目录
 const dataLayout = bootstrapDataDir(app)
@@ -90,99 +97,52 @@ function userDataConfigDir(): string {
   return join(app.getPath('userData'), 'config')
 }
 
-// ---------- 订阅自动更新开关（持久化到 userData/settings.json） ----------
-function settingsFilePath(): string {
-  return join(app.getPath('userData'), 'settings.json')
-}
+// ---------- 设置持久化（统一走 settings 模块，落盘到 userData/settings.json） ----------
 
+/** 订阅自动更新开关（默认关闭） */
 function readAutoRefresh(): boolean {
-  try {
-    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { autoRefresh?: boolean }
-    return j.autoRefresh === true
-  } catch {
-    return false
-  }
+  return getSetting<boolean>('autoRefresh', false) === true
 }
 
 function writeAutoRefresh(enabled: boolean): void {
-  try {
-    const file = settingsFilePath()
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
-    } catch {
-      /* 首次写入 */
-    }
-    j.autoRefresh = enabled
-    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
-  } catch (e) {
-    console.warn('[teyvat-arkhon] 保存订阅自动更新设置失败:', (e as Error).message)
-  }
+  setSetting('autoRefresh', enabled)
 }
 
-// ---------- 订阅排除关键词（持久化到 settings.json，导入/刷新时过滤节点） ----------
-
+/** 订阅排除关键词（导入/刷新时过滤节点） */
 function readExcludeKeywords(): string[] {
-  try {
-    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { excludeKeywords?: string[] }
-    return Array.isArray(j.excludeKeywords) ? j.excludeKeywords.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
-  }
+  const v = getSetting<unknown>('excludeKeywords', [])
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
 }
 
 function writeExcludeKeywords(keywords: string[]): void {
-  try {
-    const file = settingsFilePath()
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
-    } catch {
-      /* 首次写入 */
-    }
-    j.excludeKeywords = keywords
-    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
-  } catch (e) {
-    console.warn('[teyvat-arkhon] 保存订阅排除关键词失败:', (e as Error).message)
-  }
+  setSetting('excludeKeywords', keywords)
 }
 
-// ---------- 自动检查更新（默认开启，持久化到 settings.json） ----------
-
+/** 自动检查更新（默认开启） */
 function readAutoUpdate(): boolean {
-  try {
-    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { autoUpdate?: boolean }
-    return j.autoUpdate !== false
-  } catch {
-    return true
-  }
+  return getSetting<boolean>('autoUpdate', true) !== false
 }
 
 function writeAutoUpdate(enabled: boolean): void {
-  try {
-    const file = settingsFilePath()
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
-    } catch {
-      /* 首次写入 */
-    }
-    j.autoUpdate = enabled
-    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
-  } catch (e) {
-    console.warn('[teyvat-arkhon] 保存自动更新设置失败:', (e as Error).message)
-  }
+  setSetting('autoUpdate', enabled)
 }
 
-// ---------- 开机自启（系统登录项，独立于 Windows 服务托管） ----------
+/**
+ * 界面语言。渲染端启动与切换语言时经 IPC 同步过来；
+ * 主进程据此产出托盘菜单、原生对话框与网络自检结果文案。
+ */
+function readLanguage(): UiLanguage {
+  const v = getSetting<unknown>('language', undefined)
+  return isUiLanguage(v) ? v : DEFAULT_UI_LANGUAGE
+}
 
+function writeLanguage(lang: UiLanguage): void {
+  setSetting('language', lang)
+}
+
+/** 开机自启（系统登录项，独立于 Windows 服务托管） */
 function readAutoStart(): boolean {
-  try {
-    const j = JSON.parse(readFileSync(settingsFilePath(), 'utf-8')) as { autoStart?: boolean }
-    return j.autoStart === true
-  } catch {
-    return false
-  }
+  return getSetting<boolean>('autoStart', false) === true
 }
 
 /**
@@ -199,15 +159,7 @@ function applyAutoStart(enabled: boolean): boolean {
         openAsHidden: true
       })
     }
-    const file = settingsFilePath()
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
-    } catch {
-      /* 首次写入 */
-    }
-    j.autoStart = enabled
-    writeFileSync(file, JSON.stringify(j, null, 2), 'utf-8')
+    setSetting('autoStart', enabled)
     return true
   } catch (e) {
     console.warn('[teyvat-arkhon] 设置开机自启失败:', (e as Error).message)
@@ -230,9 +182,9 @@ let trayTargetWin: BrowserWindow | null = null
 /** 托盘增强所需的控制器（系统代理/模式切换），createTray 时注入 */
 let traySystemProxy: SystemProxyController | null = null
 
-/** 内核模式中文名（托盘菜单硬编码文案，与渲染端一致） */
+/** 内核模式显示名（托盘菜单文案，跟随主进程语言） */
 function modeLabel(mode: ProxyMode): string {
-  return mode === 'rule' ? '规则' : mode === 'global' ? '全局' : '直连'
+  return mode === 'rule' ? t('tray.mode.rule') : mode === 'global' ? t('tray.mode.global') : t('tray.mode.direct')
 }
 
 /** 重建托盘右键菜单：档案快速切换（勾选当前使用中）+ 系统代理开关 + 模式切换 + 显示/退出 */
@@ -252,7 +204,7 @@ async function rebuildTrayMenu(): Promise<void> {
   } catch {
     /* 未运行 */
   }
-  items.push({ label: '代理模式', enabled: false })
+  items.push({ label: t('tray.proxyMode'), enabled: false })
   for (const m of ['rule', 'global', 'direct'] as ProxyMode[]) {
     items.push({
       label: modeLabel(m),
@@ -273,7 +225,7 @@ async function rebuildTrayMenu(): Promise<void> {
     /* 读取失败视为关闭 */
   }
   items.push({
-    label: sysProxyOn ? '系统代理：已开启' : '系统代理：已关闭',
+    label: sysProxyOn ? t('tray.systemProxy.on') : t('tray.systemProxy.off'),
     type: 'checkbox',
     checked: sysProxyOn,
     click: (item) => {
@@ -286,7 +238,7 @@ async function rebuildTrayMenu(): Promise<void> {
   })
   items.push({ type: 'separator' })
   if (profiles.length) {
-    items.push({ label: '快速切换档案', enabled: false })
+    items.push({ label: t('tray.quickSwitch'), enabled: false })
     for (const p of profiles.slice(0, 12)) {
       items.push({
         label: p.name,
@@ -305,14 +257,14 @@ async function rebuildTrayMenu(): Promise<void> {
     items.push({ type: 'separator' })
   }
   items.push({
-    label: '显示主窗口',
+    label: t('tray.show'),
     click: () => {
       if (trayTargetWin) trayTargetWin.show()
       for (const w of BrowserWindow.getAllWindows()) w.show()
     }
   })
   items.push({ type: 'separator' })
-  items.push({ label: '退出', click: () => { isQuitting = true; app.quit() } })
+  items.push({ label: t('tray.quit'), click: () => { isQuitting = true; app.quit() } })
   tray.setContextMenu(Menu.buildFromTemplate(items))
 }
 
@@ -325,9 +277,9 @@ function createTray(win: BrowserWindow, systemProxy: SystemProxyController): voi
   traySystemProxy = systemProxy
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '显示主窗口', click: () => { win.show(); win.focus() } },
+      { label: t('tray.show'), click: () => { win.show(); win.focus() } },
       { type: 'separator' },
-      { label: '退出', click: () => { isQuitting = true; app.quit() } }
+      { label: t('tray.quit'), click: () => { isQuitting = true; app.quit() } }
     ])
   )
   void rebuildTrayMenu()
@@ -351,10 +303,32 @@ async function createWindow(systemProxy: SystemProxyController): Promise<void> {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      sandbox: false
+      // 渲染进程沙箱：preload 仅用 contextBridge/ipcRenderer（产物为 CJS、只 require electron），
+      // 不触碰 Node 内置模块，故可开启以获得 OS 级渲染进程隔离。
+      sandbox: true
     }
   })
   mainWindow = win
+
+  // 外链一律交给系统浏览器：应用窗口内没有返回入口，被导航走只能重启。
+  // 同源导航（开发期 dev server 的 HMR 重载、生产期 file://）放行。
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  win.webContents.on('will-navigate', (e, url) => {
+    let target: URL
+    let current: URL
+    try {
+      target = new URL(url)
+      current = new URL(win.webContents.getURL())
+    } catch {
+      return
+    }
+    if (target.protocol === current.protocol && target.origin === current.origin) return
+    e.preventDefault()
+    if (target.protocol === 'http:' || target.protocol === 'https:') void shell.openExternal(url)
+  })
 
   win.once('ready-to-show', () => {
     win.show()
@@ -410,6 +384,8 @@ if (!gotLock) {
   })
 
   app.whenReady().then(async () => {
+    // 主进程语言须在创建托盘/窗口之前就位（托盘文案在窗口加载前即已生成）
+    setMainLanguage(readLanguage())
     seedGeoData()
     // 系统服务托管管理器（须在 bootstrapService 之前就位：后者按服务状态选择驱动）
     serviceManager = createServiceManager({
@@ -439,7 +415,7 @@ if (!gotLock) {
           if (actual.enabled === true) return
           await sysProxy.set(true)
           for (const w of BrowserWindow.getAllWindows()) {
-            w.webContents.send('arkhon:error', '系统代理设置被外部程序修改，已自动恢复')
+            w.webContents.send('arkhon:error', t('tray.sysProxyRestored'))
           }
         } catch {
           /* 本轮读取/恢复失败，下轮重试 */
@@ -470,30 +446,41 @@ if (!gotLock) {
       writeAutoUpdate(enabled)
       return ok
     }
-    createIpc(
+    // 语言切换（渲染端设置页触发）：持久化 + 重建托盘菜单使文案即时跟随
+    const setLanguage = (lang: UiLanguage): UiLanguage => {
+      const applied = setMainLanguage(lang)
+      writeLanguage(applied)
+      void rebuildTrayMenu()
+      return applied
+    }
+    // 流量监控先于 IPC 就位：连接明细订阅处理器依赖该实例
+    const monitor = createTrafficMonitor(() => service)
+    trafficMonitor = monitor
+    createIpc({
       service,
-      sysProxy,
+      systemProxy: sysProxy,
       serviceManager,
       // TUN 前置依赖探测：resources/arkhon-core 或内核工作目录存在 wintun.dll 即为可用
-      () =>
+      tunPrereq: () =>
         existsSync(join(coreResourcesDir(), 'wintun.dll')) ||
         (existsSync(userDataConfigDir()) && existsSync(join(userDataConfigDir(), 'wintun.dll'))),
       netChecker,
       loopback,
-      readAutoRefresh,
+      getAutoRefresh: readAutoRefresh,
       setAutoRefresh,
-      readExcludeKeywords,
-      writeExcludeKeywords,
-      readAutoStart,
-      applyAutoStart,
+      getExcludeKeywords: readExcludeKeywords,
+      setExcludeKeywords: writeExcludeKeywords,
+      getAutoStart: readAutoStart,
+      setAutoStart: applyAutoStart,
       updateManager,
-      setAutoUpdate
-    )
+      setAutoUpdate,
+      setLanguage,
+      trafficMonitor: monitor
+    })
     // 已开启自动更新的用户：启动即进入定时刷新节奏
     if (readAutoRefresh()) subscriptionSync.start()
 
-    trafficMonitor = createTrafficMonitor(() => service)
-    trafficMonitor.start()
+    monitor.start()
 
     // 启动稍后自动检查一次更新（未勾选自动检查时仍可到设置页手动检查）
     if (readAutoUpdate()) {
@@ -512,14 +499,27 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+/** 退出时等待内核停止的上限；超时即强制结束，避免内核不响应导致进程无法退出 */
+const SHUTDOWN_TIMEOUT_MS = 3_000
+
 app.on('before-quit', async (e) => {
   // 托盘"退出"或系统退出时放行窗口 close（不再最小化到托盘）
   isQuitting = true
   e.preventDefault()
   trafficMonitor?.stop()
   if (service) {
-    await service.stop()
+    const svc = service
     service = null
+    // 内核 stop() 依赖子进程 exit 事件；极端情况下该事件可能不触发（kill 失效），
+    // 用超时兜底保证应用一定能退出。
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([
+      svc.stop().catch(() => undefined),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)
+      })
+    ])
+    if (timer) clearTimeout(timer)
   }
   // 退出清理：仅当本会话开启过系统代理时才关闭，
   // 避免误关用户系统自带的代理设置（内核停止后代理端口悬空会导致断网；
