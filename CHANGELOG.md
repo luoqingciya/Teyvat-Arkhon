@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.26...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.26...v1.4.0
 [1.3.26]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.25...v1.3.26
 [1.3.25]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...v1.3.25
 [1.3.24]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.23...v1.3.24
@@ -26,6 +27,30 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.4.0] - 2026-10-07
+
+### Added
+- **主进程文案国际化**：托盘菜单、原生对话框（导出日志）、网络自检结果、便携模式提示、UWP 回环豁免提示、系统代理/系统服务错误、更新器提示与更新对话框全部支持中英切换，跟随设置页语言（此前固定为中文）。语言取值统一定义在 `@teyvat-arkhon/shared` 的 `UiLanguage`，渲染端切换语言时经 IPC 同步主进程并重建托盘。
+- **内核守护状态机单测**：新增 11 项单测覆盖意外退出退避重启（2s→4s→8s→16s→30s，上限 5 次，稳定 60s 计数归零）与假死 watchdog 判定；通过 `CoreServiceOptions.driverFactory` 注入假驱动 + 假计时器做确定性验证（此前仅靠 E2E 覆盖）。
+
+### Changed
+- **实时流量与连接明细拆分通道**：流量卡片只接收轻量快照（速率/累计/连接数），连接明细仅在「连接」页打开期间订阅推送；无可见窗口时（托盘常驻/最小化）降频轮询且不推送，降低空载开销。
+- **内核日志批量推送**：由逐行推送改为按 100ms 窗口 / 200 条上限合并为数组推送，高吞吐日志下不再洪泛 IPC。
+- **订阅批量刷新并发化**：改为「限量并发拉取 → 串行落盘」两阶段，多订阅用户不再逐个串行等待；同时避免并发写档案索引互相覆盖。
+- **首屏并行化**：渲染端启动时 13 个相互独立的 IPC 调用改为并行发起，缩短首屏就绪时间。
+- **安全加固**：生产构建注入 `Content-Security-Policy`（`default-src 'self'`，无内联脚本、无 eval；渲染端不直连网络，全部经 IPC 交主进程）；渲染进程启用 OS 级沙箱（`sandbox: true`）；窗口内点击外链一律交系统浏览器打开并拒绝窗口导航。
+- **NodeType 语义统一**：节点/策略组类型判定下沉到 `@teyvat-arkhon/shared`，消除主进程与渲染端各自硬编码的双份映射。
+- **主进程设置持久化收敛**：`settings.json` 改为统一读写入口（内存缓存 + 单点落盘），替代原先四组重复的读改写实现。
+- **工程**：CI 增加 lint 步骤；发布流程增加「tag 与 `package.json` 版本一致」校验；README 版本与 Node 要求（`engines.node >= 22.13.0`）对齐。
+
+### Fixed
+- **退出可能卡死**：内核 `stop()` 依赖子进程 `exit` 事件，kill 失效时该事件不触发会导致应用无法退出；现加 3s 超时兜底。
+- **内核版本号滞后**：热重载（档案切换/配置保存）后状态栏与总览页的内核版本号停留在启动时的旧值；现版本变化时补发状态同步。
+- **外链把应用窗口导航走**：点击「关于」页的 GPL 许可证链接会把应用界面替换为网页且窗口内无返回入口；现一律交系统浏览器打开。
+
+### 说明
+- 界面骨架（导航/按钮/设置项）、系统托盘、原生对话框与网络自检结果均已国际化；**内核/配置层（core-bridge）抛出的解析与校验类诊断报错保持中文**，便于检索与反馈（详见 README「已知限制」）。
 
 ## [1.3.26] - 2026-09-22
 
