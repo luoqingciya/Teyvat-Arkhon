@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { SystemProxyState } from '@teyvat-arkhon/shared'
 import type { PlatformSystemProxy } from '.'
+import { t } from '../i18n'
 
 const execFileAsync = promisify(execFile)
 
@@ -46,7 +47,7 @@ export class LinuxSystemProxy implements PlatformSystemProxy {
       }
       return { enabled, http: enabled ? `127.0.0.1:${httpPort}` : undefined }
     } catch (e) {
-      throw new Error(`当前桌面环境不支持 gsettings 系统代理设置: ${(e as Error).message}`)
+      throw new Error(t('sysproxy.gsettingsUnsupported', { msg: (e as Error).message }))
     }
   }
 }

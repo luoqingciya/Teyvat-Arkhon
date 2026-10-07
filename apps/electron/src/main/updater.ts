@@ -8,6 +8,7 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateState } from '@teyvat-arkhon/shared'
+import { t } from './i18n'
 
 export interface UpdateManager {
   /** 当前更新状态快照 */
@@ -33,16 +34,16 @@ const UPDATE_CHANNEL = 'arkhon:update'
 function friendlyUpdateError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
   if (/Cannot find latest\.yml|latest-linux\.yml|404/i.test(msg) && /404/.test(msg)) {
-    return '发布尚未完成或版本已下线，请稍后再试'
+    return t('update.err.releaseMissing')
   }
   if (/release.*not found|404/i.test(msg) && !/401|403/.test(msg)) {
-    return '未找到可下载的版本（发布可能尚未完成），请稍后重试'
+    return t('update.err.notFound')
   }
   if (/401|403|token|authentication|unauthorized/i.test(msg)) {
-    return '更新服务器鉴权失败，请确认发布可用后重试'
+    return t('update.err.auth')
   }
   if (/getaddrinfo|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|fetch failed|ERR_INTERNET|network/i.test(msg)) {
-    return '无法连接更新服务器，请检查网络后重试'
+    return t('update.err.network')
   }
   return msg
 }
@@ -98,9 +99,9 @@ export function createUpdateManager(opts: UpdateManagerOptions): UpdateManager {
           .showMessageBox({
             type: 'info',
             title: 'Teyvat Arkhon',
-            message: `新版本 ${info.version} 已就绪`,
-            detail: '可在「设置 → 更新」中安装。是否立即重启应用完成更新？',
-            buttons: ['稍后', '立即重启'],
+            message: t('update.dialog.title', { version: info.version }),
+            detail: t('update.dialog.detail'),
+            buttons: [t('update.dialog.later'), t('update.dialog.restart')],
             defaultId: 1,
             cancelId: 0
           })
@@ -128,7 +129,7 @@ export function createUpdateManager(opts: UpdateManagerOptions): UpdateManager {
           state: process.env['TEVVAT_ARKHON_DISABLE_UPDATE'] === '1' ? 'disabled' : 'disabled',
           currentVersion: app.getVersion(),
           autoUpdate: autoEnabled,
-          message: !app.isPackaged ? '开发环境不检查更新' : '自动更新已被环境变量禁用'
+          message: !app.isPackaged ? t('update.devDisabled') : t('update.envDisabled')
         }
       }
       return snapshotState()

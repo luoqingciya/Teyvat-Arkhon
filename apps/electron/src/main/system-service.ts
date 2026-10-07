@@ -14,6 +14,7 @@ import { TextDecoder } from 'node:util'
 import { promisify } from 'node:util'
 import type { CoreDriverConfig } from '@teyvat-arkhon/core-bridge'
 import type { SystemServiceState } from '@teyvat-arkhon/shared'
+import { t } from './i18n'
 
 const execFileAsync = promisify(execFile)
 
@@ -82,7 +83,7 @@ export class WindowsServiceManager {
    * 直接 sc create 注册后 SCM 等不到握手必然 1053 启动超时，NSSM 解决该问题。 */
   async install(): Promise<SystemServiceState> {
     if (process.platform !== 'win32') {
-      throw new Error('系统服务托管目前仅支持 Windows')
+      throw new Error(t('service.windowsOnly'))
     }
     const { nssmPath, binaryPath: bin, workingDir, configFile } = this.opts
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
@@ -107,7 +108,7 @@ export class WindowsServiceManager {
 
   /** 停止并删除服务（单次提权） */
   async uninstall(): Promise<SystemServiceState> {
-    if (process.platform !== 'win32') throw new Error('系统服务托管目前仅支持 Windows')
+    if (process.platform !== 'win32') throw new Error(t('service.windowsOnly'))
     const { nssmPath } = this.opts
     const logFile = path.join(os.tmpdir(), `arkhon-svc-${Date.now()}.log`)
     try {
@@ -164,7 +165,10 @@ export class WindowsServiceManager {
     const m = text.match(/EXIT=([0-9]+)/)
     if (m) {
       throw new Error(
-        `服务命令执行失败（退出码 ${m[1]}）：\n${text.split('\n').filter(Boolean).join(' | ')}`
+        t('service.cmdFailed', {
+          code: m[1],
+          detail: text.split('\n').filter(Boolean).join(' | ')
+        })
       )
     }
   }

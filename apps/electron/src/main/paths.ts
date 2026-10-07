@@ -14,6 +14,7 @@
 import { type App } from 'electron'
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { t } from './i18n'
 
 export const PORTABLE_MARKER = 'portable.txt'
 export const PORTABLE_DATA_DIR = 'data'
@@ -63,12 +64,12 @@ export function setPortableEnabled(appHandle: App, enabled: boolean): { portable
   if (enabled) {
     mkdirSync(dirname(marker), { recursive: true })
     writeFileSync(marker, '1\n', 'utf-8')
-    return { portable: true, note: '已启用便携模式，重启应用后生效' }
+    return { portable: true, note: t('portable.enabled') }
   }
   try {
     unlinkSync(marker)
   } catch {
     /* 标记不存在则忽略 */
   }
-  return { portable: false, note: '已停用便携模式，重启应用后生效' }
+  return { portable: false, note: t('portable.disabled') }
 }

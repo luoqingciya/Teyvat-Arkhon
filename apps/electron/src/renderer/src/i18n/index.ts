@@ -1,13 +1,16 @@
 /**
  * 国际化：i18next（zh-CN / en-US）
- * 主题与语言偏好均持久化在 localStorage。
+ * 主题与语言偏好均持久化在 localStorage；语言同时同步给主进程，
+ * 使托盘菜单、原生对话框与网络自检结果等主进程文案保持一致。
  */
 
 import i18next from 'i18next'
 // i18next-vue 的 useTranslation 在组件内创建 reactive 实例，避免与 store 联动时的闭包问题
 import { useTranslation } from 'i18next-vue'
+import type { UiLanguage } from '@teyvat-arkhon/shared'
 
-export type Lang = 'zh-CN' | 'en-US'
+/** 界面语言（与主进程 i18n 共用同一取值定义，避免两侧语言集合漂移） */
+export type Lang = UiLanguage
 
 const resources = {
   'zh-CN': {
@@ -693,20 +696,30 @@ const resources = {
   }
 }
 
+/** 读取持久化的语言偏好（非法值回落 zh-CN） */
+function readStoredLang(): Lang {
+  if (typeof localStorage === 'undefined') return 'zh-CN'
+  return localStorage.getItem('arkhon-lang') === 'en-US' ? 'en-US' : 'zh-CN'
+}
+
 function createI18n(): void {
   if (i18next.isInitialized) return
+  const lang = readStoredLang()
   void i18next.init({
-    lng: typeof localStorage !== 'undefined' ? localStorage.getItem('arkhon-lang') ?? 'zh-CN' : 'zh-CN',
+    lng: lang,
     fallbackLng: 'zh-CN',
     resources,
     interpolation: { escapeValue: false }
   })
+  // 主进程（托盘/原生对话框/自检结果）需与界面同一语言：启动即同步一次
+  void window.arkhon.setLanguage(lang)
 }
 
-/** 切换语言并持久化 */
+/** 切换语言并持久化；同时同步给主进程 */
 function setLanguage(lang: Lang): void {
   void i18next.changeLanguage(lang)
   localStorage.setItem('arkhon-lang', lang)
+  void window.arkhon.setLanguage(lang)
 }
 
 export { createI18n, setLanguage, useTranslation }

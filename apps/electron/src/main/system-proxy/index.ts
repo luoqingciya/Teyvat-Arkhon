@@ -2,6 +2,7 @@ import type { SystemProxyState } from '@teyvat-arkhon/shared'
 import { WindowsSystemProxy } from './win'
 import { DarwinSystemProxy } from './darwin'
 import { LinuxSystemProxy } from './linux'
+import { t } from '../i18n'
 
 /** 各平台系统代理实现统一接口 */
 export interface PlatformSystemProxy {
@@ -39,7 +40,7 @@ export function createSystemProxyController(
     read: () => impl.read(),
     async set(enabled): Promise<SystemProxyState> {
       if (enabled && !isCoreRunning()) {
-        throw new Error('内核未运行，无法开启系统代理')
+        throw new Error(t('sysproxy.coreNotRunning'))
       }
       const httpPort = await getHttpPort()
       const state = await impl.apply(enabled, httpPort)

@@ -5,6 +5,7 @@
 
 import { request } from 'node:http'
 import type { NetProbeResult } from '@teyvat-arkhon/shared'
+import { t } from './i18n'
 
 export interface NetCheckOptions {
   /** 当前生效的内核本地混合端口（无配置时为 undefined） */
@@ -87,10 +88,10 @@ export function createNetChecker(opts: NetCheckOptions): NetChecker {
         return [
           {
             key: 'unavailable',
-            label: 'Proxy',
+            label: t('netcheck.label.proxy'),
             ok: false,
             status: 0,
-            detail: '内核未运行或未配置代理端口',
+            detail: t('netcheck.noPort'),
             elapsedMs: 0
           }
         ]
@@ -102,10 +103,14 @@ export function createNetChecker(opts: NetCheckOptions): NetChecker {
       {
         const raw = await probeThroughProxy(port, 'https://ipinfo.io/json', timeoutMs)
         const detail =
-          raw.status >= 200 && raw.status < 400 ? parseGeo(raw.body) : raw.status === 0 ? '请求失败/超时' : `HTTP ${raw.status}`
+          raw.status >= 200 && raw.status < 400
+            ? parseGeo(raw.body)
+            : raw.status === 0
+              ? t('netcheck.fail.timeout')
+              : `HTTP ${raw.status}`
         results.push({
           key: 'ip',
-          label: '出口 IP',
+          label: t('netcheck.label.ip'),
           ok: raw.status >= 200 && raw.status < 400,
           status: raw.status,
           detail,
@@ -120,14 +125,16 @@ export function createNetChecker(opts: NetCheckOptions): NetChecker {
           label: 'Netflix',
           url: 'https://www.netflix.com',
           reachable: (s) => s >= 200 && s < 400,
-          failText: (s) => (s === 0 ? '不可达' : `受限 HTTP ${s}`)
+          failText: (s) =>
+            s === 0 ? t('netcheck.fail.unreachable') : t('netcheck.fail.restricted', { status: s })
         },
         {
           key: 'youtube',
           label: 'YouTube',
           url: 'https://www.youtube.com',
           reachable: (s) => s >= 200 && s < 400,
-          failText: (s) => (s === 0 ? '不可达' : `受限 HTTP ${s}`)
+          failText: (s) =>
+            s === 0 ? t('netcheck.fail.unreachable') : t('netcheck.fail.restricted', { status: s })
         },
         {
           key: 'openai',
@@ -135,24 +142,25 @@ export function createNetChecker(opts: NetCheckOptions): NetChecker {
           url: 'https://api.openai.com/v1/models',
           // 401/403 说明已到达服务（未授权/受限），视为可达
           reachable: (s) => s > 0 && s !== 408 && s < 500,
-          failText: (s) => (s === 0 ? '不可达' : `异常 HTTP ${s}`)
+          failText: (s) =>
+            s === 0 ? t('netcheck.fail.unreachable') : t('netcheck.fail.abnormal', { status: s })
         }
       ]
 
-      for (const t of targets) {
-        const raw = await probeThroughProxy(port, t.url, timeoutMs)
+      for (const t2 of targets) {
+        const raw = await probeThroughProxy(port, t2.url, timeoutMs)
         results.push({
-          key: t.key,
-          label: t.label,
-          ok: t.reachable(raw.status),
+          key: t2.key,
+          label: t2.label,
+          ok: t2.reachable(raw.status),
           status: raw.status,
-          detail: t.reachable(raw.status)
+          detail: t2.reachable(raw.status)
             ? raw.status === 401
-              ? '可达（需鉴权）'
+              ? t('netcheck.ok.auth')
               : raw.status === 403
-                ? '可达（区域受限）'
-                : '可达'
-            : t.failText(raw.status),
+                ? t('netcheck.ok.region')
+                : t('netcheck.ok')
+            : t2.failText(raw.status),
           elapsedMs: raw.elapsedMs
         })
       }

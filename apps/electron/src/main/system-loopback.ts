@@ -7,6 +7,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { LoopbackState } from '@teyvat-arkhon/shared'
+import { t } from './i18n'
 
 const execFileAsync = promisify(execFile)
 
@@ -61,16 +62,16 @@ export function createLoopbackController(): LoopbackController {
       const out = await runCheckNet(['LoopbackExempt', '-s'])
       return { supported, exemptCount: parseExemptCount(out) }
     } catch (e) {
-      return { supported, exemptCount: 0, note: `查询失败: ${(e as Error).message}` }
+      return { supported, exemptCount: 0, note: t('loopback.queryFailed', { msg: (e as Error).message }) }
     }
   }
 
   async function mutate(flag: '-a' | '-d'): Promise<LoopbackState> {
-    if (!supported) return { supported: false, exemptCount: 0, note: '仅 Windows 支持' }
+    if (!supported) return { supported: false, exemptCount: 0, note: t('loopback.windowsOnly') }
     try {
       const families = await listPackageFamilies()
       if (families.length === 0) {
-        return { supported, exemptCount: 0, note: '未检测到可豁免的应用' }
+        return { supported, exemptCount: 0, note: t('loopback.none') }
       }
       let done = 0
       let failed = 0
@@ -87,10 +88,13 @@ export function createLoopbackController(): LoopbackController {
       return {
         supported,
         exemptCount: state.exemptCount,
-        note: flag === '-a' ? `已豁免 ${done} 个应用（跳过 ${failed}）` : `已撤销 ${done} 个应用的豁免（跳过 ${failed}）`
+        note:
+          flag === '-a'
+            ? t('loopback.exempted', { done, failed })
+            : t('loopback.revoked', { done, failed })
       }
     } catch (e) {
-      return { supported, exemptCount: 0, note: `操作失败: ${(e as Error).message}` }
+      return { supported, exemptCount: 0, note: t('loopback.failed', { msg: (e as Error).message }) }
     }
   }
 
