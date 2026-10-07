@@ -25,6 +25,8 @@ jobs:
         run: pnpm --filter @teyvat-arkhon/core-bridge exec vitest run
       - name: 类型检查
         run: pnpm --filter @teyvat-arkhon/electron typecheck
+      - name: 代码规范检查
+        run: pnpm lint
       - name: 构建 Electron 应用
         run: pnpm --filter @teyvat-arkhon/electron build
 

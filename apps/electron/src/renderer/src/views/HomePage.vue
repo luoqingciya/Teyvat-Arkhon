@@ -162,7 +162,7 @@ function drawChart(): void {
             </div>
             <div class="rate">
               <span class="conn">≡</span>
-              <strong>{{ store.traffic?.connections.length ?? 0 }}</strong>
+              <strong>{{ store.traffic?.connectionCount ?? 0 }}</strong>
               <span class="dim">{{ t('home.connections') }}</span>
             </div>
           </div>

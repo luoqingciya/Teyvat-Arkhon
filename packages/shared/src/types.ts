@@ -9,6 +9,23 @@ export interface MihomoVersion {
   premium?: boolean
 }
 
+/**
+ * 界面语言（渲染端 i18next 与主进程 i18n 共用的取值）。
+ * 主进程侧用于托盘菜单、原生对话框、网络自检结果等由主进程直接产出的文案。
+ */
+export type UiLanguage = 'zh-CN' | 'en-US'
+
+/** 支持的界面语言全集 */
+export const UI_LANGUAGES: UiLanguage[] = ['zh-CN', 'en-US']
+
+/** 默认界面语言 */
+export const DEFAULT_UI_LANGUAGE: UiLanguage = 'zh-CN'
+
+/** 判定任意值是否为受支持的界面语言 */
+export function isUiLanguage(v: unknown): v is UiLanguage {
+  return v === 'zh-CN' || v === 'en-US'
+}
+
 /** 策略组/节点 */
 export interface ProxyItem {
   name: string
@@ -19,6 +36,46 @@ export interface ProxyItem {
   history?: Array<{ time: string; delay: number }>
   all?: string[]
   bot?: boolean
+}
+
+/**
+ * mihomo 内核 NodeType 语义（数值与内核定义一致）：
+ * 0=单节点；1=URLTest；2=Selector；3=Fallback；4=LoadBalance；5=Relay。
+ * 内核 REST `/proxies` 不返回该字段，需由 `type` 推断（见 `inferNodeType`）。
+ */
+export const NODE_TYPE = {
+  Node: 0,
+  URLTest: 1,
+  Selector: 2,
+  Fallback: 3,
+  LoadBalance: 4,
+  Relay: 5
+} as const
+
+/**
+ * 由内核返回的 proxy.type 推断 nodeType。
+ * 单一真相来源：主进程（core-bridge）与渲染进程共用本函数，避免两侧各写一份映射。
+ */
+export function inferNodeType(type: string): number {
+  switch (type) {
+    case 'Selector':
+      return NODE_TYPE.Selector
+    case 'URLTest':
+      return NODE_TYPE.URLTest
+    case 'Fallback':
+      return NODE_TYPE.Fallback
+    case 'LoadBalance':
+      return NODE_TYPE.LoadBalance
+    case 'Relay':
+      return NODE_TYPE.Relay
+    default:
+      return NODE_TYPE.Node
+  }
+}
+
+/** 是否为策略组（URLTest / Selector / Fallback / LoadBalance / Relay），即"可切换/可测速的组" */
+export function isGroupNodeType(nodeType: number): boolean {
+  return nodeType >= NODE_TYPE.URLTest && nodeType <= NODE_TYPE.Relay
 }
 
 /** 订阅配额信息（来自 subscription-userinfo 响应头，仅 URL 订阅） */
@@ -106,13 +163,18 @@ export interface ConnectionInfo {
   rulePayload?: string
 }
 
-/** 实时流量快照（轮询 /connections 计算） */
+/**
+ * 实时流量快照（轮询 /connections 计算），**仅含轻量字段**。
+ * 连接明细体积大，走独立的订阅通道（`onConnections`），此处只带数量，
+ * 避免每秒向所有窗口结构化克隆整个连接数组。
+ */
 export interface TrafficSnapshot {
   downloadSpeed: number
   uploadSpeed: number
   downloadTotal: number
   uploadTotal: number
-  connections: ConnectionInfo[]
+  /** 当前活跃连接数（明细需经 subscribeConnections + onConnections 获取） */
+  connectionCount: number
 }
 
 /** 路由规则条目（来自 REST /rules，路由模式 rule 有效） */

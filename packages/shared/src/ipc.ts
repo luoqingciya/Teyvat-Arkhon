@@ -19,6 +19,7 @@ import type {
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot,
+  UiLanguage,
   UpdateState
 } from './types'
 
@@ -43,6 +44,13 @@ export interface ArkhonAPI {
     uploadTotal: number
     connections: ConnectionInfo[]
   }>
+  /**
+   * 订阅连接明细推送（连接页挂载时调用，主进程按引用计数开关）。
+   * 返回订阅瞬间的快照，随后由 onConnections 持续推送。
+   */
+  subscribeConnections(): Promise<ConnectionInfo[]>
+  /** 退订连接明细推送（连接页卸载时调用） */
+  unsubscribeConnections(): Promise<void>
   closeConnection(id: string): Promise<void>
   closeAllConnections(): Promise<void>
 
@@ -151,6 +159,11 @@ export interface ArkhonAPI {
   getDataInfo(): Promise<{ dataDir: string; portable: boolean }>
   setPortable(enabled: boolean): Promise<{ portable: boolean; note: string }>
   getTunPrereq(): Promise<{ wintun: boolean; windows: boolean }>
+  /**
+   * 同步界面语言给主进程：托盘菜单、原生对话框、网络自检结果等由主进程
+   * 直接产出的文案需要与渲染端保持一致。返回主进程实际采用的语言。
+   */
+  setLanguage(lang: UiLanguage): Promise<UiLanguage>
 
   // ---------- 应用更新（设置页） ----------
   /** 获取当前更新状态（含自动检查开关） */
@@ -166,7 +179,11 @@ export interface ArkhonAPI {
 
   // ---------- 事件订阅（返回取消函数） ----------
   onStateChange(cb: (status: CoreStatus) => void): () => void
+  /** 实时流量速率与累计（轻量，1s 级推送） */
   onTraffic(cb: (snapshot: TrafficSnapshot) => void): () => void
+  /** 连接明细推送（仅在 subscribeConnections 之后有效） */
+  onConnections(cb: (connections: ConnectionInfo[]) => void): () => void
   onError(cb: (message: string) => void): () => void
-  onCoreLog(cb: (line: string) => void): () => void
+  /** 内核日志（按时间窗口批量合并推送，单次回调携带多行） */
+  onCoreLog(cb: (lines: string[]) => void): () => void
 }

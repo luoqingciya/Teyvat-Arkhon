@@ -287,6 +287,62 @@ describe('ConfigManager', () => {
     expect(list[0].nodeCount).toBe(1)
   })
 
+  it('批量刷新订阅：限量并发拉取 + 串行落盘，单条失败不丢档且保留旧内容', async () => {
+    const a = await mgr.importFromText('A', SAMPLE_YAML, 'https://sub.test/a')
+    const b = await mgr.importFromText('B', SAMPLE_YAML, 'https://sub.test/b')
+    const c = await mgr.importFromText('C', SAMPLE_YAML, 'https://sub.test/c')
+
+    const calls: string[] = []
+    let inflight = 0
+    let maxInflight = 0
+    const fetchImpl = (async (url: string) => {
+      calls.push(url)
+      inflight++
+      maxInflight = Math.max(maxInflight, inflight)
+      await new Promise((r) => setTimeout(r, 5))
+      inflight--
+      if (url.endsWith('/c')) return new Response('boom', { status: 500 })
+      return new Response(SAMPLE_YAML.replace('HK-01', 'HK-NEW'), { status: 200 })
+    }) as unknown as typeof fetch
+
+    const res = await mgr.refreshProfiles([a.profile.id, b.profile.id, c.profile.id], fetchImpl, 2)
+
+    // 成功/失败归类正确，且三条都发起了请求
+    expect([...res.ok].sort()).toEqual([a.profile.id, b.profile.id].sort())
+    expect(res.failed).toHaveLength(1)
+    expect(res.failed[0].id).toBe(c.profile.id)
+    expect(calls).toHaveLength(3)
+
+    // 并发受上限约束（确实并发，但不超过传入的并发度）
+    expect(maxInflight).toBeGreaterThan(1)
+    expect(maxInflight).toBeLessThanOrEqual(2)
+
+    // 索引完整：三个档案一个不少（串行落盘避免了并发写 index.json 互相覆盖）
+    const list = await mgr.listProfiles()
+    expect(list).toHaveLength(3)
+
+    // 成功的档案已写入新内容；失败的档案保留旧内容
+    const rawA = await fs.readFile(path.join(profilesDir, `${a.profile.id}.yaml`), 'utf-8')
+    expect(rawA).toContain('HK-NEW')
+    const rawC = await fs.readFile(path.join(profilesDir, `${c.profile.id}.yaml`), 'utf-8')
+    expect(rawC).toContain('HK-01')
+  })
+
+  it('批量刷新订阅：本地（无 URL）档案被跳过，不发起任何请求', async () => {
+    const local = await mgr.importFromText('local', SAMPLE_YAML)
+    let called = 0
+    const fetchImpl = (async () => {
+      called++
+      return new Response(SAMPLE_YAML, { status: 200 })
+    }) as unknown as typeof fetch
+
+    const res = await mgr.refreshProfiles([local.profile.id], fetchImpl, 4)
+
+    expect(called).toBe(0)
+    expect(res.ok).toHaveLength(0)
+    expect(res.failed).toHaveLength(0)
+  })
+
   it('mergeKernelDefaults 仅在缺失时补全监听与稳定性防线', () => {
     const out = mergeKernelDefaults('mode: rule')
     expect(out).toContain('mixed-port: 7890')

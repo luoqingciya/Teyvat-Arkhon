@@ -21,6 +21,7 @@ import type {
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot,
+  UiLanguage,
   UpdateState
 } from '@teyvat-arkhon/shared'
 
@@ -57,6 +58,9 @@ const api: ArkhonAPI = {
     }>,
   closeConnection: (id) => invoke('core:close-connection', id) as Promise<void>,
   closeAllConnections: () => invoke('core:close-all-connections') as Promise<void>,
+
+  subscribeConnections: () => invoke('connections:subscribe') as Promise<ConnectionInfo[]>,
+  unsubscribeConnections: () => invoke('connections:unsubscribe') as Promise<void>,
 
   getActiveConfig: () => invoke('config:get-active') as Promise<string>,
   saveActiveConfig: (content) =>
@@ -142,6 +146,8 @@ const api: ArkhonAPI = {
   getTunPrereq: () =>
     invoke('app:get-tun-prereq') as Promise<{ wintun: boolean; windows: boolean }>,
 
+  setLanguage: (lang) => invoke('app:language-set', lang) as Promise<UiLanguage>,
+
   getUpdateState: () => invoke('update:get-state') as Promise<UpdateState>,
   checkUpdate: () => invoke('update:check') as Promise<UpdateState>,
   installUpdate: () => invoke('update:install') as Promise<void>,
@@ -162,13 +168,19 @@ const api: ArkhonAPI = {
     ipcRenderer.on('arkhon:traffic', listener)
     return () => ipcRenderer.removeListener('arkhon:traffic', listener)
   },
+  onConnections: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, connections: ConnectionInfo[]): void =>
+      cb(connections)
+    ipcRenderer.on('arkhon:connections', listener)
+    return () => ipcRenderer.removeListener('arkhon:connections', listener)
+  },
   onError: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)
     ipcRenderer.on('arkhon:error', listener)
     return () => ipcRenderer.removeListener('arkhon:error', listener)
   },
   onCoreLog: (cb) => {
-    const listener = (_e: Electron.IpcRendererEvent, line: string): void => cb(line)
+    const listener = (_e: Electron.IpcRendererEvent, lines: string[]): void => cb(lines)
     ipcRenderer.on('arkhon:log', listener)
     return () => ipcRenderer.removeListener('arkhon:log', listener)
   }

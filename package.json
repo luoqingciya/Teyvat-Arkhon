@@ -6,7 +6,7 @@
   "license": "GPL-3.0-only",
   "packageManager": "pnpm@11.24.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "prebuild-deps": "pnpm -r --if-present --filter \"./packages/**\" build",

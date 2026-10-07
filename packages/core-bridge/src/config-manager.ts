@@ -280,6 +280,69 @@ export class ConfigManager {
     return profile
   }
 
+  /**
+   * 批量刷新 URL 订阅（自动更新用）。
+   * 两阶段执行：
+   *  1) 限量并发拉取 + 解码 + 校验（纯网络/解析，**不落盘**）；
+   *  2) 串行写入各档案并**一次性**更新索引。
+   *
+   * 之所以不能简单并发调用 refreshProfile：后者内部是
+   * `readIndex → 写档案 → writeIndex` 的读改写序列，并发时索引写入会互相覆盖。
+   * 两阶段方案同时把索引写入次数从 N 降为 1；单条失败不写入任何文件（保留旧内容）。
+   */
+  async refreshProfiles(
+    ids: string[],
+    fetchImpl: typeof fetch = fetch,
+    concurrency = 4
+  ): Promise<{ ok: string[]; failed: Array<{ id: string; error: string }> }> {
+    const list = await this.readIndex()
+    const targets = ids
+      .map((id) => list.find((p) => p.id === id))
+      .filter((p): p is Profile => !!p && !!p.url)
+
+    const ok: string[] = []
+    const failed: Array<{ id: string; error: string }> = []
+    /** 阶段一产物：id → 已校验的新内容与元数据（尚未落盘） */
+    const fetched = new Map<string, { content: string; summary: ClashConfigSummary; subInfo?: ProfileSubInfo }>()
+
+    const queue = [...targets]
+    const workerCount = Math.min(Math.max(1, concurrency), queue.length)
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (queue.length) {
+        const profile = queue.shift()
+        if (!profile) break
+        try {
+          const res = await fetchImpl(profile.url as string, {
+            headers: { 'user-agent': 'TeyvatArkhon/0.1' }
+          })
+          if (!res.ok) throw new Error(`订阅刷新失败: HTTP ${res.status}`)
+          const content = this.filterConverted(decodeProfilePayload(await res.text()))
+          const summary = this.parseAndValidate(content)
+          fetched.set(profile.id, { content, summary, subInfo: parseSubscriptionUserinfo(res) })
+        } catch (e) {
+          failed.push({ id: profile.id, error: (e as Error).message })
+        }
+      }
+    })
+    await Promise.all(workers)
+
+    // 阶段二：串行落盘（一次性更新索引，避免并发读改写互相覆盖）
+    if (fetched.size) {
+      const updatedAt = new Date().toISOString()
+      for (const profile of list) {
+        const hit = fetched.get(profile.id)
+        if (!hit) continue
+        profile.updatedAt = updatedAt
+        profile.nodeCount = hit.summary.proxies.length
+        if (hit.subInfo) profile.subInfo = hit.subInfo
+        await fs.writeFile(this.profileFile(profile.id), hit.content, 'utf-8')
+        ok.push(profile.id)
+      }
+      await this.writeIndex(list)
+    }
+    return { ok, failed }
+  }
+
   /** 切换当前使用档案：拷贝到工作配置并补齐缺失的默认监听项 */
   async selectProfile(id: string): Promise<ClashConfigSummary> {
     const list = await this.readIndex()

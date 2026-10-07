@@ -6,6 +6,7 @@
  * - reload()：走 REST 热重载（配置变更直接作用到服务内唯一内核）
  */
 
+import { inferNodeType } from '@teyvat-arkhon/shared'
 import type {
   ConnectionInfo,
   DelayResult,
@@ -15,7 +16,6 @@ import type {
   RuleInfo
 } from '@teyvat-arkhon/shared'
 import { RestClient, type MihomoConnections, type MihomoProxyMap, type MihomoRules } from './rest-client'
-import { inferNodeType } from './process-driver'
 import type { CoreDriver } from './driver'
 
 export interface ServiceDriverOptions {
@@ -106,7 +106,7 @@ export class ServiceCoreDriver implements CoreDriver {
     return Object.values(map.proxies).map((p) => ({
       name: p.name,
       type: p.type,
-      nodeType: inferNodeType(p),
+      nodeType: inferNodeType(p.type),
       now: p.now,
       alive: p.alive,
       history: p.history,

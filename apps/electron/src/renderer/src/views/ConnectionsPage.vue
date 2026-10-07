@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 
@@ -7,9 +7,13 @@ const store = useAppStore()
 const { t } = useTranslation()
 const keyword = ref('')
 
+// 连接明细体积大：仅在本页挂载期间订阅主进程推送，离开即退订（主进程按引用计数开关）
+onMounted(() => void store.subscribeConnections())
+onUnmounted(() => void store.unsubscribeConnections())
+
 const filtered = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
-  const all = store.traffic?.connections ?? []
+  const all = store.connections
   if (!kw) return all
   return all.filter((c) =>
     [c.host, c.rule, c.process, c.type, c.network, c.rulePayload].some(
@@ -39,7 +43,7 @@ function fmtTime(iso: string): string {
       <h3>{{ t('connections.title') }}</h3>
       <div class="actions">
         <span v-if="store.traffic" class="hint">
-          {{ t('connections.totalHint', { count: store.traffic.connections.length, down: fmt(store.traffic.downloadTotal), up: fmt(store.traffic.uploadTotal) }) }}
+          {{ t('connections.totalHint', { count: store.connections.length, down: fmt(store.traffic.downloadTotal), up: fmt(store.traffic.uploadTotal) }) }}
         </span>
         <input
           v-model="keyword"
@@ -55,7 +59,7 @@ function fmtTime(iso: string): string {
 
     <div class="table-wrap glass">
       <div v-if="!store.running" class="empty">{{ t('status.stopped') }}</div>
-      <div v-else-if="!store.traffic || store.traffic.connections.length === 0" class="empty">
+      <div v-else-if="store.connections.length === 0" class="empty">
         {{ t('connections.empty') }}
       </div>
       <div v-else-if="filtered.length === 0" class="empty">{{ t('connections.noMatch') }}</div>

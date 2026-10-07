@@ -4,6 +4,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import { inferNodeType } from '@teyvat-arkhon/shared'
 import type {
   ConnectionInfo,
   DelayResult,
@@ -12,7 +13,7 @@ import type {
   ProxyMode,
   RuleInfo
 } from '@teyvat-arkhon/shared'
-import { RestClient, type MihomoConnections, type MihomoProxyEntry, type MihomoProxyMap, type MihomoRules } from './rest-client'
+import { RestClient, type MihomoConnections, type MihomoProxyMap, type MihomoRules } from './rest-client'
 import type { CoreDriver } from './driver'
 
 export interface ProcessDriverOptions {
@@ -26,8 +27,8 @@ export interface ProcessDriverOptions {
   secret: string
   /** 子进程意外退出回调 */
   onExit?: (code: number | null, signal: NodeJS.Signals | null) => void
-  /** 内核 stdout/stderr 每行日志回调 */
-  onLog?: (line: string) => void
+  /** 内核 stdout/stderr 日志回调（按时间窗口批量合并，单次携带多行） */
+  onLogs?: (lines: string[]) => void
   /** 内核日志环形缓冲上限 */
   logLimit?: number
   /** fetch 注入（测试用） */
@@ -37,6 +38,10 @@ export interface ProcessDriverOptions {
 }
 
 const READY_POLL_INTERVAL = 250
+/** 日志批量推送窗口：窗口内到达的行合并为一次回调，降低 IPC 频次 */
+const LOG_FLUSH_INTERVAL_MS = 100
+/** 待推送日志达到该条数立即冲刷，避免高吞吐日志下的推送延迟累积 */
+const LOG_FLUSH_MAX_PENDING = 200
 
 export class ProcessCoreDriver implements CoreDriver {
   readonly kind = 'process' as const
@@ -47,6 +52,9 @@ export class ProcessCoreDriver implements CoreDriver {
   private readonly startupTimeoutMs: number
   private readonly logs: string[] = []
   private readonly logLimit: number
+  /** 待批量推送的日志（时间窗口内累积） */
+  private readonly pendingLogs: string[] = []
+  private flushTimer: NodeJS.Timeout | null = null
 
   constructor(private readonly opts: ProcessDriverOptions) {
     this.rest = new RestClient({
@@ -69,8 +77,29 @@ export class ProcessCoreDriver implements CoreDriver {
       if (!trimmed) continue
       this.logs.push(trimmed)
       if (this.logs.length > this.logLimit) this.logs.shift()
-      this.opts.onLog?.(trimmed)
+      this.pendingLogs.push(trimmed)
     }
+    if (!this.pendingLogs.length) return
+    // 高吞吐日志立即冲刷，避免推送延迟累积
+    if (this.pendingLogs.length >= LOG_FLUSH_MAX_PENDING) {
+      this.flushLogs()
+      return
+    }
+    if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => this.flushLogs(), LOG_FLUSH_INTERVAL_MS)
+      this.flushTimer.unref?.()
+    }
+  }
+
+  /** 冲刷待推送日志：合并为一次回调（stop/close 时也会调用，避免尾部日志丢失） */
+  private flushLogs(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    if (!this.pendingLogs.length) return
+    const batch = this.pendingLogs.splice(0, this.pendingLogs.length)
+    this.opts.onLogs?.(batch)
   }
 
   getLogs(): string[] {
@@ -139,6 +168,8 @@ export class ProcessCoreDriver implements CoreDriver {
     }, 3000).unref()
     await exited
     this.exited = true
+    // 冲刷尾部日志（子进程退出前最后几行可能仍在待推送缓冲中）
+    this.flushLogs()
   }
 
   async reload(configPath: string): Promise<void> {
@@ -165,7 +196,7 @@ export class ProcessCoreDriver implements CoreDriver {
     return Object.values(map.proxies).map((p) => ({
       name: p.name,
       type: p.type,
-      nodeType: inferNodeType(p),
+      nodeType: inferNodeType(p.type),
       now: p.now,
       alive: p.alive,
       history: p.history,
@@ -257,21 +288,3 @@ export class ProcessCoreDriver implements CoreDriver {
     await this.stop()
   }
 }
-
-/**
- * mihomo REST /proxies 列表响应不返回 nodeType 字段（实测 v1.19.30），
- * 按 type 推断其语义（数值与 mihomo 内核 NodeType 定义一致）：
- *   Selector=2 / URLTest=1 / Fallback=3 / LoadBalance=4 / Relay=5，其余为单节点=0。
- */
-function inferNodeType(p: MihomoProxyEntry): number {
-  switch (p.type) {
-    case 'Selector':return 2
-    case 'URLTest': return 1
-    case 'Fallback': return 3
-    case 'LoadBalance': return 4
-    case 'Relay': return 5
-    default: return 0
-  }
-}
-
-export { inferNodeType }

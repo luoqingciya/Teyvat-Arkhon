@@ -36,6 +36,17 @@ export type CoreDriverConfig =
   | { mode: 'process'; options: ProcessDriverOptions }
   | { mode: 'service'; options: ServiceDriverOptions }
 
+/**
+ * 驱动生命周期钩子：由 CoreService 提供给驱动的回调。
+ * 独立成类型是为了让自定义驱动工厂（测试注入）能复用同一套钩子签名。
+ */
+export interface DriverHooks {
+  /** 驱动进程/内核意外退出（进程驱动有效） */
+  onExit: (code: number | null, signal: NodeJS.Signals | null) => void
+  /** 内核日志批量推送 */
+  onLogs: (lines: string[]) => void
+}
+
 export interface CoreServiceOptions {
   profilesDir: string
   activeConfigFile: string
@@ -46,6 +57,11 @@ export interface CoreServiceOptions {
   excludeKeywords?: () => string[]
   /** geosite.dat / geoip.dat 候选目录（规则命中调试本地判定用） */
   geodataDirs?: string[]
+  /**
+   * 驱动工厂（测试注入点）。缺省按 driver 配置构造真实驱动；
+   * 提供后可在单测中以假驱动驱动状态机（退避重启 / 假死 watchdog），无需真实内核。
+   */
+  driverFactory?: (config: CoreDriverConfig, hooks: DriverHooks) => CoreDriver
 }
 
 /** 意外退出自动重启的退避间隔（第 1~5 次） */
@@ -56,6 +72,8 @@ const STABLE_UPTIME_MS = 60_000
 /** 假死探测间隔与判定阈值 */
 const WATCHDOG_INTERVAL_MS = 30_000
 const WATCHDOG_MAX_FAILS = 3
+/** 批量刷新订阅的并发上限（避免串行网络往返叠加，同时防止瞬时打满出口） */
+const SUBSCRIPTION_REFRESH_CONCURRENCY = 4
 
 export class CoreService extends EventEmitter {
   private readonly config: ConfigManager
@@ -177,16 +195,7 @@ export class CoreService extends EventEmitter {
   }
 
   private buildDriver(active: ClashConfigSummary): CoreDriver {
-    const cfg = this.driverConfig
-    if (cfg.mode === 'service') {
-      return new ServiceCoreDriver({
-        externalController: cleanController(active.externalController, cfg.options.externalController),
-        secret: active.secret ?? cfg.options.secret,
-        fetchImpl: this.opts.fetchImpl
-      })
-    }
-    return new ProcessCoreDriver({
-      ...cfg.options,
+    const hooks: DriverHooks = {
       onExit: (code) => {
         this.stopWatchdog()
         this.clearStableTimer()
@@ -197,7 +206,24 @@ export class CoreService extends EventEmitter {
         // 意外退出：进入自动重启退避链路
         void this.handleUnexpectedExit(code)
       },
-      onLog: (line) => this.emit('core-log', line)
+      onLogs: (lines) => this.emit('core-logs', lines)
+    }
+
+    // 测试注入优先：假驱动复用同一套钩子，状态机行为与真实驱动一致
+    if (this.opts.driverFactory) return this.opts.driverFactory(this.driverConfig, hooks)
+
+    const cfg = this.driverConfig
+    if (cfg.mode === 'service') {
+      return new ServiceCoreDriver({
+        externalController: cleanController(active.externalController, cfg.options.externalController),
+        secret: active.secret ?? cfg.options.secret,
+        fetchImpl: this.opts.fetchImpl
+      })
+    }
+    return new ProcessCoreDriver({
+      ...cfg.options,
+      onExit: hooks.onExit,
+      onLogs: hooks.onLogs
     })
   }
 
@@ -326,12 +352,15 @@ export class CoreService extends EventEmitter {
   }
 
   private async syncVersion(): Promise<void> {
+    const prev = this.version?.version
     try {
       this.version = await this.driver?.getVersion()
-      this.emit('version-change', this.version)
     } catch {
       this.version = undefined
     }
+    // 版本发生变化时补发状态变更：reloadActive() 不改变运行态、不经过 setState，
+    // 否则渲染端（状态栏/总览）的内核版本号会停留在启动时的旧值。
+    if (this.version?.version !== prev) this.emit('state-change', this.status())
   }
 
   // ---------- 数据面 ----------
@@ -439,29 +468,25 @@ export class CoreService extends EventEmitter {
 
   /**
    * 刷新全部 URL 订阅（自动更新用）。
-   * 失败的档案保留旧内容（refreshProfile 失败即抛错不落盘）；
-   * 若当前使用中的档案被成功刷新且内核运行中，则热重载使其生效。
+   * 由 ConfigManager 两阶段执行：限量并发拉取 → 串行落盘（见 refreshProfiles），
+   * 失败的档案保留旧内容；若当前使用中的档案被成功刷新且内核运行中，则热重载使其生效。
    */
   async refreshAllUrlProfiles(): Promise<{ ok: number; failed: number }> {
     const profiles = await this.config.listProfiles()
     const urls = profiles.filter((p) => p.url)
-    let ok = 0
-    let failed = 0
-    const refreshedIds = new Set<string>()
-    for (const p of urls) {
-      try {
-        await this.config.refreshProfile(p.id, this.opts.fetchImpl)
-        refreshedIds.add(p.id)
-        ok++
-      } catch {
-        failed++
-      }
-    }
+    if (!urls.length) return { ok: 0, failed: 0 }
+
+    const refreshed = await this.config.refreshProfiles(
+      urls.map((p) => p.id),
+      this.opts.fetchImpl,
+      SUBSCRIPTION_REFRESH_CONCURRENCY
+    )
+    const refreshedIds = new Set(refreshed.ok)
     const active = profiles.find((p) => p.selected)
-    if (ok > 0 && active && refreshedIds.has(active.id) && this.state === 'running') {
+    if (refreshedIds.size > 0 && active && refreshedIds.has(active.id) && this.state === 'running') {
       await this.reloadActive().catch(() => undefined)
     }
-    return { ok, failed }
+    return { ok: refreshed.ok.length, failed: refreshed.failed.length }
   }
 
   /** 切换档案 + 热重载内核 */

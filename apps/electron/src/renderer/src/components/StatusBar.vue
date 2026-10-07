@@ -24,7 +24,7 @@ const stateText: Record<string, string> = {
       <span class="sep">·</span>
       <span>{{ t('home.version') }} {{ store.status.version.version }}</span>
     </template>
-    <span v-if="store.traffic" class="conn-pill">{{ store.traffic.connections.length }}</span>
+    <span v-if="store.traffic" class="conn-pill">{{ store.traffic.connectionCount }}</span>
     <span v-if="store.systemProxy.enabled" class="proxy-on">{{ t('status.sysProxyOn') }}</span>
     <transition name="fade">
       <div v-if="store.error" class="err">{{ store.error }}</div>

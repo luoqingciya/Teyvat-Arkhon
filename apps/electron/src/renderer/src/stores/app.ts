@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import i18next from 'i18next'
 import type {
+  ConnectionInfo,
   CoreStatus,
   DelayResult,
   LoopbackState,
@@ -18,6 +19,7 @@ import type {
   TrafficSnapshot,
   UpdateState
 } from '@teyvat-arkhon/shared'
+import { isGroupNodeType } from '@teyvat-arkhon/shared'
 import { applyTheme, readTheme, type Theme } from '../theme'
 
 export type ViewKey = 'home' | 'proxies' | 'profiles' | 'rules' | 'dns' | 'connections' | 'config' | 'settings' | 'logs'
@@ -34,8 +36,10 @@ interface AppState {
   error: string
   /** 节点延迟结果缓存 */
   delays: Record<string, DelayResult>
-  /** 实时流量快照（主进程推流） */
+  /** 实时流量快照（主进程推流，轻量：速率/累计/连接数） */
   traffic: TrafficSnapshot | null
+  /** 活跃连接明细（仅「连接」页订阅期间由主进程推送，见 subscribeConnections） */
+  connections: ConnectionInfo[]
   /** 最近流量历史（用于曲线） */
   trafficHistory: Array<{ t: number; down: number; up: number }>
   /** TUN 开关状态 */
@@ -97,9 +101,9 @@ const LOG_LIMIT = 500
 /** 批量测速的并发上限（限量并发：避免瞬时打满内核/订阅出口） */
 const TEST_CONCURRENCY = 8
 
-/** 策略组节点类型：URLTest=1 / Select=2 / Fallback=3 / LoadBalance=4 / Relay=5 */
+/** 策略组判定（URLTest/Select/Fallback/LoadBalance/Relay 的语义统一定义在 @teyvat-arkhon/shared） */
 function isGroupNode(p: ProxyItem): boolean {
-  return p.nodeType >= 1 && p.nodeType <= 5
+  return isGroupNodeType(p.nodeType)
 }
 
 interface BatchTestState {
@@ -121,6 +125,7 @@ export const useAppStore = defineStore('app', {
     error: '',
     delays: {},
     traffic: null,
+    connections: [],
     trafficHistory: [],
     tunEnabled: false,
     tunPrereq: { wintun: true, windows: false },
@@ -165,13 +170,18 @@ export const useAppStore = defineStore('app', {
         this.trafficHistory.push({ t: Date.now(), down: snapshot.downloadSpeed, up: snapshot.uploadSpeed })
         if (this.trafficHistory.length > 60) this.trafficHistory.shift()
       })
+      // 连接明细走独立通道：仅在「连接」页订阅期间推送
+      window.arkhon.onConnections((connections) => {
+        this.connections = connections
+      })
       window.arkhon.onError((message) => {
         this.error = message
         setTimeout(() => (this.error = ''), 6000)
       })
-      window.arkhon.onCoreLog((line) => {
-        this.logs.push(line)
-        if (this.logs.length > LOG_LIMIT) this.logs.shift()
+      window.arkhon.onCoreLog((lines) => {
+        // 主进程已按时间窗口批量合并：一次追加多行，超限时整段裁剪（避免逐行 shift）
+        this.logs.push(...lines)
+        if (this.logs.length > LOG_LIMIT) this.logs.splice(0, this.logs.length - LOG_LIMIT)
       })
       window.arkhon.onProfilesChanged(() => {
         void this.refreshProfiles()
@@ -179,21 +189,28 @@ export const useAppStore = defineStore('app', {
       window.arkhon.onUpdateState((state) => {
         this.update = state
       })
-      await this.refreshStatus()
-      await this.refreshProfiles()
-      await this.refreshSystemProxy()
-      await this.refreshTun()
-      await this.refreshService()
-      await this.refreshTunPrereq()
-      await this.initCoreMode()
-      await this.initLogs()
-      await this.refreshAutoRefresh()
-      await this.refreshAutoStart()
-      await this.refreshExcludeKeywords()
-      await this.refreshLoopback()
-      await this.initUpdateState()
+      // 首屏就绪：相互独立的 IPC 调用并行发起（原为逐个 await，串行叠加往返延迟）
+      const [, version] = await Promise.all([
+        Promise.all([
+          this.refreshStatus(),
+          this.refreshProfiles(),
+          this.refreshSystemProxy(),
+          this.refreshTun(),
+          this.refreshService(),
+          this.refreshTunPrereq(),
+          this.initCoreMode(),
+          this.initLogs(),
+          this.refreshAutoRefresh(),
+          this.refreshAutoStart(),
+          this.refreshExcludeKeywords(),
+          this.refreshLoopback(),
+          this.initUpdateState()
+        ]),
+        window.arkhon.getAppVersion()
+      ])
+      this.appVersion = version
+      // 依赖订阅列表：须在 refreshProfiles 之后执行
       await this.checkExpiringProfiles()
-      this.appVersion = await window.arkhon.getAppVersion()
     },
 
     /** 启动时检查即将到期的订阅（≤7 天）并弹系统通知 */
@@ -316,6 +333,7 @@ export const useAppStore = defineStore('app', {
         this.proxies = []
         this.delays = {}
         this.rules = []
+        this.connections = []
         // 内核停止后系统代理失去转发目标，同步关闭避免"代理已开但内核未跑"的断网状态
         if (this.systemProxy.enabled) {
           try {
@@ -729,6 +747,24 @@ export const useAppStore = defineStore('app', {
     },
 
     // ---------- 连接管理 ----------
+
+    /** 订阅连接明细推送（连接页挂载时调用；主进程按引用计数开启明细通道） */
+    async subscribeConnections(): Promise<void> {
+      try {
+        this.connections = await window.arkhon.subscribeConnections()
+      } catch (e) {
+        this.error = (e as Error).message
+      }
+    },
+
+    /** 退订连接明细推送（连接页卸载时调用） */
+    async unsubscribeConnections(): Promise<void> {
+      try {
+        await window.arkhon.unsubscribeConnections()
+      } catch {
+        /* 退订失败不影响界面 */
+      }
+    },
 
     async closeConnection(id: string): Promise<void> {
       try {
