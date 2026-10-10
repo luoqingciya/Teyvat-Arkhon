@@ -5,7 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.26...v1.4.0
 [1.3.26]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.25...v1.3.26
 [1.3.25]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.24...v1.3.25
@@ -27,6 +28,28 @@
 [1.3.9]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.3.8...v1.3.9
 [1.2.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/luoqingciya/Teyvat-Arkhon/compare/v1.0.0...v1.1.0
+
+## [1.4.1] - 2026-10-10
+
+### Fixed
+- **修复「完全不能代理」**：规则页在加载失败时会静默保留空列表，此后任意保存动作都会把这个空状态写回工作配置，清空全部 `rules` 与 `rule-providers` —— 在 `mode: rule` 下所有流量随即直连，表现为本应用无法代理、而其它客户端正常。现在主进程默认拒绝「现有规则非空、而提交为空」的写入；渲染端加载失败时禁用保存并提供重试；确实需要清空全部规则时必须显式确认。已用真实故障配置验证防线按预期拦截。
+- **英文界面文案修正**：「推荐规则集」「规则模板」「DNS 预设」「规则类型提示」的说明文字此前固定为中文，现随界面语言切换。
+- 清理 4 个从未被调用的 IPC 通道与相关死接口（不影响使用）。
+
+### Added
+- **规则编辑器支持批量粘贴**：一次粘贴多行 `TYPE,目标,策略` 即可导入，可选「追加到末尾」或「替换全部」，逐行报错并定位行号，全部解析成功才自动收起。
+- **规则策略字段改为可下拉选择**：候选为 `DIRECT` / `REJECT` / 当前配置的策略组名，同时保留自由输入（自定义或尚未创建的组），避免组名手打错误导致规则静默不命中。
+
+### Changed
+- **规则页签精简为 3 个**：「预设模板」并入「规则集」页作为「规则模板」区块，避免两个并列的「一键加规则」入口造成困惑。
+- **删除 3 个与推荐规则集功能重复的内置模板**（广告与追踪拦截 / 本地与局域网直连 / 中国大陆直连）——分别由 `reject`、`lancidr`+`private`、`cncidr`+`direct` 规则集覆盖，且规则集会随上游自动更新，优于内联静态规则。
+
+### 工程
+- IPC 通道名集中到 `@teyvat-arkhon/shared` 的 `channels.ts` 作为唯一来源，preload 与主进程共用常量，消除同一通道名两处字符串的静默失效面（顺带修正了一处通道错配）。
+- eslint 强制分层边界：`shared` 禁 Electron/Node 内置，`core-bridge` 禁 Electron 与应用层，渲染端禁直连 `core-bridge` 与 Node/Electron API。
+- 共享内核去展示文案：规则/模板/DNS 预设与规则类型提示的 name/desc 移出 `shared`，改由渲染端按 id 从 i18n 取，保持共享包语言中立。
+- 从 `config-manager` 抽出工作配置文件级操作（新增 `active-config.ts` / `config-utils.ts`，公开 API 与行为不变）。
+- CI 增加 preload 沙箱约束断言（产物只允许 `require('electron')`）。
 
 ## [1.4.0] - 2026-10-07
 
