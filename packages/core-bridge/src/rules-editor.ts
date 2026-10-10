@@ -13,7 +13,8 @@ import {
   type RuleDebugStep,
   type RuleEntry,
   type RuleLineValidation,
-  type RuleProvider
+  type RuleProvider,
+  type RuleTextParseResult
 } from '@teyvat-arkhon/shared'
 import yaml from 'js-yaml'
 
@@ -107,6 +108,25 @@ export function ruleToText(r: RuleEntry): string {
   const proxy = r.proxy?.trim() ?? ''
   if (NO_PAYLOAD_TYPES.has(r.type) || payload === '') return `${r.type},${proxy}`
   return `${r.type},${payload},${proxy}`
+}
+
+/**
+ * 解析多行规则文本（规则编辑器「批量粘贴」用）。
+ * - 空行与 `#` / `//` 注释行跳过
+ * - 无法识别的行计入 errors（不阻断其余行），行号从 1 开始以便界面定位
+ */
+export function parseRuleLines(text: string): RuleTextParseResult {
+  const entries: RuleEntry[] = []
+  const errors: RuleTextParseResult['errors'] = []
+  const lines = text.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue
+    const entry = parseRuleText(trimmed)
+    if (entry) entries.push(entry)
+    else errors.push({ line: i + 1, text: trimmed, message: `无法识别的规则：${trimmed}` })
+  }
+  return { entries, errors }
 }
 
 /** 从 YAML 的 rules 数组元素解析出结构化条目（过滤非法/注释行） */

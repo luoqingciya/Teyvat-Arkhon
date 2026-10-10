@@ -373,56 +373,39 @@ export interface RuleDebugResult {
   steps: RuleDebugStep[]
 }
 
-/** 内置分流预设模板元信息（模板规则本人前端组装后经 saveRuleEditorState 落盘） */
-export interface RulePresetMeta {
-  id: string
-  name: string
-  desc?: string
-}
-
-/** 内置规则预设的具体内容 */
+/**
+ * 内置规则模板（内联规则）。
+ * 展示名与说明**不放在本包**——由渲染端按 id 从 i18n 取（`rules.templates.<id>.name/.desc`），
+ * 以保持共享内核语言中立。
+ */
 export interface RulePreset {
   id: string
-  name: string
-  desc?: string
   /** 模板规则；proxy 为 DIRECT / REJECT 或 `__PROXY__` 占位（应用时由用户替换） */
   rules: RuleEntry[]
 }
 
+/** 批量粘贴规则文本的解析结果 */
+export interface RuleTextParseResult {
+  /** 成功解析的规则（保持输入顺序） */
+  entries: RuleEntry[]
+  /** 无法解析的行；行号从 1 开始，便于界面定位 */
+  errors: Array<{ line: number; text: string; message: string }>
+}
+
 /**
- * 内置分流预设模板库。
+ * 内置规则模板库（内联规则，不随上游更新）。
+ *
+ * 与 RECOMMENDED_RULE_SETS（provider 型，自动随上游更新）的边界：
+ * 凡规则集能覆盖的一律走规则集，这里只保留规则集无法表达的"域名清单型"模板。
+ * 因此原先与规则集功能重复的三项已移除，对应关系：
+ *   lan-direct → lancidr + private ；ads-block → reject ；cn-direct → cncidr + direct
+ *
  * `{name}` 占位符表示代理组/节点名，应用时由用户替换；`DIRECT` 直连、`REJECT` 拦截为内置策略。
  * 模板规则插入到现有 rules 顶部。
  */
 export const RULE_PRESETS: RulePreset[] = [
   {
-    id: 'lan-direct',
-    name: '本地与局域网直连',
-    desc: '回环、内网、组播直接连接，不走代理（默认添加在最前）',
-    rules: [
-      { type: 'IP-CIDR', payload: '127.0.0.0/8', proxy: 'DIRECT' },
-      { type: 'IP-CIDR', payload: '10.0.0.0/8', proxy: 'DIRECT' },
-      { type: 'IP-CIDR', payload: '172.16.0.0/12', proxy: 'DIRECT' },
-      { type: 'IP-CIDR', payload: '192.168.0.0/16', proxy: 'DIRECT' },
-      { type: 'GEOIP', payload: 'LAN', proxy: 'DIRECT' }
-    ]
-  },
-  {
-    id: 'ads-block',
-    name: '广告与追踪拦截',
-    desc: '常见广告/追踪域名拦截（REJECT）',
-    rules: [
-      { type: 'DOMAIN-SUFFIX', payload: 'doubleclick.net', proxy: 'REJECT' },
-      { type: 'DOMAIN-SUFFIX', payload: 'googlesyndication.com', proxy: 'REJECT' },
-      { type: 'DOMAIN-SUFFIX', payload: 'googleadservices.com', proxy: 'REJECT' },
-      { type: 'DOMAIN-SUFFIX', payload: 'googletagmanager.com', proxy: 'REJECT' },
-      { type: 'DOMAIN-SUFFIX', payload: 'scorecardresearch.com', proxy: 'REJECT' }
-    ]
-  },
-  {
     id: 'streaming-proxy',
-    name: '流媒体走代理',
-    desc: '常见流媒体域名走 {name} 全局代理',
     rules: [
       { type: 'DOMAIN-SUFFIX', payload: 'netflix.com', proxy: '__PROXY__' },
       { type: 'DOMAIN-SUFFIX', payload: 'nflxvideo.net', proxy: '__PROXY__' },
@@ -434,23 +417,12 @@ export const RULE_PRESETS: RulePreset[] = [
   },
   {
     id: 'ai-proxy',
-    name: 'AI 服务走代理',
-    desc: '主流 AI 服务域名走 {name} 代理',
     rules: [
       { type: 'DOMAIN-SUFFIX', payload: 'openai.com', proxy: '__PROXY__' },
       { type: 'DOMAIN-SUFFIX', payload: 'chatgpt.com', proxy: '__PROXY__' },
       { type: 'DOMAIN-SUFFIX', payload: 'anthropic.com', proxy: '__PROXY__' },
       { type: 'DOMAIN-SUFFIX', payload: 'claude.ai', proxy: '__PROXY__' },
       { type: 'DOMAIN-SUFFIX', payload: 'perplexity.ai', proxy: '__PROXY__' }
-    ]
-  },
-  {
-    id: 'cn-direct',
-    name: '中国大陆直连',
-    desc: 'geosite+geoip 中国直连，其余走 {name}（放到 rules 末尾、MATCH 之前）',
-    rules: [
-      { type: 'GEOSITE', payload: 'cn', proxy: 'DIRECT' },
-      { type: 'GEOIP', payload: 'CN', proxy: 'DIRECT' }
     ]
   }
 ]
@@ -493,17 +465,13 @@ export interface DnsPolicyEntry {
 }
 
 /** 内置 DNS 分流预设模板元信息 */
-export interface DnsPresetMeta {
-  id: string
-  name: string
-  desc?: string
-}
-
-/** 内置 DNS 分流预设模板具体内容 */
+/**
+ * 内置 DNS 分流预设。
+ * 展示名与说明由渲染端按 id 从 i18n 取（`dns.presets.items.<id>.name/.desc`），
+ * 本包只保留结构性数据（settings），以保持共享内核语言中立。
+ */
 export interface DnsPreset {
   id: string
-  name: string
-  desc?: string
   settings: DnsSettings
 }
 
@@ -514,9 +482,6 @@ export interface DnsPreset {
  */
 export interface RecommendedRuleSet {
   id: string
-  /** 展示名 */
-  name: string
-  desc: string
   /** 写入 rule-providers 的键名（也是 RULE-SET 规则行的 payload） */
   providerName: string
   behavior: RuleProviderBehavior
@@ -527,12 +492,14 @@ export interface RecommendedRuleSet {
   suggestedProxy: string
 }
 
-/** 内置推荐规则集列表（规则集市场） */
+/**
+ * 内置推荐规则集列表（规则集市场）。
+ * 展示名与说明由渲染端按 id 从 i18n 取（`rules.providers.market.<id>.name/.desc`），
+ * 本包只保留结构性数据（下载地址 / 语义 / 建议策略）。
+ */
 export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   {
     id: 'reject',
-    name: '广告与追踪拦截',
-    desc: '常见广告/追踪/恶意域名（数万条），拦截后可显著减少请求',
     providerName: 'loyalsoldier-reject',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt',
@@ -541,8 +508,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'direct',
-    name: '大陆可直连域名',
-    desc: ' Apple / Microsoft / 国内站点等在大陆可直连的域名集合',
     providerName: 'loyalsoldier-direct',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt',
@@ -551,8 +516,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'proxy',
-    name: '常见代理域名',
-    desc: '需要走代理的境外域名集合（Google/Twitter/YouTube 等）',
     providerName: 'loyalsoldier-proxy',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt',
@@ -561,8 +524,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'gfw',
-    name: 'GFWList 域名',
-    desc: '被防火长城拦截的域名列表',
     providerName: 'loyalsoldier-gfw',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt',
@@ -571,8 +532,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'tld-not-cn',
-    name: '非大陆顶级域名',
-    desc: '非中国大陆使用的顶级域名（.jp / .kr / .hk 等）',
     providerName: 'loyalsoldier-tld-not-cn',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/tld-not-cn.txt',
@@ -581,8 +540,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'apple',
-    name: 'Apple 直连域名',
-    desc: 'Apple 在中国大陆可直连的域名',
     providerName: 'loyalsoldier-apple',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt',
@@ -591,8 +548,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'icloud',
-    name: 'iCloud 域名',
-    desc: 'iCloud 服务域名集合',
     providerName: 'loyalsoldier-icloud',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/icloud.txt',
@@ -601,8 +556,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'private',
-    name: '私有网络域名',
-    desc: '局域网 / 保留地址专用域名（配合 lancidr 使用）',
     providerName: 'loyalsoldier-private',
     behavior: 'domain',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt',
@@ -611,8 +564,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'applications',
-    name: '常见软件直连',
-    desc: '需要直连的常见软件（按进程名匹配，behavior=classical）',
     providerName: 'loyalsoldier-applications',
     behavior: 'classical',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt',
@@ -621,8 +572,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'telegramcidr',
-    name: 'Telegram IP 段',
-    desc: 'Telegram 使用的 IP 地址段',
     providerName: 'loyalsoldier-telegramcidr',
     behavior: 'ipcidr',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt',
@@ -631,8 +580,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'cncidr',
-    name: '大陆 IP 段',
-    desc: '中国大陆 IPv4 地址段（规则末尾 MATCH 之前的兜底直连）',
     providerName: 'loyalsoldier-cncidr',
     behavior: 'ipcidr',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt',
@@ -641,8 +588,6 @@ export const RECOMMENDED_RULE_SETS: RecommendedRuleSet[] = [
   },
   {
     id: 'lancidr',
-    name: '局域网 IP 段',
-    desc: '局域网及保留 IP 地址段',
     providerName: 'loyalsoldier-lancidr',
     behavior: 'ipcidr',
     url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/lancidr.txt',
@@ -674,8 +619,6 @@ export interface UpdateState {
 export const DNS_PRESETS: DnsPreset[] = [
   {
     id: 'fake-ip-domestic',
-    name: 'fake-ip + 国内直连兜底',
-    desc: '全局 fake-ip，nameserver 走公共 DNS，.cn / 内网域名经 `cn` 组直连解析',
     settings: {
       enable: true,
       enhancedMode: 'fake-ip',
@@ -719,8 +662,6 @@ export const DNS_PRESETS: DnsPreset[] = [
   },
   {
     id: 'redir-host-exchange',
-    name: 'redir-host 公平分流',
-    desc: 'redir-host 模式，nameserver 主用 + fallback 防污染，域名级策略拆分国内/国外',
     settings: {
       enable: true,
       enhancedMode: 'redir-host',
@@ -740,8 +681,6 @@ export const DNS_PRESETS: DnsPreset[] = [
   },
   {
     id: 'minimal-direct',
-    name: '极简直连',
-    desc: '仅用系统 DNS 与公共 DoH，无状态、无策略，适合简单直连场景',
     settings: {
       enable: true,
       enhancedMode: 'redir-host',

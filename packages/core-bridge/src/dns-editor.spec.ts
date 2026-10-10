@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   applyDnsToConfig,
   buildDnsBlock,
-  listDnsPresetMetas,
   parseDnsSettings,
   validateDnsSettings
 } from './dns-editor'
@@ -92,15 +91,6 @@ describe('validateDnsSettings', () => {
 
   it('合法配置无问题', () => {
     expect(validateDnsSettings(SAMPLE)).toHaveLength(0)
-  })
-})
-
-describe('listDnsPresetMetas', () => {
-  it('返回内置预设元信息', () => {
-    const metas = listDnsPresetMetas()
-    expect(metas.length).toBeGreaterThan(0)
-    expect(metas[0]).toHaveProperty('id')
-    expect(metas[0]).toHaveProperty('name')
   })
 })
 

@@ -11,6 +11,7 @@
  */
 
 import { BrowserWindow } from 'electron'
+import { EVT } from '@teyvat-arkhon/shared'
 import type { ConnectionInfo, TrafficSnapshot } from '@teyvat-arkhon/shared'
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 
@@ -63,7 +64,7 @@ export function createTrafficMonitor(service: () => CoreService | null): Traffic
       prev = null
       lastTs = 0
       lastConnections = []
-      if (visible && subscribers > 0) broadcast('arkhon:connections', [])
+      if (visible && subscribers > 0) broadcast(EVT.connections, [])
       schedule(visible ? VISIBLE_INTERVAL_MS : HIDDEN_INTERVAL_MS)
       return
     }
@@ -91,8 +92,8 @@ export function createTrafficMonitor(service: () => CoreService | null): Traffic
           uploadTotal,
           connectionCount: connections.length
         }
-        broadcast('arkhon:traffic', snapshot)
-        if (subscribers > 0) broadcast('arkhon:connections', connections)
+        broadcast(EVT.traffic, snapshot)
+        if (subscribers > 0) broadcast(EVT.connections, connections)
       }
     } catch {
       // 内核数据面暂不可用（如启动/切换瞬间），跳过本轮

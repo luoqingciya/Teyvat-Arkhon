@@ -56,7 +56,11 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    // 必须把 @teyvat-arkhon/shared 打进产物（不 externalize）：
+    // 渲染进程启用了 sandbox，沙箱化 preload 只能 require('electron')，
+    // 任何其它运行时 require 都会直接抛错（曾因此导致 window.arkhon 未暴露、界面全白）。
+    // shared 自身零运行时依赖，打包进来无副作用。
+    plugins: [externalizeDepsPlugin({ exclude: ['@teyvat-arkhon/shared'] })],
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'src/preload/index.ts')

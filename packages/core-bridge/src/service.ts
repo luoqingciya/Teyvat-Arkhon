@@ -10,7 +10,6 @@ import type {
   CoreState,
   CoreStatus,
   DelayResult,
-  DnsPresetMeta,
   DnsSettings,
   MihomoVersion,
   Profile,
@@ -21,13 +20,13 @@ import type {
   RuleEntry,
   RuleInfo,
   RuleLineValidation,
-  RulePresetMeta,
   RuleProvider,
-  RuleProviderPreview
+  RuleProviderPreview,
+  RuleTextParseResult
 } from '@teyvat-arkhon/shared'
-import { RULE_PRESETS } from '@teyvat-arkhon/shared'
 import type { CoreDriver } from './driver'
 import { ConfigManager } from './config-manager'
+import { parseRuleLines } from './rules-editor'
 import { ProcessCoreDriver, type ProcessDriverOptions } from './process-driver'
 import { ServiceCoreDriver, type ServiceDriverOptions } from './service-driver'
 
@@ -521,11 +520,22 @@ export class CoreService extends EventEmitter {
     return this.config.readActiveRules()
   }
 
-  /** 保存结构化 rules/rule-providers 到工作配置并热重载（内核运行中时） */
-  async saveRuleEditorState(state: RuleEditorState): Promise<ClashConfigSummary> {
-    const summary = await this.config.writeActiveRules(state)
+  /**
+   * 保存结构化 rules/rule-providers 到工作配置并热重载（内核运行中时）。
+   * allowEmptyRules 仅在用户明确确认「清空全部规则」时由渲染端置为 true。
+   */
+  async saveRuleEditorState(
+    state: RuleEditorState,
+    allowEmptyRules = false
+  ): Promise<ClashConfigSummary> {
+    const summary = await this.config.writeActiveRules(state, allowEmptyRules)
     await this.reloadActive()
     return summary
+  }
+
+  /** 解析批量粘贴的规则文本（纯计算，不落盘） */
+  parseRuleLines(text: string): RuleTextParseResult {
+    return parseRuleLines(text)
   }
 
   /** 逐条校验规则（按当前工作配置的节点/组名做策略引用检查） */
@@ -558,11 +568,6 @@ export class CoreService extends EventEmitter {
     return this.config.debugRuleMatch(target, rules, providers)
   }
 
-  /** 内置分流预设模板元信息列表 */
-  listRulePresets(): RulePresetMeta[] {
-    return RULE_PRESETS.map(({ id, name, desc }) => ({ id, name, desc }))
-  }
-
   // ---------- DNS 分流联动 ----------
 
   /** 读取当前工作配置的 dns 段（结构化编辑状态） */
@@ -575,11 +580,6 @@ export class CoreService extends EventEmitter {
     const summary = await this.config.writeActiveDns(settings)
     await this.reloadActive()
     return summary
-  }
-
-  /** 内置 DNS 分流预设模板元信息列表 */
-  listDnsPresets(): DnsPresetMeta[] {
-    return this.config.listDnsPresets()
   }
 }
 

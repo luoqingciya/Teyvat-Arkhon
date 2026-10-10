@@ -1,4 +1,5 @@
 import { BrowserWindow, app, dialog, ipcMain } from 'electron'
+import { EVT, IPC } from '@teyvat-arkhon/shared'
 import type { CoreStatus, ProxyMode, SystemProxyState, UiLanguage } from '@teyvat-arkhon/shared'
 import type { CoreService } from '@teyvat-arkhon/core-bridge'
 import type { SystemProxyController } from './system-proxy'
@@ -58,63 +59,63 @@ export function createIpc(deps: IpcDeps): void {
 
   service.on('state-change', (status: CoreStatus) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send('arkhon:state', status)
+      win.webContents.send(EVT.state, status)
     }
   })
   service.on('error', (err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err)
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send('arkhon:error', msg)
+      win.webContents.send(EVT.error, msg)
     }
   })
   // 内核日志按时间窗口批量推送（单次携带多行），避免逐行 IPC 洪泛
   service.on('core-logs', (lines: string[]) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send('arkhon:log', lines)
+      win.webContents.send(EVT.log, lines)
     }
   })
 
-  ipcMain.handle('core:get-status', () => service.status())
-  ipcMain.handle('core:start', () => service.start())
-  ipcMain.handle('core:stop', () => service.stop())
-  ipcMain.handle('core:set-mode', (_e, mode: ProxyMode) => service.setMode(mode))
-  ipcMain.handle('core:get-mode', () => service.getMode())
-  ipcMain.handle('core:get-logs', () => service.getLogs())
+  ipcMain.handle(IPC.coreGetStatus, () => service.status())
+  ipcMain.handle(IPC.coreStart, () => service.start())
+  ipcMain.handle(IPC.coreStop, () => service.stop())
+  ipcMain.handle(IPC.coreSetMode, (_e, mode: ProxyMode) => service.setMode(mode))
+  ipcMain.handle(IPC.coreGetMode, () => service.getMode())
+  ipcMain.handle(IPC.coreGetLogs, () => service.getLogs())
 
-  ipcMain.handle('core:get-connections', () => service.getConnections())
-  ipcMain.handle('core:close-connection', (_e, id: string) => service.closeConnection(id))
-  ipcMain.handle('core:close-all-connections', () => service.closeAllConnections())
+  ipcMain.handle(IPC.coreCloseConnection, (_e, id: string) => service.closeConnection(id))
+  ipcMain.handle(IPC.coreCloseAllConnections, () => service.closeAllConnections())
   // 连接明细订阅（连接页挂载/卸载时调用）：主进程据此开关明细推送
-  ipcMain.handle('connections:subscribe', () => trafficMonitor.subscribeConnections())
-  ipcMain.handle('connections:unsubscribe', () => {
+  ipcMain.handle(IPC.connectionsSubscribe, () => trafficMonitor.subscribeConnections())
+  ipcMain.handle(IPC.connectionsUnsubscribe, () => {
     trafficMonitor.unsubscribeConnections()
   })
 
-  ipcMain.handle('config:get-active', () => service.getActiveConfig())
-  ipcMain.handle('config:save-active', (_e, content: string) => service.saveActiveConfig(content))
+  ipcMain.handle(IPC.configGetActive, () => service.getActiveConfig())
+  ipcMain.handle(IPC.configSaveActive, (_e, content: string) => service.saveActiveConfig(content))
 
   // 可视化分流规则编辑器
-  ipcMain.handle('rules:editor-get', () => service.getRuleEditorState())
-  ipcMain.handle('rules:editor-save', (_e, state) => service.saveRuleEditorState(state))
-  ipcMain.handle('rules:validate', (_e, rules) => service.validateRuleLines(rules))
-  ipcMain.handle('rules:provider-preview', (_e, provider) => service.previewRuleProvider(provider))
-  ipcMain.handle('rules:provider-install', (_e, provider) => service.installRuleProvider(provider))
-  ipcMain.handle('rules:debug-hit', (_e, target: string, rules, providers) =>
+  ipcMain.handle(IPC.rulesEditorGet, () => service.getRuleEditorState())
+  ipcMain.handle(IPC.rulesEditorSave, (_e, state, allowEmptyRules?: boolean) =>
+    service.saveRuleEditorState(state, allowEmptyRules === true)
+  )
+  ipcMain.handle(IPC.rulesParseText, (_e, text: string) => service.parseRuleLines(text))
+  ipcMain.handle(IPC.rulesValidate, (_e, rules) => service.validateRuleLines(rules))
+  ipcMain.handle(IPC.rulesProviderPreview, (_e, provider) => service.previewRuleProvider(provider))
+  ipcMain.handle(IPC.rulesProviderInstall, (_e, provider) => service.installRuleProvider(provider))
+  ipcMain.handle(IPC.rulesDebugHit, (_e, target: string, rules, providers) =>
     service.debugRuleMatch(target, rules, providers)
   )
-  ipcMain.handle('rules:presets', () => service.listRulePresets())
 
   // DNS 分流联动
-  ipcMain.handle('dns:get', () => service.getDnsState())
-  ipcMain.handle('dns:save', (_e, settings) => service.saveDnsState(settings))
-  ipcMain.handle('dns:presets', () => service.listDnsPresets())
+  ipcMain.handle(IPC.dnsGet, () => service.getDnsState())
+  ipcMain.handle(IPC.dnsSave, (_e, settings) => service.saveDnsState(settings))
 
-  ipcMain.handle('core:get-tun', () => service.getTunEnabled())
-  ipcMain.handle('core:set-tun', (_e, enabled: boolean) => service.setTunEnabled(enabled))
+  ipcMain.handle(IPC.coreGetTun, () => service.getTunEnabled())
+  ipcMain.handle(IPC.coreSetTun, (_e, enabled: boolean) => service.setTunEnabled(enabled))
 
-  ipcMain.handle('service:status', () => serviceManager.status())
-  ipcMain.handle('service:install', () => serviceManager.install())
-  ipcMain.handle('service:uninstall', async () => {
+  ipcMain.handle(IPC.serviceStatus, () => serviceManager.status())
+  ipcMain.handle(IPC.serviceInstall, () => serviceManager.install())
+  ipcMain.handle(IPC.serviceUninstall, async () => {
     const st = await serviceManager.uninstall()
     // 服务卸载后内核已停止：把驱动切回应用进程模式（重新 spawn 内核接管），
     // 避免界面停留在「服务接管但有 REST 已断」的悬空状态。
@@ -125,7 +126,7 @@ export function createIpc(deps: IpcDeps): void {
   })
 
   // ---------- 日志导出 ----------
-  ipcMain.handle('logs:export', async (): Promise<string | null> => {
+  ipcMain.handle(IPC.logsExport, async (): Promise<string | null> => {
     const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19)
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: t('dialog.exportLogs.title'),
@@ -138,60 +139,59 @@ export function createIpc(deps: IpcDeps): void {
     return filePath
   })
 
-  ipcMain.handle('proxies:list', () => service.listProxies())
-  ipcMain.handle('rules:list', () => service.listRules())
-  ipcMain.handle('proxies:select', (_e, group: string, node: string) => service.selectProxy(group, node))
-  ipcMain.handle('proxies:delay', (_e, name: string, url?: string, timeoutMs?: number) =>
+  ipcMain.handle(IPC.proxiesList, () => service.listProxies())
+  ipcMain.handle(IPC.rulesList, () => service.listRules())
+  ipcMain.handle(IPC.proxiesSelect, (_e, group: string, node: string) => service.selectProxy(group, node))
+  ipcMain.handle(IPC.proxiesDelay, (_e, name: string, url?: string, timeoutMs?: number) =>
     service.testDelay(name, url, timeoutMs)
   )
-  ipcMain.handle('proxies:delay-snapshot', () => service.listDelaySnapshot())
+  ipcMain.handle(IPC.proxiesDelaySnapshot, () => service.listDelaySnapshot())
 
-  ipcMain.handle('profiles:list', () => service.listProfiles())
-  ipcMain.handle('profiles:import-url', (_e, url: string) => service.importFromUrl(url))
-  ipcMain.handle('profiles:import-text', (_e, name: string, content: string) => service.importFromText(name, content))
-  ipcMain.handle('profiles:remove', (_e, id: string) => service.removeProfile(id))
-  ipcMain.handle('profiles:refresh', (_e, id: string) => service.refreshProfile(id))
-  ipcMain.handle('profiles:select', (_e, id: string) => service.selectProfile(id))
-  ipcMain.handle('profiles:export-uris', (_e, id: string) => service.exportProfileUris(id))
-  ipcMain.handle('profiles:refresh-all', () => service.refreshAllUrlProfiles())
+  ipcMain.handle(IPC.profilesList, () => service.listProfiles())
+  ipcMain.handle(IPC.profilesImportUrl, (_e, url: string) => service.importFromUrl(url))
+  ipcMain.handle(IPC.profilesImportText, (_e, name: string, content: string) => service.importFromText(name, content))
+  ipcMain.handle(IPC.profilesRemove, (_e, id: string) => service.removeProfile(id))
+  ipcMain.handle(IPC.profilesRefresh, (_e, id: string) => service.refreshProfile(id))
+  ipcMain.handle(IPC.profilesSelect, (_e, id: string) => service.selectProfile(id))
+  ipcMain.handle(IPC.profilesExportUris, (_e, id: string) => service.exportProfileUris(id))
+  ipcMain.handle(IPC.profilesRefreshAll, () => service.refreshAllUrlProfiles())
 
-  ipcMain.handle('net:check', () => netChecker.run())
+  ipcMain.handle(IPC.netCheck, () => netChecker.run())
 
-  ipcMain.handle('loopback:status', () => loopback.status())
-  ipcMain.handle('loopback:enable', () => loopback.enable())
-  ipcMain.handle('loopback:disable', () => loopback.disable())
+  ipcMain.handle(IPC.loopbackStatus, () => loopback.status())
+  ipcMain.handle(IPC.loopbackEnable, () => loopback.enable())
+  ipcMain.handle(IPC.loopbackDisable, () => loopback.disable())
 
-  ipcMain.handle('app:auto-refresh-get', () => getAutoRefresh())
-  ipcMain.handle('app:auto-refresh-set', (_e, enabled: boolean) => setAutoRefresh(enabled))
+  ipcMain.handle(IPC.appAutoRefreshGet, () => getAutoRefresh())
+  ipcMain.handle(IPC.appAutoRefreshSet, (_e, enabled: boolean) => setAutoRefresh(enabled))
 
-  ipcMain.handle('sub:exclude-get', () => getExcludeKeywords())
-  ipcMain.handle('sub:exclude-set', (_e, keywords: string[]) => setExcludeKeywords(Array.isArray(keywords) ? keywords : []))
+  ipcMain.handle(IPC.subExcludeGet, () => getExcludeKeywords())
+  ipcMain.handle(IPC.subExcludeSet, (_e, keywords: string[]) => setExcludeKeywords(Array.isArray(keywords) ? keywords : []))
 
-  ipcMain.handle('system-proxy:get', async (): Promise<SystemProxyState> => systemProxy.read())
-  ipcMain.handle('system-proxy:set', async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))
+  ipcMain.handle(IPC.systemProxyGet, async (): Promise<SystemProxyState> => systemProxy.read())
+  ipcMain.handle(IPC.systemProxySet, async (_e, enabled: boolean): Promise<SystemProxyState> => systemProxy.set(enabled))
 
-  ipcMain.handle('app:auto-start-get', () => getAutoStart())
-  ipcMain.handle('app:auto-start-set', (_e, enabled: boolean) => setAutoStart(enabled === true))
+  ipcMain.handle(IPC.appAutoStartGet, () => getAutoStart())
+  ipcMain.handle(IPC.appAutoStartSet, (_e, enabled: boolean) => setAutoStart(enabled === true))
 
   // 渲染端同步界面语言（托盘/原生对话框/自检结果文案跟随）
-  ipcMain.handle('app:language-set', (_e, lang: UiLanguage) => setLanguage(lang))
+  ipcMain.handle(IPC.appLanguageSet, (_e, lang: UiLanguage) => setLanguage(lang))
 
-  ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle(IPC.appVersion, () => app.getVersion())
 
-  ipcMain.handle('app:data-info', () => ({
+  ipcMain.handle(IPC.appDataInfo, () => ({
     dataDir: app.getPath('userData'),
     portable: isPortableMode(app)
   }))
-  ipcMain.handle('app:set-portable', (_e, enabled: boolean) => setPortableEnabled(app, enabled))
-  ipcMain.handle('app:get-tun-prereq', () => ({
+  ipcMain.handle(IPC.appSetPortable, (_e, enabled: boolean) => setPortableEnabled(app, enabled))
+  ipcMain.handle(IPC.appGetTunPrereq, () => ({
     wintun: tunPrereq(),
     windows: process.platform === 'win32'
   }))
 
   // ---------- 应用更新（设置页） ----------
-  ipcMain.handle('update:get-state', () => updateManager.getState())
-  ipcMain.handle('update:check', () => updateManager.checkNow())
-  ipcMain.handle('update:install', () => updateManager.installNow())
-  ipcMain.handle('app:update-auto-get', () => updateManager.getState().autoUpdate)
-  ipcMain.handle('app:update-auto-set', (_e, enabled: boolean) => setAutoUpdate(enabled === true))
+  ipcMain.handle(IPC.updateGetState, () => updateManager.getState())
+  ipcMain.handle(IPC.updateCheck, () => updateManager.checkNow())
+  ipcMain.handle(IPC.updateInstall, () => updateManager.installNow())
+  ipcMain.handle(IPC.appUpdateAutoSet, (_e, enabled: boolean) => setAutoUpdate(enabled === true))
 }

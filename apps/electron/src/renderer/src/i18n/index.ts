@@ -231,7 +231,7 @@ const resources = {
       rules: {
         title: '分流规则',
         hint: '可视化编辑生效配置的 rules 与 rule-providers，保存即热重载。与「配置」页的 YAML 编辑双写同一份工作配置。',
-        tabs: { editor: '规则编辑', providers: '规则集', presets: '预设模板', debug: '命中调试' },
+        tabs: { editor: '规则编辑', providers: '规则集与模板', debug: '命中调试' },
         editor: {
           noConfig: '暂无生效配置。请先在「订阅」页导入并选为一个档案作为当前使用。',
           placeholder: '暂无规则。点击"添加规则"开始构建。',
@@ -253,7 +253,21 @@ const resources = {
           noPayload: '缺少匹配目标',
           emptyType: '类型为空',
           matcherHint: 'MATCH 建议放在末尾',
-          matchFirst: '（已匹配，其后规则不生效）'
+          matchFirst: '（已匹配，其后规则不生效）',
+          proxyPlaceholder: 'DIRECT / REJECT / 组名',
+          count: '共 {{n}} 条',
+          bulkPaste: '批量粘贴',
+          bulkTitle: '批量粘贴规则',
+          bulkHint: '每行一条，形如 DOMAIN-SUFFIX,example.com,PROXY 或 MATCH,PROXY；以 # 或 // 开头的行视为注释。',
+          bulkPlaceholder: 'DOMAIN-SUFFIX,google.com,PROXY\nIP-CIDR,10.0.0.0/8,DIRECT\nMATCH,PROXY',
+          bulkAppend: '追加到末尾',
+          bulkReplace: '替换全部',
+          bulkParsed: '解析成功 {{ok}} 条，失败 {{bad}} 条',
+          bulkEmpty: '未解析出任何规则',
+          bulkClose: '关闭',
+          loadFailed: '规则加载失败，已禁用保存，以免用空状态覆盖现有配置。',
+          retry: '重新加载',
+          confirmEmpty: '当前规则列表为空。确认清空工作配置中的全部规则吗？清空后 mode: rule 下所有流量将直连。'
         },
         providers: {
           title: '规则集（rule-providers）',
@@ -270,6 +284,8 @@ const resources = {
           url: 'URL',
           path: '路径',
           interval: '刷新(分)',
+          typeCol: '类型',
+          behaviorCol: '语义',
           add: '新增规则集',
           remove: '删除',
           preview: '预览',
@@ -284,13 +300,76 @@ const resources = {
           installedTag: '已安装',
           installed: '已安装「{{name}}」并添加规则行',
           installedDefault: '已安装「{{name}}」并添加规则行（策略默认 {{policy}}，可在规则编辑器修改）',
-          viaProxy: '走代理'
+          viaProxy: '走代理',
+          market: {
+            reject: {
+              name: '广告与追踪拦截',
+              desc: '常见广告/追踪/恶意域名（数万条），拦截后可显著减少请求'
+            },
+            direct: {
+              name: '大陆可直连域名',
+              desc: 'Apple / Microsoft / 国内站点等在大陆可直连的域名集合'
+            },
+            proxy: {
+              name: '常见代理域名',
+              desc: '需要走代理的境外域名集合（Google/Twitter/YouTube 等）'
+            },
+            gfw: { name: 'GFWList 域名', desc: '被防火长城拦截的域名列表' },
+            'tld-not-cn': {
+              name: '非大陆顶级域名',
+              desc: '非中国大陆使用的顶级域名（.jp / .kr / .hk 等）'
+            },
+            apple: { name: 'Apple 直连域名', desc: 'Apple 在中国大陆可直连的域名' },
+            icloud: { name: 'iCloud 域名', desc: 'iCloud 服务域名集合' },
+            private: {
+              name: '私有网络域名',
+              desc: '局域网 / 保留地址专用域名（配合 lancidr 使用）'
+            },
+            applications: {
+              name: '常见软件直连',
+              desc: '需要直连的常见软件（按进程名匹配，behavior=classical）'
+            },
+            telegramcidr: { name: 'Telegram IP 段', desc: 'Telegram 使用的 IP 地址段' },
+            cncidr: {
+              name: '大陆 IP 段',
+              desc: '中国大陆 IPv4 地址段（规则末尾 MATCH 之前的兜底直连）'
+            },
+            lancidr: { name: '局域网 IP 段', desc: '局域网及保留 IP 地址段' }
+          }
         },
-        presets: {
-          title: '内置分流预设',
-          hint: '一键将常见分流场景模板插入到规则列表顶部，之后可继续手工调整。',
-          apply: '应用',
-          applied: '已应用模板 "{{name}}"'
+        templates: {
+          title: '规则模板（内联规则）',
+          hint: '直接插入规则列表的域名清单模板，不随上游更新；能用「推荐规则集」覆盖的场景请优先用规则集。',
+          apply: '插入',
+          applied: '已插入模板 "{{name}}"',
+          items: {
+            'streaming-proxy': {
+              name: '流媒体走代理',
+              desc: '常见流媒体域名走 {name} 全局代理'
+            },
+            'ai-proxy': { name: 'AI 服务走代理', desc: '主流 AI 服务域名走 {name} 代理' }
+          }
+        },
+        typeHints: {
+          DOMAIN: '精确匹配域名',
+          'DOMAIN-SUFFIX': '匹配域名及子域',
+          'DOMAIN-KEYWORD': '域名包含关键词',
+          'DOMAIN-REGEX': '域名正则匹配',
+          GEOSITE: '按 geosite 分类匹配',
+          GEOIP: '按 IP 归属地匹配',
+          'IP-CIDR': 'IP 网段匹配',
+          'IP-CIDR6': 'IPv6 网段匹配',
+          'SRC-IP-CIDR': '源 IP 网段匹配',
+          'SRC-PORT': '源端口匹配',
+          'DST-PORT': '目标端口匹配',
+          'PROCESS-NAME': '按进程名匹配',
+          'PROCESS-PATH': '按进程路径匹配',
+          NETWORK: '按网络类型(mixed/tcp/udp)匹配',
+          'RULE-SET': '引用规则集(rule-provider)',
+          AND: '逻辑与（子规则）',
+          OR: '逻辑或（子规则）',
+          NOT: '逻辑非（子规则）',
+          MATCH: '兜底全匹配（必须末位）'
         },
         debug: {
           title: '规则命中调试',
@@ -346,7 +425,21 @@ const resources = {
           title: '内置 DNS 分流预设',
           hint: '一键套用常见 DNS 分流模板，随后可手工微调。',
           apply: '应用模板',
-          applied: '已套用模板 "{{name}}"'
+          applied: '已套用模板 "{{name}}"',
+          items: {
+            'fake-ip-domestic': {
+              name: 'fake-ip + 国内直连兜底',
+              desc: '全局 fake-ip，nameserver 走公共 DNS，.cn / 内网域名经 cn 组直连解析'
+            },
+            'redir-host-exchange': {
+              name: 'redir-host 公平分流',
+              desc: 'redir-host 模式，nameserver 主用 + fallback 防污染，域名级策略拆分国内/国外'
+            },
+            'minimal-direct': {
+              name: '极简直连',
+              desc: '仅用系统 DNS 与公共 DoH，无状态、无策略，适合简单直连场景'
+            }
+          }
         }
       },
     }
@@ -500,11 +593,6 @@ const resources = {
         enableTun: 'Enable TUN',
         tunEffective: 'Written to config, effective after core start',
         tunRunning: 'Global mode active',
-        data: 'Data & Portable',
-        dataHint: 'Subscriptions, working config and geo data live in the data directory. Portable mode keeps data beside the app (green-edition); takes effect after restart.',
-        dataDir: 'Data directory',
-        portableOn: 'Enable portable',
-        portableOff: 'Disable portable',
         service: 'System Service',
         serviceHint: 'Register mihomo as a Windows service for auto-start & always-on (runs in process-driver mode).',
         svcStatus: 'Service state',
@@ -574,7 +662,7 @@ const resources = {
       rules: {
         title: 'Routing Rules',
         hint: 'Visually edit the `rules` and `rule-providers` of the active config. Saving hot-reloads. It writes the same working config as the YAML editor in "Config".',
-        tabs: { editor: 'Editor', providers: 'Rule Sets', presets: 'Templates', debug: 'Trace' },
+        tabs: { editor: 'Editor', providers: 'Rule Sets & Templates', debug: 'Trace' },
         editor: {
           noConfig: 'No active config. Import a subscription and set it as current in "Subscriptions" first.',
           placeholder: 'No rules yet. Click "Add rule" to start.',
@@ -596,7 +684,21 @@ const resources = {
           noPayload: 'Payload missing',
           emptyType: 'Type is empty',
           matcherHint: 'MATCH should be last',
-          matchFirst: '(matched earlier; later rules inactive)'
+          matchFirst: '(matched earlier; later rules inactive)',
+          proxyPlaceholder: 'DIRECT / REJECT / group name',
+          count: '{{n}} rule(s)',
+          bulkPaste: 'Bulk paste',
+          bulkTitle: 'Bulk paste rules',
+          bulkHint: 'One rule per line, e.g. DOMAIN-SUFFIX,example.com,PROXY or MATCH,PROXY. Lines starting with # or // are treated as comments.',
+          bulkPlaceholder: 'DOMAIN-SUFFIX,google.com,PROXY\nIP-CIDR,10.0.0.0/8,DIRECT\nMATCH,PROXY',
+          bulkAppend: 'Append',
+          bulkReplace: 'Replace all',
+          bulkParsed: 'Parsed {{ok}} rule(s), {{bad}} failed',
+          bulkEmpty: 'No rule could be parsed',
+          bulkClose: 'Close',
+          loadFailed: 'Failed to load rules. Saving is disabled so an empty state cannot overwrite the existing config.',
+          retry: 'Reload',
+          confirmEmpty: 'The rule list is currently empty. Clear all rules in the working config? With mode: rule, all traffic will then go DIRECT.'
         },
         providers: {
           title: 'Rule Sets (rule-providers)',
@@ -613,6 +715,8 @@ const resources = {
           url: 'URL',
           path: 'Path',
           interval: 'Refresh (min)',
+          typeCol: 'Type',
+          behaviorCol: 'Behavior',
           add: 'Add rule set',
           remove: 'Remove',
           preview: 'Preview',
@@ -627,13 +731,82 @@ const resources = {
           installedTag: 'Installed',
           installed: 'Installed "{{name}}" and added the rule line',
           installedDefault: 'Installed "{{name}}" and added the rule line (policy defaults to {{policy}}, editable in the editor)',
-          viaProxy: 'via proxy'
+          viaProxy: 'via proxy',
+          market: {
+            reject: {
+              name: 'Ads & trackers',
+              desc: 'Common ad / tracker / malware domains (tens of thousands); blocking them cuts many requests'
+            },
+            direct: {
+              name: 'Domains reachable from mainland',
+              desc: 'Apple / Microsoft / domestic sites reachable directly from mainland China'
+            },
+            proxy: {
+              name: 'Common proxied domains',
+              desc: 'Overseas domains that need the proxy (Google, Twitter, YouTube, ...)'
+            },
+            gfw: { name: 'GFWList domains', desc: 'Domains blocked by the Great Firewall' },
+            'tld-not-cn': {
+              name: 'Non-mainland TLDs',
+              desc: 'Top-level domains not used in mainland China (.jp / .kr / .hk, ...)'
+            },
+            apple: {
+              name: 'Apple direct domains',
+              desc: 'Apple domains reachable directly from mainland China'
+            },
+            icloud: { name: 'iCloud domains', desc: 'iCloud service domains' },
+            private: {
+              name: 'Private network domains',
+              desc: 'LAN / reserved-address domains (use together with lancidr)'
+            },
+            applications: {
+              name: 'Common apps direct',
+              desc: 'Common apps that should go direct (matched by process name, behavior=classical)'
+            },
+            telegramcidr: { name: 'Telegram IP ranges', desc: 'IP ranges used by Telegram' },
+            cncidr: {
+              name: 'Mainland IP ranges',
+              desc: 'Mainland China IPv4 ranges (direct fallback before the trailing MATCH)'
+            },
+            lancidr: { name: 'LAN IP ranges', desc: 'LAN and reserved IP ranges' }
+          }
         },
-        presets: {
-          title: 'Built-in Templates',
-          hint: 'Insert a common routing scenario template to the top of the rule list, then fine-tune manually.',
-          apply: 'Apply',
-          applied: 'Template "{{name}}" applied'
+        templates: {
+          title: 'Rule Templates (inline)',
+          hint: 'Domain-list templates inserted directly into the rule list; they do not track upstream. Prefer "Recommended Rule Sets" whenever a rule set can cover the case.',
+          apply: 'Insert',
+          applied: 'Template "{{name}}" inserted',
+          items: {
+            'streaming-proxy': {
+              name: 'Streaming via proxy',
+              desc: 'Common streaming domains routed to {name}'
+            },
+            'ai-proxy': {
+              name: 'AI services via proxy',
+              desc: 'Major AI service domains routed to {name}'
+            }
+          }
+        },
+        typeHints: {
+          DOMAIN: 'Exact domain match',
+          'DOMAIN-SUFFIX': 'Domain and its subdomains',
+          'DOMAIN-KEYWORD': 'Domain contains keyword',
+          'DOMAIN-REGEX': 'Domain regex match',
+          GEOSITE: 'Match by geosite category',
+          GEOIP: 'Match by IP geolocation',
+          'IP-CIDR': 'IP CIDR match',
+          'IP-CIDR6': 'IPv6 CIDR match',
+          'SRC-IP-CIDR': 'Source IP CIDR match',
+          'SRC-PORT': 'Source port match',
+          'DST-PORT': 'Destination port match',
+          'PROCESS-NAME': 'Match by process name',
+          'PROCESS-PATH': 'Match by process path',
+          NETWORK: 'Match by network type (mixed/tcp/udp)',
+          'RULE-SET': 'Reference a rule provider',
+          AND: 'Logical AND (sub-rules)',
+          OR: 'Logical OR (sub-rules)',
+          NOT: 'Logical NOT (sub-rules)',
+          MATCH: 'Catch-all match (must be last)'
         },
         debug: {
           title: 'Rule Trace',
@@ -689,7 +862,21 @@ const resources = {
           title: 'Built-in DNS split presets',
           hint: 'Apply a common DNS split template in one click, then fine-tune manually.',
           apply: 'Apply preset',
-          applied: 'Preset "{{name}}" applied'
+          applied: 'Preset "{{name}}" applied',
+          items: {
+            'fake-ip-domestic': {
+              name: 'fake-ip + domestic direct',
+              desc: 'Global fake-ip with public DNS upstreams; .cn and LAN domains resolved directly via the cn group'
+            },
+            'redir-host-exchange': {
+              name: 'redir-host balanced split',
+              desc: 'redir-host mode with a primary nameserver plus anti-poisoning fallback; domain-level split between domestic and overseas'
+            },
+            'minimal-direct': {
+              name: 'Minimal direct',
+              desc: 'System DNS plus public DoH only; stateless and policy-free, for simple direct connections'
+            }
+          }
         }
       },
     }

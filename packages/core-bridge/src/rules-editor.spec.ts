@@ -3,6 +3,7 @@ import {
   applyRulesToConfig,
   debugRulesMatch,
   parseProvidersMap,
+  parseRuleLines,
   parseRuleText,
   parseRulesArray,
   providersToMap,
@@ -210,5 +211,54 @@ describe('applyRulesToConfig', () => {
     expect(text).toContain('  ad:')
     expect(text).toContain('    url: https://x/a.yaml')
     expect(text).not.toContain('rule-providers: {}')
+  })
+})
+
+describe('parseRuleLines（批量粘贴解析）', () => {
+  it('解析多行，跳过空行与 # / // 注释', () => {
+    const r = parseRuleLines(
+      [
+        '# 注释行',
+        'DOMAIN-SUFFIX,example.com,PROXY',
+        '',
+        'IP-CIDR,10.0.0.0/8,DIRECT',
+        '// 另一种注释',
+        'MATCH,PROXY'
+      ].join('\n')
+    )
+    expect(r.entries).toEqual([
+      { type: 'DOMAIN-SUFFIX', payload: 'example.com', proxy: 'PROXY' },
+      { type: 'IP-CIDR', payload: '10.0.0.0/8', proxy: 'DIRECT' },
+      { type: 'MATCH', payload: '', proxy: 'PROXY' }
+    ])
+    expect(r.errors).toEqual([])
+  })
+
+  it('无法识别的行计入 errors 且不阻断其余行（行号从 1 开始）', () => {
+    const r = parseRuleLines(['BOGUS,foo,PROXY', 'DOMAIN-SUFFIX,ok.com,PROXY', '只有两段'].join('\n'))
+    expect(r.entries).toEqual([{ type: 'DOMAIN-SUFFIX', payload: 'ok.com', proxy: 'PROXY' }])
+    expect(r.errors.map((e) => e.line)).toEqual([1, 3])
+    expect(r.errors[0].message).toContain('无法识别')
+  })
+
+  it('逻辑组合规则的嵌套逗号不被切碎', () => {
+    const r = parseRuleLines('AND,((DOMAIN-SUFFIX,a.com),(DOMAIN-SUFFIX,b.com)),PROXY')
+    expect(r.errors).toEqual([])
+    expect(r.entries).toHaveLength(1)
+    expect(r.entries[0]).toEqual({
+      type: 'AND',
+      payload: '((DOMAIN-SUFFIX,a.com),(DOMAIN-SUFFIX,b.com))',
+      proxy: 'PROXY'
+    })
+  })
+
+  it('兼容 CRLF 与首尾空白', () => {
+    const r = parseRuleLines('  DOMAIN,a.com,DIRECT  \r\n\tDOMAIN,b.com,DIRECT\r\n')
+    expect(r.entries.map((e) => e.payload)).toEqual(['a.com', 'b.com'])
+    expect(r.errors).toEqual([])
+  })
+
+  it('空文本返回空结果', () => {
+    expect(parseRuleLines('')).toEqual({ entries: [], errors: [] })
   })
 })

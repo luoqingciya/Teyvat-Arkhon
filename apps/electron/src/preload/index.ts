@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { EVT, IPC } from '@teyvat-arkhon/shared'
 import type {
   ArkhonAPI,
   ClashConfigSummary,
   ConnectionInfo,
   CoreStatus,
   DelayResult,
-  DnsPresetMeta,
   DnsSettings,
   LoopbackState,
   NetProbeResult,
@@ -16,8 +16,8 @@ import type {
   RuleEditorState,
   RuleInfo,
   RuleLineValidation,
-  RulePresetMeta,
   RuleProviderPreview,
+  RuleTextParseResult,
   SystemProxyState,
   SystemServiceState,
   TrafficSnapshot,
@@ -42,147 +42,140 @@ const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args.map(toPlain)) as Promise<T>
 
 const api: ArkhonAPI = {
-  getCoreStatus: () => invoke('core:get-status') as Promise<CoreStatus>,
-  startCore: () => invoke('core:start') as Promise<CoreStatus>,
-  stopCore: () => invoke('core:stop') as Promise<CoreStatus>,
-  setCoreMode: (mode) => invoke('core:set-mode', mode) as Promise<void>,
-  getCoreMode: () => invoke('core:get-mode') as Promise<ProxyMode | undefined>,
-  getCoreLogs: () => invoke('core:get-logs') as Promise<string[]>,
-  exportLogs: () => invoke('logs:export') as Promise<string | null>,
+  getCoreStatus: () => invoke(IPC.coreGetStatus) as Promise<CoreStatus>,
+  startCore: () => invoke(IPC.coreStart) as Promise<CoreStatus>,
+  stopCore: () => invoke(IPC.coreStop) as Promise<CoreStatus>,
+  setCoreMode: (mode) => invoke(IPC.coreSetMode, mode) as Promise<void>,
+  getCoreMode: () => invoke(IPC.coreGetMode) as Promise<ProxyMode | undefined>,
+  getCoreLogs: () => invoke(IPC.coreGetLogs) as Promise<string[]>,
+  exportLogs: () => invoke(IPC.logsExport) as Promise<string | null>,
 
-  getConnections: () =>
-    invoke('core:get-connections') as Promise<{
-      downloadTotal: number
-      uploadTotal: number
-      connections: ConnectionInfo[]
-    }>,
-  closeConnection: (id) => invoke('core:close-connection', id) as Promise<void>,
-  closeAllConnections: () => invoke('core:close-all-connections') as Promise<void>,
+  closeConnection: (id) => invoke(IPC.coreCloseConnection, id) as Promise<void>,
+  closeAllConnections: () => invoke(IPC.coreCloseAllConnections) as Promise<void>,
 
-  subscribeConnections: () => invoke('connections:subscribe') as Promise<ConnectionInfo[]>,
-  unsubscribeConnections: () => invoke('connections:unsubscribe') as Promise<void>,
+  subscribeConnections: () => invoke(IPC.connectionsSubscribe) as Promise<ConnectionInfo[]>,
+  unsubscribeConnections: () => invoke(IPC.connectionsUnsubscribe) as Promise<void>,
 
-  getActiveConfig: () => invoke('config:get-active') as Promise<string>,
+  getActiveConfig: () => invoke(IPC.configGetActive) as Promise<string>,
   saveActiveConfig: (content) =>
-    invoke('config:save-active', content) as Promise<ClashConfigSummary>,
+    invoke(IPC.configSaveActive, content) as Promise<ClashConfigSummary>,
 
-  getRuleEditorState: () => invoke('rules:editor-get') as Promise<RuleEditorState>,
-  saveRuleEditorState: (state) =>
-    invoke('rules:editor-save', state) as Promise<ClashConfigSummary>,
-  validateRuleLines: (rules) => invoke('rules:validate', rules) as Promise<RuleLineValidation[]>,
+  getRuleEditorState: () => invoke(IPC.rulesEditorGet) as Promise<RuleEditorState>,
+  saveRuleEditorState: (state, allowEmptyRules) =>
+    invoke(IPC.rulesEditorSave, state, allowEmptyRules) as Promise<ClashConfigSummary>,
+  parseRuleLines: (text) => invoke(IPC.rulesParseText, text) as Promise<RuleTextParseResult>,
+  validateRuleLines: (rules) => invoke(IPC.rulesValidate, rules) as Promise<RuleLineValidation[]>,
   previewRuleProvider: (provider) =>
-    invoke('rules:provider-preview', provider) as Promise<RuleProviderPreview>,
+    invoke(IPC.rulesProviderPreview, provider) as Promise<RuleProviderPreview>,
   installRuleProvider: (provider) =>
-    invoke('rules:provider-install', provider) as Promise<RuleEditorState>,
+    invoke(IPC.rulesProviderInstall, provider) as Promise<RuleEditorState>,
   debugRuleHit: (target, rules, providers) =>
-    invoke('rules:debug-hit', target, rules, providers) as Promise<RuleDebugResult>,
-  listRulePresets: () => invoke('rules:presets') as Promise<RulePresetMeta[]>,
+    invoke(IPC.rulesDebugHit, target, rules, providers) as Promise<RuleDebugResult>,
 
-  getDnsState: () => invoke('dns:get') as Promise<DnsSettings>,
+  getDnsState: () => invoke(IPC.dnsGet) as Promise<DnsSettings>,
   saveDnsState: (settings) =>
-    invoke('dns:save', settings) as Promise<ClashConfigSummary>,
-  listDnsPresets: () => invoke('dns:presets') as Promise<DnsPresetMeta[]>,
+    invoke(IPC.dnsSave, settings) as Promise<ClashConfigSummary>,
 
-  getTunEnabled: () => invoke('core:get-tun') as Promise<boolean>,
+  getTunEnabled: () => invoke(IPC.coreGetTun) as Promise<boolean>,
   setTunEnabled: (enabled) =>
-    invoke('core:set-tun', enabled) as Promise<ClashConfigSummary>,
+    invoke(IPC.coreSetTun, enabled) as Promise<ClashConfigSummary>,
 
-  getServiceStatus: () => invoke('service:status') as Promise<SystemServiceState>,
-  installService: () => invoke('service:install') as Promise<SystemServiceState>,
-  uninstallService: () => invoke('service:uninstall') as Promise<SystemServiceState>,
+  getServiceStatus: () => invoke(IPC.serviceStatus) as Promise<SystemServiceState>,
+  installService: () => invoke(IPC.serviceInstall) as Promise<SystemServiceState>,
+  uninstallService: () => invoke(IPC.serviceUninstall) as Promise<SystemServiceState>,
 
-  listProxies: () => invoke('proxies:list') as Promise<ProxyItem[]>,
-  listRules: () => invoke('rules:list') as Promise<RuleInfo[]>,
-  selectProxy: (group, node) => invoke('proxies:select', group, node) as Promise<void>,
+  listProxies: () => invoke(IPC.proxiesList) as Promise<ProxyItem[]>,
+  listRules: () => invoke(IPC.rulesList) as Promise<RuleInfo[]>,
+  selectProxy: (group, node) => invoke(IPC.proxiesSelect, group, node) as Promise<void>,
   testDelay: (name, url, timeoutMs) =>
-    invoke('proxies:delay', name, url, timeoutMs) as Promise<DelayResult>,
+    invoke(IPC.proxiesDelay, name, url, timeoutMs) as Promise<DelayResult>,
   listDelaySnapshot: () =>
-    invoke('proxies:delay-snapshot') as Promise<Record<string, number | null>>,
+    invoke(IPC.proxiesDelaySnapshot) as Promise<Record<string, number | null>>,
 
-  listProfiles: () => invoke('profiles:list') as Promise<Profile[]>,
+  listProfiles: () => invoke(IPC.profilesList) as Promise<Profile[]>,
   importProfileFromUrl: (url) =>
-    invoke('profiles:import-url', url) as Promise<{ profile: Profile; summary: ClashConfigSummary }>,
+    invoke(IPC.profilesImportUrl, url) as Promise<{ profile: Profile; summary: ClashConfigSummary }>,
   importProfileFromText: (name, content) =>
-    invoke('profiles:import-text', name, content) as Promise<{
+    invoke(IPC.profilesImportText, name, content) as Promise<{
       profile: Profile
       summary: ClashConfigSummary
     }>,
-  removeProfile: (id) => invoke('profiles:remove', id) as Promise<void>,
-  refreshProfile: (id) => invoke('profiles:refresh', id) as Promise<Profile>,
-  selectProfile: (id) => invoke('profiles:select', id) as Promise<ClashConfigSummary>,
-  exportProfileUris: (id) => invoke('profiles:export-uris', id) as Promise<string>,
+  removeProfile: (id) => invoke(IPC.profilesRemove, id) as Promise<void>,
+  refreshProfile: (id) => invoke(IPC.profilesRefresh, id) as Promise<Profile>,
+  selectProfile: (id) => invoke(IPC.profilesSelect, id) as Promise<ClashConfigSummary>,
+  exportProfileUris: (id) => invoke(IPC.profilesExportUris, id) as Promise<string>,
   refreshAllProfiles: () =>
-    invoke('profiles:refresh-all') as Promise<{ ok: number; failed: number }>,
+    invoke(IPC.profilesRefreshAll) as Promise<{ ok: number; failed: number }>,
 
-  runNetCheck: () => invoke('net:check') as Promise<NetProbeResult[]>,
+  runNetCheck: () => invoke(IPC.netCheck) as Promise<NetProbeResult[]>,
 
-  getLoopbackState: () => invoke('loopback:status') as Promise<LoopbackState>,
-  enableLoopbackExempt: () => invoke('loopback:enable') as Promise<LoopbackState>,
-  disableLoopbackExempt: () => invoke('loopback:disable') as Promise<LoopbackState>,
+  getLoopbackState: () => invoke(IPC.loopbackStatus) as Promise<LoopbackState>,
+  enableLoopbackExempt: () => invoke(IPC.loopbackEnable) as Promise<LoopbackState>,
+  disableLoopbackExempt: () => invoke(IPC.loopbackDisable) as Promise<LoopbackState>,
 
-  getAutoRefresh: () => invoke('app:auto-refresh-get') as Promise<boolean>,
-  setAutoRefresh: (enabled) => invoke('app:auto-refresh-set', enabled) as Promise<void>,
+  getAutoRefresh: () => invoke(IPC.appAutoRefreshGet) as Promise<boolean>,
+  setAutoRefresh: (enabled) => invoke(IPC.appAutoRefreshSet, enabled) as Promise<void>,
 
-  getExcludeKeywords: () => invoke('sub:exclude-get') as Promise<string[]>,
-  setExcludeKeywords: (keywords) => invoke('sub:exclude-set', keywords) as Promise<void>,
+  getExcludeKeywords: () => invoke(IPC.subExcludeGet) as Promise<string[]>,
+  setExcludeKeywords: (keywords) => invoke(IPC.subExcludeSet, keywords) as Promise<void>,
   onProfilesChanged: (cb) => {
     const listener = (): void => cb()
-    ipcRenderer.on('arkhon:profiles-changed', listener)
-    return () => ipcRenderer.removeListener('arkhon:profiles-changed', listener)
+    ipcRenderer.on(EVT.profilesChanged, listener)
+    return () => ipcRenderer.removeListener(EVT.profilesChanged, listener)
   },
 
-  getSystemProxy: () => invoke('system-proxy:get') as Promise<SystemProxyState>,
-  setSystemProxy: (enabled) => invoke('system-proxy:set', enabled) as Promise<SystemProxyState>,
+  getSystemProxy: () => invoke(IPC.systemProxyGet) as Promise<SystemProxyState>,
+  setSystemProxy: (enabled) => invoke(IPC.systemProxySet, enabled) as Promise<SystemProxyState>,
 
-  getAutoStart: () => invoke('app:auto-start-get') as Promise<boolean>,
-  setAutoStart: (enabled) => invoke('app:auto-start-set', enabled) as Promise<boolean>,
+  getAutoStart: () => invoke(IPC.appAutoStartGet) as Promise<boolean>,
+  setAutoStart: (enabled) => invoke(IPC.appAutoStartSet, enabled) as Promise<boolean>,
 
-  getAppVersion: () => invoke('app:version') as Promise<string>,
+  getAppVersion: () => invoke(IPC.appVersion) as Promise<string>,
   getDataInfo: () =>
-    invoke('app:data-info') as Promise<{ dataDir: string; portable: boolean }>,
+    invoke(IPC.appDataInfo) as Promise<{ dataDir: string; portable: boolean }>,
   setPortable: (enabled) =>
-    invoke('app:set-portable', enabled) as Promise<{ portable: boolean; note: string }>,
+    invoke(IPC.appSetPortable, enabled) as Promise<{ portable: boolean; note: string }>,
 
   getTunPrereq: () =>
-    invoke('app:get-tun-prereq') as Promise<{ wintun: boolean; windows: boolean }>,
+    invoke(IPC.appGetTunPrereq) as Promise<{ wintun: boolean; windows: boolean }>,
 
-  setLanguage: (lang) => invoke('app:language-set', lang) as Promise<UiLanguage>,
+  setLanguage: (lang) => invoke(IPC.appLanguageSet, lang) as Promise<UiLanguage>,
 
-  getUpdateState: () => invoke('update:get-state') as Promise<UpdateState>,
-  checkUpdate: () => invoke('update:check') as Promise<UpdateState>,
-  installUpdate: () => invoke('update:install') as Promise<void>,
-  setAutoUpdate: (enabled) => invoke('app:update-auto-set', enabled) as Promise<boolean>,
+  getUpdateState: () => invoke(IPC.updateGetState) as Promise<UpdateState>,
+  checkUpdate: () => invoke(IPC.updateCheck) as Promise<UpdateState>,
+  installUpdate: () => invoke(IPC.updateInstall) as Promise<void>,
+  setAutoUpdate: (enabled) => invoke(IPC.appUpdateAutoSet, enabled) as Promise<boolean>,
   onUpdateState: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, state: UpdateState): void => cb(state)
-    ipcRenderer.on('arkhon:update', listener)
-    return () => ipcRenderer.removeListener('arkhon:update', listener)
+    ipcRenderer.on(EVT.update, listener)
+    return () => ipcRenderer.removeListener(EVT.update, listener)
   },
 
   onStateChange: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, status: CoreStatus): void => cb(status)
-    ipcRenderer.on('arkhon:state', listener)
-    return () => ipcRenderer.removeListener('arkhon:state', listener)
+    ipcRenderer.on(EVT.state, listener)
+    return () => ipcRenderer.removeListener(EVT.state, listener)
   },
   onTraffic: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, snapshot: TrafficSnapshot): void => cb(snapshot)
-    ipcRenderer.on('arkhon:traffic', listener)
-    return () => ipcRenderer.removeListener('arkhon:traffic', listener)
+    ipcRenderer.on(EVT.traffic, listener)
+    return () => ipcRenderer.removeListener(EVT.traffic, listener)
   },
   onConnections: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, connections: ConnectionInfo[]): void =>
       cb(connections)
-    ipcRenderer.on('arkhon:connections', listener)
-    return () => ipcRenderer.removeListener('arkhon:connections', listener)
+    ipcRenderer.on(EVT.connections, listener)
+    return () => ipcRenderer.removeListener(EVT.connections, listener)
   },
   onError: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, msg: string): void => cb(msg)
-    ipcRenderer.on('arkhon:error', listener)
-    return () => ipcRenderer.removeListener('arkhon:error', listener)
+    ipcRenderer.on(EVT.error, listener)
+    return () => ipcRenderer.removeListener(EVT.error, listener)
   },
   onCoreLog: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, lines: string[]): void => cb(lines)
-    ipcRenderer.on('arkhon:log', listener)
-    return () => ipcRenderer.removeListener('arkhon:log', listener)
+    ipcRenderer.on(EVT.log, listener)
+    return () => ipcRenderer.removeListener(EVT.log, listener)
   }
 }
 

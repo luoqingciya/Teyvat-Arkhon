@@ -7,6 +7,7 @@
 
 import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
+import { EVT } from '@teyvat-arkhon/shared'
 import type { UpdateState } from '@teyvat-arkhon/shared'
 import { t } from './i18n'
 
@@ -28,7 +29,7 @@ export interface UpdateManagerOptions {
   onBroadcast?: (state: UpdateState) => void
 }
 
-const UPDATE_CHANNEL = 'arkhon:update'
+const UPDATE_CHANNEL = EVT.update
 
 /** 把 electron-updater 的原始报错映射成用户可读的提示（404/网络/认证等常见场景） */
 function friendlyUpdateError(err: unknown): string {

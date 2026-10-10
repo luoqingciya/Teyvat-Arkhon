@@ -16,18 +16,26 @@ import { useAppStore } from '../stores/app'
 import { plain } from '../utils/plain'
 
 // 具名常量经命名空间再解构，规避 rollup 对 shared CJS `__exportStar` 桶的静态分析限制
-const { RULE_PRESETS, RULE_TYPES, RULE_TYPE_HINTS, RECOMMENDED_RULE_SETS } = RULES_CONST
+const { RULE_PRESETS, RULE_TYPES, RECOMMENDED_RULE_SETS } = RULES_CONST
 
 const store = useAppStore()
 const { t } = useTranslation()
 
-type TabKey = 'editor' | 'providers' | 'presets' | 'debug'
+type TabKey = 'editor' | 'providers' | 'debug'
 
 const hasConfig = ref(false)
 const activeTab = ref<TabKey>('editor')
 const busy = ref(false)
 const savedAt = ref('')
 const error = ref('')
+/** 加载失败标记：禁止保存，避免把空状态写回工作配置（会清空全部规则与规则集） */
+const loadFailed = ref(false)
+
+// ---- 批量粘贴 ----
+const bulkOpen = ref(false)
+const bulkText = ref('')
+const bulkNote = ref('')
+const bulkErrors = ref<Array<{ line: number; text: string; message: string }>>([])
 
 // ---- Tab1 规则编辑器 ----
 const rules = ref<RuleEntry[]>([])
@@ -48,9 +56,15 @@ const debugging = ref(false)
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'editor', label: t('rules.tabs.editor') },
   { key: 'providers', label: t('rules.tabs.providers') },
-  { key: 'presets', label: t('rules.tabs.presets') },
   { key: 'debug', label: t('rules.tabs.debug') }
 ]
+
+/** 策略候选项：内置策略 + 当前配置的策略组（供 datalist 下拉，同时允许自由输入） */
+const strategyOptions = computed(() => [
+  'DIRECT',
+  'REJECT',
+  ...store.groups.map((g) => g.name)
+])
 
 /** 已安装的规则集名集合（推荐列表标记「已安装」） */
 const installedNames = computed(() => new Set(providers.value.map((p) => p.name)))
@@ -74,6 +88,7 @@ const issueHint = computed(() => {
 
 async function load(): Promise<void> {
   busy.value = true
+  loadFailed.value = false
   try {
     const active = await window.arkhon.getActiveConfig()
     hasConfig.value = active.trim().length > 0
@@ -81,6 +96,8 @@ async function load(): Promise<void> {
     rules.value = state.rules ?? []
     providers.value = state.providers ?? []
   } catch (e) {
+    // 必须标记失败：否则下面的空数组会被 save() 当成「用户清空了规则」写回配置
+    loadFailed.value = true
     error.value = (e as Error).message
   } finally {
     busy.value = false
@@ -96,13 +113,66 @@ async function validate(): Promise<void> {
   }
 }
 
+/**
+ * 保存到工作配置。
+ * - 加载失败时直接返回（禁用保存，防止空状态覆盖）
+ * - 规则列表为空时需用户确认；主进程侧另有「现有规则非空则拒绝空写入」的硬防线
+ */
 async function save(): Promise<void> {
+  if (loadFailed.value) return
+  let allowEmptyRules = false
+  if (rules.value.length === 0) {
+    if (!window.confirm(t('rules.editor.confirmEmpty'))) return
+    allowEmptyRules = true
+  }
   busy.value = true
+  error.value = ''
   try {
-    await window.arkhon.saveRuleEditorState(plain({ rules: rules.value, providers: providers.value }))
+    await window.arkhon.saveRuleEditorState(
+      plain({ rules: rules.value, providers: providers.value }),
+      allowEmptyRules
+    )
     savedAt.value = new Date().toLocaleTimeString()
     await validate()
     await store.refreshRules?.()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 展开/收起批量粘贴面板 */
+function toggleBulk(): void {
+  bulkOpen.value = !bulkOpen.value
+  if (bulkOpen.value) {
+    bulkNote.value = ''
+    bulkErrors.value = []
+  }
+}
+
+/** 解析批量粘贴的规则文本并按指定方式应用 */
+async function applyBulk(mode: 'append' | 'replace'): Promise<void> {
+  if (!bulkText.value.trim()) return
+  busy.value = true
+  try {
+    const res = await window.arkhon.parseRuleLines(bulkText.value)
+    bulkErrors.value = res.errors
+    if (res.entries.length === 0) {
+      bulkNote.value = t('rules.editor.bulkEmpty')
+      return
+    }
+    rules.value = mode === 'replace' ? res.entries : [...rules.value, ...res.entries]
+    validated.value = false
+    bulkNote.value = t('rules.editor.bulkParsed', {
+      ok: res.entries.length,
+      bad: res.errors.length
+    })
+    // 全部解析成功才收起面板并清空输入，有失败行时保留内容便于修正
+    if (res.errors.length === 0) {
+      bulkText.value = ''
+      bulkOpen.value = false
+    }
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -191,8 +261,11 @@ async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
     await save()
     installNote.value =
       rs.suggestedProxy === '__PROXY__'
-        ? t('rules.providers.installedDefault', { name: rs.name, policy })
-        : t('rules.providers.installed', { name: rs.name })
+        ? t('rules.providers.installedDefault', {
+            name: t(`rules.providers.market.${rs.id}.name`),
+            policy
+          })
+        : t('rules.providers.installed', { name: t(`rules.providers.market.${rs.id}.name`) })
     await store.refreshRules?.()
   } catch (e) {
     error.value = (e as Error).message
@@ -201,8 +274,12 @@ async function installRecommended(rs: RecommendedRuleSet): Promise<void> {
   }
 }
 
-// ---- Tab3 预设 ----
-async function applyPreset(preset: RulePreset): Promise<void> {
+// ---- Tab2 规则模板（内联规则） ----
+/**
+ * 插入规则模板。
+ * 统一插到首条 MATCH 之前，保证 MATCH 始终作为兜底留在最后。
+ */
+async function applyTemplate(preset: RulePreset): Promise<void> {
   // __PROXY__ 占位：默认用当前选中组（无则 PROXY），可后续在编辑器修改
   // （Electron 不支持 window.prompt，不能弹窗询问）
   const policy = store.selectedGroup || 'PROXY'
@@ -211,14 +288,9 @@ async function applyPreset(preset: RulePreset): Promise<void> {
     payload: r.payload ?? '',
     proxy: r.proxy === '__PROXY__' ? policy : (r.proxy ?? '')
   }))
-  if (preset.id === 'cn-direct') {
-    // 中国大陆直连：插到 MATCH 之前（末尾）
-    const matchIdx = rules.value.findIndex((r) => (r.type ?? '').toUpperCase() === 'MATCH')
-    if (matchIdx >= 0) rules.value.splice(matchIdx, 0, ...entries)
-    else rules.value.push(...entries)
-  } else {
-    rules.value.unshift(...entries)
-  }
+  const matchIdx = rules.value.findIndex((r) => (r.type ?? '').toUpperCase() === 'MATCH')
+  if (matchIdx >= 0) rules.value.splice(matchIdx, 0, ...entries)
+  else rules.value.push(...entries)
   validated.value = false
   await save()
 }
@@ -263,7 +335,11 @@ onMounted(load)
       </button>
     </nav>
 
-    <div v-if="error" class="banner error">{{ error }}</div>
+    <div v-if="loadFailed" class="banner error">
+      {{ t('rules.editor.loadFailed') }}（{{ error }}）
+      <button class="btn mini" :disabled="busy" @click="load">{{ t('rules.editor.retry') }}</button>
+    </div>
+    <div v-else-if="error" class="banner error">{{ error }}</div>
 
     <div v-if="!hasConfig" class="empty glass">{{ t('rules.editor.noConfig') }}</div>
 
@@ -272,11 +348,42 @@ onMounted(load)
       <section v-if="activeTab === 'editor'" class="card glass">
         <div class="card-head">
           <div class="toolbar">
-            <span class="count" v-if="rules.length">共 {{ rules.length }} 条</span>
-            <button class="btn" :disabled="busy" @click="addRule">{{ t('rules.editor.add') }}</button>
-            <button class="btn" :disabled="busy" @click="validate">{{ t('rules.editor.validate') }}</button>
-            <button class="btn primary" :disabled="busy" @click="save">{{ t('rules.editor.save') }}</button>
+            <span class="count" v-if="rules.length">{{ t('rules.editor.count', { n: rules.length }) }}</span>
+            <button class="btn" :disabled="busy || loadFailed" @click="addRule">{{ t('rules.editor.add') }}</button>
+            <button class="btn" :disabled="busy || loadFailed" @click="toggleBulk">{{ t('rules.editor.bulkPaste') }}</button>
+            <button class="btn" :disabled="busy || loadFailed" @click="validate">{{ t('rules.editor.validate') }}</button>
+            <button class="btn primary" :disabled="busy || loadFailed" @click="save">{{ t('rules.editor.save') }}</button>
             <span class="issue" :class="{ ok: validated && invalidCount === 0 }">{{ issueHint }}</span>
+          </div>
+        </div>
+
+        <!-- 批量粘贴：一次性导入多行规则，避免逐行手工输入 -->
+        <div v-if="bulkOpen" class="bulk">
+          <div class="bulk-head">
+            <strong>{{ t('rules.editor.bulkTitle') }}</strong>
+            <button class="mini" @click="toggleBulk">{{ t('rules.editor.bulkClose') }}</button>
+          </div>
+          <p class="hint">{{ t('rules.editor.bulkHint') }}</p>
+          <textarea
+            v-model="bulkText"
+            class="bulk-input"
+            rows="6"
+            spellcheck="false"
+            :placeholder="t('rules.editor.bulkPlaceholder')"
+          ></textarea>
+          <div class="bulk-foot">
+            <button class="btn" :disabled="busy || !bulkText.trim()" @click="applyBulk('append')">
+              {{ t('rules.editor.bulkAppend') }}
+            </button>
+            <button class="btn" :disabled="busy || !bulkText.trim()" @click="applyBulk('replace')">
+              {{ t('rules.editor.bulkReplace') }}
+            </button>
+            <span v-if="bulkNote" class="bulk-note">{{ bulkNote }}</span>
+          </div>
+          <div v-if="bulkErrors.length" class="bulk-errors">
+            <div v-for="e in bulkErrors" :key="e.line" class="bad">
+              {{ t('rules.editor.bulkFailedLine', { line: e.line }) }}：{{ e.text }}
+            </div>
           </div>
         </div>
 
@@ -314,13 +421,19 @@ onMounted(load)
                 <input
                   v-model="r.payload"
                   class="inp"
-                  :placeholder="RULE_TYPE_HINTS[r.type] || ''"
+                  :placeholder="t(`rules.typeHints.${r.type}`)"
                   :disabled="(r.type || '').toUpperCase() === 'MATCH'"
                   @input="validated = false"
                 />
               </td>
               <td>
-                <input v-model="r.proxy" class="inp" placeholder="DIRECT / REJECT / 组名" @input="validated = false" />
+                <input
+                  v-model="r.proxy"
+                  class="inp"
+                  list="rule-strategy-options"
+                  :placeholder="t('rules.editor.proxyPlaceholder')"
+                  @input="validated = false"
+                />
               </td>
               <td class="num row">
                 {{ hitsOf(r) === null ? '—' : hitsOf(r) }}
@@ -334,6 +447,11 @@ onMounted(load)
             </tr>
           </tbody>
         </table>
+
+        <!-- 策略候选项：可从下拉选择，同时保留自由输入（自定义组名或尚未创建的组） -->
+        <datalist id="rule-strategy-options">
+          <option v-for="s in strategyOptions" :key="s" :value="s"></option>
+        </datalist>
 
         <div v-if="validated" class="vbar">
           <span v-for="(v, i) in validations" :key="i" :class="['vd', v.ok ? 'ok' : 'bad']">
@@ -362,11 +480,11 @@ onMounted(load)
           <div class="market-grid">
             <div v-for="rs in RECOMMENDED_RULE_SETS" :key="rs.id" class="market-item" :class="{ installed: installedNames.has(rs.providerName) }">
               <div class="mi-top">
-                <span class="mi-name">{{ rs.name }}</span>
+                <span class="mi-name">{{ t(`rules.providers.market.${rs.id}.name`) }}</span>
                 <span class="chip">{{ rs.behavior }}</span>
                 <span v-if="installedNames.has(rs.providerName)" class="flag">✓ {{ t('rules.providers.installedTag') }}</span>
               </div>
-              <p class="mi-desc">{{ rs.desc }}</p>
+              <p class="mi-desc">{{ t(`rules.providers.market.${rs.id}.desc`) }}</p>
               <div class="mi-foot">
                 <span class="mi-policy dim">{{ rs.suggestedProxy === '__PROXY__' ? t('rules.providers.viaProxy') : rs.suggestedProxy }}</span>
                 <button
@@ -381,14 +499,37 @@ onMounted(load)
           </div>
         </div>
 
+        <!-- 规则模板（内联规则）：与规则集同页，避免两个并列的「一键加规则」入口造成困惑 -->
+        <div class="market">
+          <div class="market-head">
+            <h5>{{ t('rules.templates.title') }}</h5>
+          </div>
+          <p class="hint">{{ t('rules.templates.hint') }}</p>
+          <div class="preset-grid">
+            <div v-for="p in RULE_PRESETS" :key="p.id" class="preset">
+              <div class="p-name">{{ t(`rules.templates.items.${p.id}.name`) }}</div>
+              <p class="p-desc">{{ t(`rules.templates.items.${p.id}.desc`) }}</p>
+              <div class="p-rules">
+                <span v-for="(r, i) in p.rules" :key="i" class="chip">
+                  {{ r.type }}{{ r.payload ? ',' + r.payload : '' }} →
+                  {{ r.proxy === '__PROXY__' ? t('rules.providers.viaProxy') : r.proxy }}
+                </span>
+              </div>
+              <button class="btn primary" :disabled="busy || loadFailed" @click="applyTemplate(p)">
+                {{ t('rules.templates.apply') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="providers.length === 0" class="rules-empty">{{ t('rules.providers.empty') }}</div>
 
         <table v-else class="rules-table">
           <thead>
             <tr>
               <th>{{ t('rules.providers.name') }}</th>
-              <th>类型</th>
-              <th>语义</th>
+              <th>{{ t('rules.providers.typeCol') }}</th>
+              <th>{{ t('rules.providers.behaviorCol') }}</th>
               <th>URL / 路径</th>
               <th class="num">{{ t('rules.providers.interval') }}</th>
               <th class="act">{{ t('rules.editor.actions') }}</th>
@@ -438,25 +579,7 @@ onMounted(load)
         </div>
       </section>
 
-      <!-- ============ Tab3 预设 ============ -->
-      <section v-if="activeTab === 'presets'" class="card glass">
-        <div class="card-head"><h4>{{ t('rules.presets.title') }}</h4></div>
-        <p class="hint">{{ t('rules.presets.hint') }}</p>
-        <div class="preset-grid">
-          <div v-for="p in RULE_PRESETS" :key="p.id" class="preset">
-            <div class="p-name">{{ p.name }}</div>
-            <p class="p-desc">{{ p.desc }}</p>
-            <div class="p-rules">
-              <span v-for="(r, i) in p.rules" :key="i" class="chip">{{ r.type }}{{ r.payload ? ',' + r.payload : '' }} → {{ r.proxy }}</span>
-            </div>
-            <button class="btn primary" :disabled="busy || rules.length === 0" @click="applyPreset(p)">
-              {{ t('rules.presets.apply') }}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ============ Tab4 命中调试 ============ -->
+      <!-- ============ Tab3 命中调试 ============ -->
       <section v-if="activeTab === 'debug'" class="card glass">
         <div class="card-head"><h4>{{ t('rules.debug.title') }}</h4></div>
         <p class="hint">{{ t('rules.debug.hint') }}</p>
@@ -629,6 +752,17 @@ onMounted(load)
 .p-desc { margin: 0; color: var(--text-dim); font-size: 12.5px; min-height: 34px; }
 .p-rules { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
 .chip { font-size: 11.5px; padding: 3px 8px; border-radius: 8px; background: rgba(79, 124, 255, 0.12); color: #a5b8ff; }
+
+/* 批量粘贴面板 */
+.bulk { margin-top: 12px; border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: rgba(79, 124, 255, 0.04); }
+.bulk-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bulk-head strong { font-size: 14.5px; }
+.bulk .hint { margin: 0; }
+.bulk-input { width: 100%; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(10, 12, 20, 0.35); color: var(--text); }
+.bulk-input::placeholder { color: var(--text-faint); }
+.bulk-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bulk-note { font-size: 12.5px; color: var(--text-dim); }
+.bulk-errors { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow: auto; font-size: 12px; }
 
 .debug-bar { display: flex; gap: 10px; margin-top: 10px; }
 .debug-bar .grow { flex: 1; }

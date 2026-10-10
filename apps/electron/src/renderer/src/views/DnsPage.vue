@@ -247,8 +247,8 @@ onMounted(load)
         <p class="hint">{{ t('dns.presets.hint') }}</p>
         <div class="preset-grid">
           <div v-for="p in DNS_PRESETS" :key="p.id" class="preset">
-            <div class="p-name">{{ p.name }}</div>
-            <p class="p-desc">{{ p.desc }}</p>
+            <div class="p-name">{{ t(`dns.presets.items.${p.id}.name`) }}</div>
+            <p class="p-desc">{{ t(`dns.presets.items.${p.id}.desc`) }}</p>
             <div class="p-rules">
               <span class="chip">{{ p.settings.enhancedMode }}</span>
               <span class="chip">nameserver ×{{ p.settings.nameserver.length }}</span>

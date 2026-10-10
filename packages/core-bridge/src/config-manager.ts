@@ -14,7 +14,6 @@ import yaml from 'js-yaml'
 import {
   decodeProfilePayload,
   type ClashConfigSummary,
-  type DnsPresetMeta,
   type DnsSettings,
   type Profile,
   type ProfileSubInfo,
@@ -39,7 +38,7 @@ import {
   type RuleMatchContext
 } from './rules-editor'
 import { GeodataMatcher, ipInCidrBytes, ipToBuffer } from './geodata'
-import { applyDnsToConfig, listDnsPresetMetas, parseDnsSettings, validateDnsSettings } from './dns-editor'
+import { applyDnsToConfig, parseDnsSettings, validateDnsSettings } from './dns-editor'
 
 export interface ConfigManagerOptions {
   profilesDir: string
@@ -489,11 +488,6 @@ export class ConfigManager {
     return this.parseAndValidate(text)
   }
 
-  /** 列出所有内置 DNS 分流预设元信息 */
-  listDnsPresets(): DnsPresetMeta[] {
-    return listDnsPresetMetas()
-  }
-
   // ---------- 可视化分流规则编辑器 ----------
 
   /** 读取当前工作配置的 rules 与 rule-providers，解析为结构化编辑状态（文件缺失返回空态） */
@@ -512,11 +506,35 @@ export class ConfigManager {
     }
   }
 
-  /** 将结构化 rules/rule-providers 序列化写回工作配置（文本级替换，保留其它内容）并热重载 */
-  async writeActiveRules(state: RuleEditorState): Promise<ClashConfigSummary> {
+  /**
+   * 将结构化 rules/rule-providers 序列化写回工作配置（文本级替换，保留其它内容）并热重载。
+   *
+   * 防误清空：工作配置现有规则非空、而本次提交为空时**默认拒绝写入**。
+   * 渲染端在加载失败/状态不完整时会持有空数组，若无此防线，一次保存就会把
+   * 全部 rules 与 rule-providers 清空（`mode: rule` 下随即全部走 DIRECT，
+   * 表现为「不能代理」；2026-10-10 曾因此发生故障）。
+   * 确实需要清空全部规则时，由调用方显式传 allowEmptyRules = true。
+   */
+  async writeActiveRules(state: RuleEditorState, allowEmptyRules = false): Promise<ClashConfigSummary> {
     if (!(await exists(this.activeConfigFile))) throw new Error('没有可用的工作配置，请先选择订阅')
     const raw = await fs.readFile(this.activeConfigFile, 'utf-8')
-    const { text } = applyRulesToConfig(raw, state.rules ?? [], state.providers ?? [])
+    const nextRules = state.rules ?? []
+    if (nextRules.length === 0 && !allowEmptyRules) {
+      let currentCount = 0
+      try {
+        const cfg = yaml.load(raw) as Record<string, unknown> | null
+        currentCount = parseRulesArray(cfg?.rules).length
+      } catch {
+        /* 现有配置无法解析：无从比较，放行交给后续写入逻辑处理 */
+      }
+      if (currentCount > 0) {
+        throw new Error(
+          `拒绝写入：工作配置现有 ${currentCount} 条规则，而本次提交为空。` +
+            '若确实要清空全部规则，请在界面上确认后重试。'
+        )
+      }
+    }
+    const { text } = applyRulesToConfig(raw, nextRules, state.providers ?? [])
     await this.writeActive(text)
     return this.parseAndValidate(text)
   }

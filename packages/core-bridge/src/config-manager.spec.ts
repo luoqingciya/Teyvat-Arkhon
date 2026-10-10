@@ -543,3 +543,67 @@ describe('工作配置自动备份', () => {
 function updatedResponse(): Response {
   return new Response(SAMPLE_YAML, { status: 200 })
 }
+
+/**
+ * writeActiveRules 的防误清空防线。
+ * 渲染端在加载失败/状态不完整时会持有空数组，若无此防线一次保存就会清空全部规则，
+ * `mode: rule` 下随即全部走 DIRECT（2026-10-10 曾因此导致「不能代理」故障）。
+ */
+describe('writeActiveRules 防误清空', () => {
+  let dir: string
+  let activeFile: string
+  let mgr: ConfigManager
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'arkhon-guard-'))
+    activeFile = path.join(dir, 'config', 'config.yaml')
+    mgr = new ConfigManager({ profilesDir: path.join(dir, 'profiles'), activeConfigFile: activeFile })
+    await mgr.init()
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  /** 预置工作配置：SAMPLE_YAML 后追加 extra（如 rules 段） */
+  async function seedActive(extra: string): Promise<void> {
+    await fs.mkdir(path.dirname(activeFile), { recursive: true })
+    await fs.writeFile(activeFile, `${SAMPLE_YAML}${extra}`, 'utf-8')
+  }
+
+  it('现有规则非空、提交为空时默认拒绝，且配置保持不变', async () => {
+    await seedActive('rules:\n  - MATCH,PROXY\n')
+    const before = await fs.readFile(activeFile, 'utf-8')
+
+    await expect(mgr.writeActiveRules({ rules: [], providers: [] })).rejects.toThrow(/拒绝写入/)
+    expect(await fs.readFile(activeFile, 'utf-8')).toBe(before)
+  })
+
+  it('显式 allowEmptyRules 时允许清空全部规则', async () => {
+    await seedActive('rules:\n  - MATCH,PROXY\n')
+
+    await mgr.writeActiveRules({ rules: [], providers: [] }, true)
+
+    const cfg = yaml.load(await fs.readFile(activeFile, 'utf-8')) as Record<string, unknown>
+    expect(cfg.rules ?? null).toBeNull()
+  })
+
+  it('现有规则本就为空时，写入空规则不报错', async () => {
+    await seedActive('')
+
+    await expect(mgr.writeActiveRules({ rules: [], providers: [] })).resolves.toBeTruthy()
+  })
+
+  it('提交非空规则时正常写入并替换原规则', async () => {
+    await seedActive('rules:\n  - MATCH,PROXY\n')
+
+    await mgr.writeActiveRules({
+      rules: [{ type: 'DOMAIN-SUFFIX', payload: 'a.com', proxy: 'PROXY' }],
+      providers: []
+    })
+
+    const cfg = yaml.load(await fs.readFile(activeFile, 'utf-8')) as Record<string, unknown>
+    expect(JSON.stringify(cfg.rules)).toContain('DOMAIN-SUFFIX')
+    expect(JSON.stringify(cfg.rules)).not.toContain('MATCH')
+  })
+})

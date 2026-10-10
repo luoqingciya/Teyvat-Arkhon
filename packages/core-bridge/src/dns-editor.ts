@@ -3,15 +3,9 @@
  *  - 从工作配置 YAML 解析 dns 段为结构化状态
  *  - 结构性校验（地址格式、必填项、fake-ip 依赖）
  *  - 将结构化状态序列化并做 dns 段的文本级替换（保留其它内容）
- *  - 内置 DNS 分流预设
  */
 
-import {
-  DNS_PRESETS,
-  type DnsPresetMeta,
-  type DnsSettings,
-  type DnsPolicyEntry
-} from '@teyvat-arkhon/shared'
+import type { DnsSettings, DnsPolicyEntry } from '@teyvat-arkhon/shared'
 
 /** 判定一个 DNS 服务器地址是否"纯 IP/主机"（非 doh/dot/系统等结构化协议） */
 function isPlainHost(addr: string): boolean {
@@ -146,9 +140,4 @@ export function validateDnsSettings(s: DnsSettings): string[] {
     }
   }
   return issues
-}
-
-/** 内置 DNS 预设元信息 */
-export function listDnsPresetMetas(): DnsPresetMeta[] {
-  return DNS_PRESETS.map(({ id, name, desc }) => ({ id, name, desc }))
 }

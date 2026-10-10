@@ -29,10 +29,10 @@ test('应用可启动并渲染主界面', async () => {
     await expect(window.locator('h3', { hasText: '导入订阅' })).toBeVisible()
     await expect(window.locator('.empty')).toBeVisible()
 
-    // 导航到分流规则页：页面头与 4 个 Tab 可见（未选档案时显示引导空态）
+    // 导航到分流规则页：页面头与 3 个 Tab 可见（规则集与模板已合并为一个页签）
     await window.locator('.nav-item').nth(3).click()
     await expect(window.locator('h3', { hasText: '分流规则' })).toBeVisible()
-    await expect(window.locator('.tab')).toHaveCount(4)
+    await expect(window.locator('.tab')).toHaveCount(3)
 
     // 导航到 DNS 分流页：页面头与 3 个 Tab 可见
     await window.locator('.nav-item').nth(4).click()

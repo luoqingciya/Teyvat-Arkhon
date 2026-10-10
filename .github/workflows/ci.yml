@@ -29,6 +29,20 @@ jobs:
         run: pnpm lint
       - name: 构建 Electron 应用
         run: pnpm --filter @teyvat-arkhon/electron build
+      # 沙箱约束：preload 产物只能 require('electron')。
+      # 渲染进程启用了 sandbox，沙箱化 preload 引入任何其它运行时依赖都会直接抛错，
+      # 表现为 window.arkhon 未暴露、界面全白（2026-10-10 曾因通道常量化把 shared 变成
+      # 运行时依赖而触发）。此处做静态断言，避免同类回归再次静默发生。
+      - name: 校验 preload 沙箱约束
+        shell: bash
+        run: |
+          OUT=apps/electron/out/preload/index.js
+          EXTRA=$(grep -oE 'require\("[^"]+"\)' "$OUT" | sort -u | grep -v 'require("electron")' || true)
+          if [ -n "$EXTRA" ]; then
+            echo "::error::preload 产物存在 electron 之外的运行时依赖：$EXTRA（会破坏 sandbox）"
+            exit 1
+          fi
+          echo "✓ preload 仅依赖 electron"
 
   ui:
     name: Playwright UI 冒烟（Windows）

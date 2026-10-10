@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { CoreService, type CoreDriverConfig } from '@teyvat-arkhon/core-bridge'
 import {
   DEFAULT_UI_LANGUAGE,
+  EVT,
   isUiLanguage,
   type ProxyMode,
   type UiLanguage
@@ -249,7 +250,7 @@ async function rebuildTrayMenu(): Promise<void> {
           void rebuildTrayMenu()
           // 通知渲染端刷新订阅列表（托盘切换不经过窗口操作）
           for (const w of BrowserWindow.getAllWindows()) {
-            w.webContents.send('arkhon:profiles-changed')
+            w.webContents.send(EVT.profilesChanged)
           }
         }
       })
@@ -415,7 +416,7 @@ if (!gotLock) {
           if (actual.enabled === true) return
           await sysProxy.set(true)
           for (const w of BrowserWindow.getAllWindows()) {
-            w.webContents.send('arkhon:error', t('tray.sysProxyRestored'))
+            w.webContents.send(EVT.error, t('tray.sysProxyRestored'))
           }
         } catch {
           /* 本轮读取/恢复失败，下轮重试 */

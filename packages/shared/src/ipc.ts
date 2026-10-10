@@ -12,9 +12,8 @@ import type {
   RuleEditorState,
   RuleInfo,
   RuleLineValidation,
-  RulePresetMeta,
   RuleProviderPreview,
-  DnsPresetMeta,
+  RuleTextParseResult,
   DnsSettings,
   SystemProxyState,
   SystemServiceState,
@@ -39,11 +38,6 @@ export interface ArkhonAPI {
   exportLogs(): Promise<string | null>
 
   // ---------- 实时连接与流量 ----------
-  getConnections(): Promise<{
-    downloadTotal: number
-    uploadTotal: number
-    connections: ConnectionInfo[]
-  }>
   /**
    * 订阅连接明细推送（连接页挂载时调用，主进程按引用计数开关）。
    * 返回订阅瞬间的快照，随后由 onConnections 持续推送。
@@ -61,8 +55,14 @@ export interface ArkhonAPI {
   // ---------- 可视化分流规则编辑器 ----------
   /** 读取当前工作配置中的 rules 和 rule-providers，解析为结构化 */
   getRuleEditorState(): Promise<RuleEditorState>
-  /** 将结构化 rules 和 rule-providers 序列化后写入工作配置并热重载 */
-  saveRuleEditorState(state: RuleEditorState): Promise<ClashConfigSummary>
+  /**
+   * 将结构化 rules 和 rule-providers 序列化后写入工作配置并热重载。
+   * `allowEmptyRules` 仅在用户明确确认「清空全部规则」时传 true——
+   * 主进程默认拒绝「现有规则非空 → 提交为空」的写入，避免加载失败时的空态覆盖配置。
+   */
+  saveRuleEditorState(state: RuleEditorState, allowEmptyRules?: boolean): Promise<ClashConfigSummary>
+  /** 解析批量粘贴的规则文本（多行 `TYPE,payload,策略`），返回成功条目与逐行错误 */
+  parseRuleLines(text: string): Promise<RuleTextParseResult>
   /** 对当前结构化规则做行级校验（空串不报错，但给警告提示） */
   validateRuleLines(rules: { type: string; payload: string; proxy: string }[]): Promise<RuleLineValidation[]>
   /** 预览规则集（远程 HTTP 规则集或本地规则集）返回前 N 行，用于编辑校验 */
@@ -83,15 +83,11 @@ export interface ArkhonAPI {
     rules: { type: string; payload: string; proxy: string }[],
     providers?: { name: string; type: 'http' | 'file'; behavior: string; url?: string; file?: string; interval?: number }[]
   ): Promise<RuleDebugResult>
-  /** 返回所有内置分流预设的元信息 */
-  listRulePresets(): Promise<RulePresetMeta[]>
 
   /** 读取当前工作配置中的 dns 段，解析为结构化状态 */
   getDnsState(): Promise<DnsSettings>
   /** 将结构化 dns 段序列化后写入工作配置并热重载 */
   saveDnsState(settings: DnsSettings): Promise<ClashConfigSummary>
-  /** 返回所有内置 DNS 分流预设的元信息 */
-  listDnsPresets(): Promise<DnsPresetMeta[]>
 
   // ---------- TUN 模式 ----------
   getTunEnabled(): Promise<boolean>
